@@ -1,9 +1,17 @@
 package com.dynamicdroid.app
 
-import android.app.*
-import android.content.*
-import android.graphics.BitmapFactory
+import android.app.ActivityOptions
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.graphics.PixelFormat
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -13,90 +21,47 @@ import android.view.Gravity
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import kotlin.math.max
 
-class IslandOverlayService : Service() {
-    private lateinit var windowManager: WindowManager
+/**
+ * Hosts the island window and decides what it shows.
+ *
+ * - One ongoing activity (music, call, timer, navigation) lives in the compact island.
+ * - Transient ones (messages, charging) briefly expand on top, then hand back.
+ * - The ongoing activity hides while its app is open and flies into the island when you leave it.
+ * - The window only ever grows before an animation and shrinks after it settles, so it never
+ *   clips mid-animation and never blocks touches on the apps underneath.
+ */
+class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks {
+    private var windowManager: WindowManager? = null
     private var island: IslandView? = null
-    private var windowParams: WindowManager.LayoutParams? = null
-    private var contentIntent: PendingIntent? = null
-    private var actionIntents: ArrayList<PendingIntent> = arrayListOf()
-    private var actionLabels: ArrayList<String> = arrayListOf()
-    private var mediaSessionAvailable = false
-    private var currentNotificationKey: String? = null
+    private var params: WindowManager.LayoutParams? = null
     private val handler = Handler(Looper.getMainLooper())
-    private val collapse = Runnable { island?.expanded = false }
 
-    private val activityReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            val view = island ?: return
-            view.mode = intent?.getStringExtra(EXTRA_MODE)?.let {
-                runCatching { IslandMode.valueOf(it) }.getOrNull()
-            } ?: IslandMode.MESSAGE
-            view.title = intent?.getStringExtra(EXTRA_TITLE) ?: "New activity"
-            view.subtitle = intent?.getStringExtra(EXTRA_SUBTITLE) ?: ""
-            currentNotificationKey = intent?.getStringExtra(EXTRA_KEY)
-            contentIntent = parcelable(intent, EXTRA_CONTENT_INTENT)
-            actionIntents = parcelableList(intent, EXTRA_ACTION_INTENTS)
-            actionLabels = intent?.getStringArrayListExtra(EXTRA_ACTION_LABELS) ?: arrayListOf()
-            mediaSessionAvailable = intent?.getBooleanExtra(
-                IslandNotificationListener.EXTRA_HAS_MEDIA_SESSION,
-                false
-            ) == true
-            view.artwork = intent?.getByteArrayExtra(IslandNotificationListener.EXTRA_MEDIA_ARTWORK)
-                ?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
-            view.isPlaying = intent?.getBooleanExtra(
-                IslandNotificationListener.EXTRA_MEDIA_IS_PLAYING,
-                false
-            ) == true
-            view.playbackPositionMs = intent?.getLongExtra(
-                IslandNotificationListener.EXTRA_MEDIA_POSITION,
-                0L
-            ) ?: 0L
-            view.durationMs = intent?.getLongExtra(
-                IslandNotificationListener.EXTRA_MEDIA_DURATION,
-                0L
-            ) ?: 0L
-            view.primaryActionLabel = intent?.getStringArrayListExtra(EXTRA_ACTION_LABELS)
-                ?.firstOrNull()?.uppercase() ?: "OPEN"
-            view.onPreviousAction = { dispatchMediaAction(IslandNotificationListener.MEDIA_PREVIOUS) }
-            view.onTogglePlayback = { dispatchMediaAction(IslandNotificationListener.MEDIA_TOGGLE) }
-            view.onNextAction = { dispatchMediaAction(IslandNotificationListener.MEDIA_NEXT) }
-            view.onSeekAction = { position ->
-                if (mediaSessionAvailable) {
-                    sendMediaControl(IslandNotificationListener.MEDIA_SEEK, position)
-                }
-            }
-            view.expanded = true
+    private var ongoing: LiveActivity? = null
+    private var transient: LiveActivity? = null
+    private var presentation = Presentation.COMPACT
+    private var foregroundPkg: String? = null
+    private var watcher: ForegroundWatcher? = null
+
+    private val clearTransient = Runnable { transient = null; render() }
+    private val autoCollapse = Runnable {
+        if (transient == null && presentation == Presentation.EXPANDED) {
+            presentation = Presentation.COMPACT
+            render()
         }
     }
 
-    private val removalReceiver = object : BroadcastReceiver() {
+    private val powerReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.getStringExtra(EXTRA_KEY) == currentNotificationKey) {
-                island?.expanded = false
-                island?.mode = IslandMode.IDLE
-                island?.artwork = null
-                currentNotificationKey = null
-                mediaSessionAvailable = false
-            }
-        }
-    }
-
-    private val batteryReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action != Intent.ACTION_BATTERY_CHANGED) return
-            val plugged = intent.getIntExtra("plugged", 0) != 0
-            if (!plugged) return
-            val level = intent.getIntExtra("level", 0)
-            island?.apply {
-                mode = IslandMode.CHARGING
-                title = "$level% Charged"
-                subtitle = if (level >= 100) "Fully charged" else "Charging"
-                artwork = null
-                primaryActionLabel = "BATTERY"
-                expanded = true
-            }
-            mediaSessionAvailable = false
+            if (intent?.action != Intent.ACTION_POWER_CONNECTED) return
+            val level = getSystemService(BatteryManager::class.java)
+                ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: return
+            onActivity(LiveActivity(
+                key = "charging", packageName = packageName, mode = IslandMode.CHARGING,
+                title = "$level%", subtitle = "Charging", appLabel = "Battery",
+                appIcon = null, artwork = null, accent = AppStyle.GREEN,
+            ))
         }
     }
 
@@ -105,103 +70,258 @@ class IslandOverlayService : Service() {
         createChannel()
         startForeground(NOTIFICATION_ID, NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Dynamic Droid is active")
-            .setContentText("Live activities can appear over other apps")
+            .setContentTitle("Dynamic Island is on")
+            .setContentText("Music, calls and messages appear at the top of your screen")
+            .setPriority(NotificationCompat.PRIORITY_MIN)
+            .setCategory(Notification.CATEGORY_SERVICE)
             .setOngoing(true)
             .build())
-
         ContextCompat.registerReceiver(
-            this,
-            activityReceiver,
-            IntentFilter(ACTION_ACTIVITY),
-            ContextCompat.RECEIVER_NOT_EXPORTED
+            this, powerReceiver, IntentFilter(Intent.ACTION_POWER_CONNECTED), ContextCompat.RECEIVER_EXPORTED
         )
-        ContextCompat.registerReceiver(
-            this,
-            removalReceiver,
-            IntentFilter(ACTION_REMOVED),
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
-        registerReceiver(batteryReceiver, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        watcher = ForegroundWatcher(this, ::onForegroundChanged)
         if (Settings.canDrawOverlays(this)) showOverlay()
+        IslandBus.listener = this
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (island == null && Settings.canDrawOverlays(this)) {
+            showOverlay()
+            render()
+        }
+        if (ongoing != null) watcher?.start()
+        return START_STICKY
     }
 
     private fun showOverlay() {
-        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
-        island = IslandView(this).apply {
-            mode = IslandMode.IDLE
-            onOpen = { send(contentIntent) }
-            onPrimaryAction = { send(actionIntents.getOrNull(0) ?: contentIntent) }
-            onBoundsChanged = { updateBounds(it) }
-        }
-        val type = if (Build.VERSION.SDK_INT >= 26)
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        else WindowManager.LayoutParams.TYPE_PHONE
-        val params = WindowManager.LayoutParams(
-            dp(COMPACT_WIDTH),
-            dp(COMPACT_HEIGHT),
-            type,
+        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+        windowManager = wm
+        val view = IslandView(this).also { it.callbacks = this }
+        island = view
+        val (w, h) = view.windowSizeFor(null, Presentation.IDLE)
+        val type = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
+        val lp = WindowManager.LayoutParams(
+            w, h, type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
             PixelFormat.TRANSLUCENT
-        ).apply { gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL; y = 0 }
-        windowParams = params
-        windowManager.addView(island, params)
+        ).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            y = 0
+            if (Build.VERSION.SDK_INT >= 28) {
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        params = lp
+        wm.addView(view, lp)
     }
 
-    private fun updateBounds(expanded: Boolean) {
+    // ---------------------------------------------------------------- state
+
+    private fun render(absorb: Boolean = false) {
         val view = island ?: return
-        val params = windowParams ?: return
-        handler.removeCallbacks(collapse)
-        params.width = dp(if (expanded) EXPANDED_WIDTH else COMPACT_WIDTH)
-        params.height = dp(if (expanded) EXPANDED_HEIGHT else COMPACT_HEIGHT)
-        windowManager.updateViewLayout(view, params)
-        if (expanded) handler.postDelayed(collapse, EXPANDED_DURATION_MS)
+        val t = transient
+        val o = ongoing?.takeIf { it.packageName != foregroundPkg }
+        val (a, p) = when {
+            t != null -> t to Presentation.EXPANDED
+            o != null -> o to presentation
+            else -> null to Presentation.IDLE
+        }
+        handler.removeCallbacks(autoCollapse)
+        if (t == null && p == Presentation.EXPANDED && a?.mode != IslandMode.CALL) {
+            handler.postDelayed(autoCollapse, EXPANDED_TIMEOUT_MS)
+        }
+        growWindow(view.windowSizeFor(a, p), absorb)
+        view.show(a, p, absorb)
     }
 
-    private fun send(pendingIntent: PendingIntent?) {
-        try {
-            pendingIntent?.send()
+    override fun onActivity(activity: LiveActivity) {
+        if (activity.isTransient) {
+            transient = activity
+            handler.removeCallbacks(clearTransient)
+            handler.postDelayed(clearTransient, if (activity.mode == IslandMode.CHARGING) 3_000L else MESSAGE_TIMEOUT_MS)
+        } else {
+            val isNew = ongoing?.key != activity.key
+            ongoing = activity
+            if (isNew) presentation = if (activity.mode == IslandMode.CALL) Presentation.EXPANDED else Presentation.COMPACT
+            watcher?.start()
+        }
+        render()
+    }
+
+    override fun onRemoved(key: String) {
+        if (transient?.key == key) {
+            transient = null
+            handler.removeCallbacks(clearTransient)
+        }
+        if (ongoing?.key == key) {
+            ongoing = IslandBus.latestOngoing()
+            presentation = Presentation.COMPACT
+            if (ongoing == null) watcher?.stop()
+        }
+        render()
+    }
+
+    private fun onForegroundChanged(pkg: String) {
+        val previous = foregroundPkg
+        foregroundPkg = pkg
+        val o = ongoing ?: return
+        if (previous == o.packageName && pkg != o.packageName && transient == null) {
+            // Swiped away from the app: fly it into the island.
+            presentation = Presentation.COMPACT
+            render(absorb = true)
+        } else if (pkg == o.packageName || previous == o.packageName) {
+            render()
+        }
+    }
+
+    // ---------------------------------------------------------------- island callbacks
+
+    override fun onOpen(activity: LiveActivity) {
+        launch(activity.contentIntent, activity.packageName)
+        if (activity === transient || activity.key == transient?.key) {
+            transient = null
+            handler.removeCallbacks(clearTransient)
+        } else {
+            presentation = Presentation.COMPACT
+        }
+        render()
+    }
+
+    override fun onAction(activity: LiveActivity, action: IslandAction) {
+        send(action.intent)
+        if (activity.key == transient?.key) {
+            transient = null
+            handler.removeCallbacks(clearTransient)
+            render()
+        }
+    }
+
+    override fun onMedia(activity: LiveActivity, command: String, positionMs: Long?) {
+        if (IslandBus.mediaControl?.invoke(command, positionMs) == true) return
+        // No media session: fall back to the notification's own buttons.
+        val words = when (command) {
+            IslandBus.MEDIA_PREVIOUS -> listOf("previous", "prev", "rewind", "back")
+            IslandBus.MEDIA_NEXT -> listOf("next", "skip", "forward")
+            IslandBus.MEDIA_TOGGLE -> listOf("pause", "play")
+            else -> emptyList()
+        }
+        activity.actions.firstOrNull { a -> words.any { a.label.contains(it, ignoreCase = true) } }
+            ?.let { send(it.intent) }
+    }
+
+    override fun onExpandRequest() {
+        if (transient != null || ongoing == null) return
+        presentation = Presentation.EXPANDED
+        render()
+    }
+
+    override fun onCollapseRequest() {
+        if (transient != null) {
+            transient = null
+            handler.removeCallbacks(clearTransient)
+        } else {
+            presentation = Presentation.COMPACT
+        }
+        render()
+    }
+
+    override fun onDismiss(activity: LiveActivity) = onCollapseRequest()
+
+    override fun onInteraction() {
+        // Keep things open while the user is touching them.
+        transient?.let {
+            handler.removeCallbacks(clearTransient)
+            handler.postDelayed(clearTransient, MESSAGE_TIMEOUT_MS)
+        }
+        if (presentation == Presentation.EXPANDED && transient == null) {
+            handler.removeCallbacks(autoCollapse)
+            if (ongoing?.mode != IslandMode.CALL) handler.postDelayed(autoCollapse, EXPANDED_TIMEOUT_MS)
+        }
+    }
+
+    override fun onSettled() {
+        val view = island ?: return
+        val lp = params ?: return
+        val a = view.activity
+        val (w, h) = view.windowSizeFor(a, view.presentation)
+        var changed = false
+        if (lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0) {
+            lp.flags = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+            changed = true
+        }
+        if (lp.width != w || lp.height != h) {
+            lp.width = w
+            lp.height = h
+            changed = true
+        }
+        if (changed) runCatching { windowManager?.updateViewLayout(view, lp) }
+    }
+
+    // ---------------------------------------------------------------- window
+
+    private fun growWindow(target: Pair<Int, Int>, absorb: Boolean) {
+        val view = island ?: return
+        val lp = params ?: return
+        val dm = resources.displayMetrics
+        val (w, h) = if (absorb || view.isAbsorbing) {
+            dm.widthPixels to dm.heightPixels
+        } else {
+            max(lp.width, target.first) to max(lp.height, target.second)
+        }
+        var flags = lp.flags
+        // During the fly-in the window covers the screen, so let every touch pass through.
+        if (absorb) flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        if (lp.width == w && lp.height == h && lp.flags == flags) return
+        lp.width = w
+        lp.height = h
+        lp.flags = flags
+        runCatching { windowManager?.updateViewLayout(view, lp) }
+    }
+
+    // ---------------------------------------------------------------- launching
+
+    private fun launch(pendingIntent: PendingIntent?, pkg: String) {
+        if (send(pendingIntent)) return
+        packageManager.getLaunchIntentForPackage(pkg)?.let {
+            it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            runCatching { startActivity(it) }
+        }
+    }
+
+    /**
+     * Android 14+ blocks activity launches from a PendingIntent sent by a background app unless
+     * the sender opts in. This was why tapping "open" often did nothing.
+     */
+    private fun send(pendingIntent: PendingIntent?): Boolean {
+        pendingIntent ?: return false
+        return try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                val options = ActivityOptions.makeBasic()
+                    .setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+                pendingIntent.send(this, 0, null, null, null, null, options.toBundle())
+            } else {
+                pendingIntent.send()
+            }
+            true
         } catch (_: PendingIntent.CanceledException) {
-            island?.expanded = false
+            false
+        } catch (_: SecurityException) {
+            false
         }
-    }
-
-    private fun dispatchMediaAction(command: String) {
-        if (mediaSessionAvailable) {
-            sendMediaControl(command)
-            return
-        }
-
-        val labels = actionLabels.map { it.lowercase() }
-        val index = when (command) {
-            IslandNotificationListener.MEDIA_PREVIOUS ->
-                labels.indexOfFirst { it.contains("previous") || it.contains("rewind") }
-            IslandNotificationListener.MEDIA_NEXT ->
-                labels.indexOfFirst { it.contains("next") || it.contains("skip") }
-            IslandNotificationListener.MEDIA_TOGGLE ->
-                labels.indexOfFirst { it.contains("play") || it.contains("pause") }
-            else -> -1
-        }
-        if (index >= 0) send(actionIntents.getOrNull(index))
-    }
-
-    private fun sendMediaControl(command: String, position: Long? = null) {
-        sendBroadcast(Intent(IslandNotificationListener.ACTION_MEDIA_CONTROL).apply {
-            setPackage(packageName)
-            putExtra(IslandNotificationListener.EXTRA_MEDIA_COMMAND, command)
-            position?.let { putExtra(IslandNotificationListener.EXTRA_MEDIA_POSITION, it) }
-        })
     }
 
     override fun onDestroy() {
-        island?.let { windowManager.removeView(it) }
+        if (IslandBus.listener === this) IslandBus.listener = null
+        watcher?.stop()
         handler.removeCallbacksAndMessages(null)
-        unregisterReceiver(activityReceiver)
-        unregisterReceiver(removalReceiver)
-        unregisterReceiver(batteryReceiver)
+        island?.let { v -> runCatching { windowManager?.removeView(v) } }
+        runCatching { unregisterReceiver(powerReceiver) }
         super.onDestroy()
     }
 
@@ -210,40 +330,15 @@ class IslandOverlayService : Service() {
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Dynamic Island service", NotificationManager.IMPORTANCE_LOW)
+                NotificationChannel(CHANNEL_ID, "Dynamic Island service", NotificationManager.IMPORTANCE_MIN)
             )
         }
     }
 
-    private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
-
-    @Suppress("DEPRECATION")
-    private fun parcelable(intent: Intent?, key: String): PendingIntent? =
-        if (Build.VERSION.SDK_INT >= 33) intent?.getParcelableExtra(key, PendingIntent::class.java)
-        else intent?.getParcelableExtra(key)
-
-    @Suppress("DEPRECATION")
-    private fun parcelableList(intent: Intent?, key: String): ArrayList<PendingIntent> =
-        if (Build.VERSION.SDK_INT >= 33)
-            intent?.getParcelableArrayListExtra(key, PendingIntent::class.java) ?: arrayListOf()
-        else intent?.getParcelableArrayListExtra(key) ?: arrayListOf()
-
     companion object {
-        const val ACTION_ACTIVITY = "com.dynamicdroid.app.LIVE_ACTIVITY"
-        const val ACTION_REMOVED = "com.dynamicdroid.app.LIVE_ACTIVITY_REMOVED"
-        const val EXTRA_MODE = "mode"
-        const val EXTRA_TITLE = "title"
-        const val EXTRA_SUBTITLE = "subtitle"
-        const val EXTRA_KEY = "notification_key"
-        const val EXTRA_CONTENT_INTENT = "content_intent"
-        const val EXTRA_ACTION_INTENTS = "action_intents"
-        const val EXTRA_ACTION_LABELS = "action_labels"
         private const val CHANNEL_ID = "dynamic_island"
         private const val NOTIFICATION_ID = 7104
-        private const val COMPACT_WIDTH = 124
-        private const val COMPACT_HEIGHT = 52
-        private const val EXPANDED_WIDTH = 310
-        private const val EXPANDED_HEIGHT = 154
-        private const val EXPANDED_DURATION_MS = 5_500L
+        private const val EXPANDED_TIMEOUT_MS = 6_000L
+        private const val MESSAGE_TIMEOUT_MS = 5_000L
     }
 }

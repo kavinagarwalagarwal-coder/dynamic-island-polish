@@ -1,248 +1,253 @@
 package com.dynamicdroid.app
 
 import android.app.Notification
-import android.app.PendingIntent
-import android.content.BroadcastReceiver
+import android.app.NotificationManager
 import android.content.ComponentName
 import android.content.Context
-import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSession
 import android.media.session.MediaSessionManager
-import android.net.Uri
 import android.media.session.PlaybackState
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
-import androidx.core.content.ContextCompat
-import java.io.ByteArrayOutputStream
+import androidx.core.graphics.drawable.toBitmap
 
+/**
+ * Turns notifications into island activities. Filters out the noise (silent, ongoing,
+ * group summaries, repeat posts) that used to make the island flash in and out.
+ */
 class IslandNotificationListener : NotificationListenerService() {
-    private val mainHandler = Handler(Looper.getMainLooper())
-    private var currentNotification: StatusBarNotification? = null
-    private var currentMediaController: MediaController? = null
+    private val main = Handler(Looper.getMainLooper())
+    private var mediaNotification: StatusBarNotification? = null
+    private var controller: MediaController? = null
+    private val lastMessageText = HashMap<String, String>()
 
-    private val mediaControllerCallback = object : MediaController.Callback() {
-        override fun onMetadataChanged(metadata: MediaMetadata?) {
-            publishCurrentMedia()
+    private var artKey: String? = null
+    private var artBitmap: Bitmap? = null
+    private var artAccent: Int? = null
+
+    private val publishMedia = Runnable { publishCurrentMedia() }
+
+    private val controllerCallback = object : MediaController.Callback() {
+        override fun onMetadataChanged(metadata: MediaMetadata?) = schedulePublish()
+        override fun onPlaybackStateChanged(state: PlaybackState?) = schedulePublish()
+        override fun onSessionDestroyed() {
+            mediaNotification?.key?.let(IslandBus::remove)
+            setController(null)
+            mediaNotification = null
         }
-
-        override fun onPlaybackStateChanged(state: PlaybackState?) {
-            publishCurrentMedia()
-        }
-    }
-
-    private val mediaActionReceiver = object : BroadcastReceiver() {
-        override fun onReceive(context: Context?, intent: Intent?) {
-            val controller = currentMediaController ?: return
-            val controls = controller.transportControls
-            when (intent?.getStringExtra(EXTRA_MEDIA_COMMAND)) {
-                MEDIA_TOGGLE -> {
-                    if (controller.playbackState?.state == PlaybackState.STATE_PLAYING) {
-                        controls.pause()
-                    } else {
-                        controls.play()
-                    }
-                }
-                MEDIA_PREVIOUS -> controls.skipToPrevious()
-                MEDIA_NEXT -> controls.skipToNext()
-                MEDIA_SEEK -> controls.seekTo(
-                    intent.getLongExtra(EXTRA_MEDIA_POSITION, 0L).coerceAtLeast(0L)
-                )
-            }
-            mainHandler.postDelayed({ publishCurrentMedia() }, 180L)
-        }
-    }
-
-    override fun onCreate() {
-        super.onCreate()
-        ContextCompat.registerReceiver(
-            this,
-            mediaActionReceiver,
-            android.content.IntentFilter(ACTION_MEDIA_CONTROL),
-            ContextCompat.RECEIVER_NOT_EXPORTED
-        )
     }
 
     override fun onListenerConnected() {
         super.onListenerConnected()
-        activeNotifications
-            ?.lastOrNull { sbn ->
-                sbn.notification.category == Notification.CATEGORY_TRANSPORT ||
-                    sessionToken(sbn.notification) != null ||
-                    findMediaController(sbn) != null
-            }
-            ?.let(::onNotificationPosted)
+        IslandBus.mediaControl = ::handleMedia
+        runCatching { activeNotifications }.getOrNull()
+            ?.sortedBy { it.postTime }
+            ?.filter { it.isOngoing }
+            ?.forEach(::onNotificationPosted)
+    }
+
+    override fun onListenerDisconnected() {
+        IslandBus.mediaControl = null
+        super.onListenerDisconnected()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName) return
-        val notification = sbn.notification
-        val extras = notification.extras
-        val controller = findMediaController(sbn)
-        val mediaSessionToken = sessionToken(notification)
-        val isMediaNotification =
-            notification.category == Notification.CATEGORY_TRANSPORT ||
-                controller != null ||
-                mediaSessionToken != null
+        val n = sbn.notification
+        if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
+        val extras = n.extras
+        val token = sessionToken(n)
+        val isMedia = token != null || n.category == Notification.CATEGORY_TRANSPORT
 
-        val mode = when (notification.category) {
-            Notification.CATEGORY_CALL -> IslandMode.CALL
-            Notification.CATEGORY_NAVIGATION -> IslandMode.NAVIGATION
-            Notification.CATEGORY_MESSAGE -> IslandMode.MESSAGE
-            Notification.CATEGORY_PROGRESS -> IslandMode.TIMER
-            else -> if (isMediaNotification) IslandMode.MUSIC else IslandMode.MESSAGE
-        }
-
-        if (mode == IslandMode.MUSIC) {
-            currentNotification = sbn
-            setMediaController(controller)
-            publishCurrentMedia()
+        if (isMedia) {
+            mediaNotification = sbn
+            setController(findMediaController(sbn, token))
+            schedulePublish()
             return
         }
 
-        currentNotification = null
-        setMediaController(null)
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
-            ?.takeIf { it.isNotBlank() }
-            ?: mode.name.lowercase().replaceFirstChar { it.uppercase() }
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
+        val chronometer = extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)
+        val mode = when {
+            n.category == Notification.CATEGORY_CALL -> IslandMode.CALL
+            n.category == Notification.CATEGORY_NAVIGATION && sbn.isOngoing -> IslandMode.NAVIGATION
+            sbn.isOngoing && (chronometer || n.category == Notification.CATEGORY_ALARM || n.category == "stopwatch") -> IslandMode.TIMER
+            sbn.isOngoing -> return // downloads, "app is running", etc.
+            else -> IslandMode.MESSAGE
+        }
 
-        sendBroadcast(Intent(IslandOverlayService.ACTION_ACTIVITY).apply {
-            setPackage(packageName)
-            putExtra(IslandOverlayService.EXTRA_MODE, mode.name)
-            putExtra(IslandOverlayService.EXTRA_TITLE, title)
-            putExtra(IslandOverlayService.EXTRA_SUBTITLE, text)
-            putExtra(IslandOverlayService.EXTRA_KEY, sbn.key)
-            putExtra(IslandOverlayService.EXTRA_CONTENT_INTENT, notification.contentIntent)
-            putParcelableArrayListExtra(
-                IslandOverlayService.EXTRA_ACTION_INTENTS,
-                ArrayList<PendingIntent>(notification.actions.orEmpty().mapNotNull { it.actionIntent })
-            )
-            putStringArrayListExtra(
-                IslandOverlayService.EXTRA_ACTION_LABELS,
-                ArrayList(notification.actions.orEmpty().map { it.title.toString() })
-            )
-        })
+        val title = (extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
+            ?: extras.getCharSequence(Notification.EXTRA_TITLE))?.toString()?.takeIf { it.isNotBlank() }
+            ?: AppStyle.label(this, sbn.packageName)
+        val text = (extras.getCharSequence(Notification.EXTRA_TEXT)
+            ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT))?.toString().orEmpty()
+
+        if (mode == IslandMode.MESSAGE) {
+            if (!isAlerting(sbn)) return
+            val signature = "$title|$text"
+            if (lastMessageText[sbn.key] == signature) return
+            lastMessageText[sbn.key] = signature
+            if (lastMessageText.size > 64) lastMessageText.keys.firstOrNull()?.let(lastMessageText::remove)
+        }
+
+        val actions = n.actions.orEmpty()
+            .filter { it.actionIntent != null && (mode == IslandMode.CALL || it.remoteInputs.isNullOrEmpty()) }
+            .map { IslandAction(it.title?.toString().orEmpty(), it.actionIntent) }
+            .filter { it.label.isNotBlank() }
+
+        IslandBus.post(LiveActivity(
+            key = sbn.key,
+            packageName = sbn.packageName,
+            mode = mode,
+            title = title,
+            subtitle = text,
+            appLabel = AppStyle.label(this, sbn.packageName),
+            appIcon = AppStyle.icon(this, sbn.packageName),
+            artwork = largeIcon(n),
+            accent = AppStyle.accent(this, sbn.packageName),
+            contentIntent = n.contentIntent,
+            actions = actions,
+            chronometerBase = if (chronometer || mode == IslandMode.CALL) n.`when`.takeIf { it > 0L } else null,
+            chronometerCountDown = Build.VERSION.SDK_INT >= 24 && extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN),
+        ))
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
-        sendBroadcast(Intent(IslandOverlayService.ACTION_REMOVED).apply {
-            setPackage(packageName)
-            putExtra(IslandOverlayService.EXTRA_KEY, sbn.key)
-        })
-        if (sbn.key == currentNotification?.key) {
-            currentNotification = null
-            setMediaController(null)
+        lastMessageText.remove(sbn.key)
+        IslandBus.remove(sbn.key)
+        if (sbn.key == mediaNotification?.key) {
+            mediaNotification = null
+            setController(null)
         }
     }
 
     override fun onDestroy() {
-        currentMediaController?.unregisterCallback(mediaControllerCallback)
-        currentMediaController = null
-        currentNotification = null
-        unregisterReceiver(mediaActionReceiver)
-        mainHandler.removeCallbacksAndMessages(null)
+        setController(null)
+        IslandBus.mediaControl = null
+        main.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
 
-    private fun findMediaController(sbn: StatusBarNotification): MediaController? {
-        val token = sessionToken(sbn.notification)
-        val activeSession = runCatching {
-            val manager = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
-            val sessions = manager.getActiveSessions(
-                ComponentName(this, IslandNotificationListener::class.java)
-            ).filter { it.packageName == sbn.packageName }
-            sessions.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING }
-                ?: sessions.firstOrNull()
-        }.getOrNull()
+    // ---------------------------------------------------------------- filtering
 
-        return activeSession ?: token?.let {
-            runCatching { MediaController(this, it) }.getOrNull()
+    private fun isAlerting(sbn: StatusBarNotification): Boolean {
+        val ranking = Ranking()
+        if (!currentRanking.getRanking(sbn.key, ranking)) return true
+        return ranking.importance >= NotificationManager.IMPORTANCE_DEFAULT && !ranking.isSuspended
+    }
+
+    // ---------------------------------------------------------------- media
+
+    private fun schedulePublish() {
+        // Players fire bursts of callbacks; coalesce them so the island updates once.
+        main.removeCallbacks(publishMedia)
+        main.postDelayed(publishMedia, 60L)
+    }
+
+    private fun handleMedia(command: String, position: Long?): Boolean {
+        val c = controller ?: return false
+        val controls = c.transportControls
+        when (command) {
+            IslandBus.MEDIA_TOGGLE ->
+                if (c.playbackState?.state == PlaybackState.STATE_PLAYING) controls.pause() else controls.play()
+            IslandBus.MEDIA_PREVIOUS -> controls.skipToPrevious()
+            IslandBus.MEDIA_NEXT -> controls.skipToNext()
+            IslandBus.MEDIA_SEEK -> controls.seekTo((position ?: 0L).coerceAtLeast(0L))
+            else -> return false
         }
+        return true
+    }
+
+    private fun findMediaController(sbn: StatusBarNotification, token: MediaSession.Token?): MediaController? {
+        token?.let { t -> runCatching { MediaController(this, t) }.getOrNull()?.let { return it } }
+        return runCatching {
+            val manager = getSystemService(Context.MEDIA_SESSION_SERVICE) as MediaSessionManager
+            val sessions = manager.getActiveSessions(ComponentName(this, IslandNotificationListener::class.java))
+                .filter { it.packageName == sbn.packageName }
+            sessions.firstOrNull { it.playbackState?.state == PlaybackState.STATE_PLAYING } ?: sessions.firstOrNull()
+        }.getOrNull()
     }
 
     @Suppress("DEPRECATION")
-    private fun sessionToken(notification: Notification): MediaSession.Token? =
-        if (Build.VERSION.SDK_INT >= 33) {
-            notification.extras.getParcelable(
-                Notification.EXTRA_MEDIA_SESSION,
-                MediaSession.Token::class.java
-            )
-        } else {
-            notification.extras.getParcelable(Notification.EXTRA_MEDIA_SESSION)
-        }
+    private fun sessionToken(n: Notification): MediaSession.Token? =
+        if (Build.VERSION.SDK_INT >= 33) n.extras.getParcelable(Notification.EXTRA_MEDIA_SESSION, MediaSession.Token::class.java)
+        else n.extras.getParcelable(Notification.EXTRA_MEDIA_SESSION)
 
-    private fun setMediaController(controller: MediaController?) {
-        if (currentMediaController?.sessionToken == controller?.sessionToken) return
-        currentMediaController?.unregisterCallback(mediaControllerCallback)
-        currentMediaController = controller
-        currentMediaController?.registerCallback(mediaControllerCallback, mainHandler)
+    private fun setController(next: MediaController?) {
+        if (controller?.sessionToken == next?.sessionToken && next != null) return
+        controller?.unregisterCallback(controllerCallback)
+        controller = next
+        next?.registerCallback(controllerCallback, main)
     }
 
     private fun publishCurrentMedia() {
-        val sbn = currentNotification ?: return
-        val notification = sbn.notification
-        val extras = notification.extras
-        val metadata = currentMediaController?.metadata
-        val title = metadata?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)
-            ?.takeIf { it.isNotBlank() }
-            ?: metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)?.takeIf { it.isNotBlank() }
-            ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()
-                ?.takeIf { it.isNotBlank() }
-            ?: "Unknown track"
-        val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)
-            ?.takeIf { it.isNotBlank() }
-            ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST)
-                ?.takeIf { it.isNotBlank() }
+        val sbn = mediaNotification ?: return
+        val n = sbn.notification
+        val extras = n.extras
+        val metadata = controller?.metadata
+        val title = metadata?.getString(MediaMetadata.METADATA_KEY_TITLE)?.takeIf { it.isNotBlank() }
+            ?: metadata?.getString(MediaMetadata.METADATA_KEY_DISPLAY_TITLE)?.takeIf { it.isNotBlank() }
+            ?: extras.getCharSequence(Notification.EXTRA_TITLE)?.toString()?.takeIf { it.isNotBlank() }
+            ?: return
+        val artist = metadata?.getString(MediaMetadata.METADATA_KEY_ARTIST)?.takeIf { it.isNotBlank() }
+            ?: metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ARTIST)?.takeIf { it.isNotBlank() }
             ?: extras.getCharSequence(Notification.EXTRA_TEXT)?.toString().orEmpty()
-        val playbackState = currentMediaController?.playbackState
-        val duration = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION)
-            ?.takeIf { it > 0L } ?: 0L
-        val position = playbackState?.position?.coerceAtLeast(0L) ?: 0L
-        val artwork = mediaArtwork(metadata, notification)
+        val state = controller?.playbackState
+        val duration = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION)?.takeIf { it > 0L } ?: 0L
 
-        sendBroadcast(Intent(IslandOverlayService.ACTION_ACTIVITY).apply {
-            setPackage(packageName)
-            putExtra(IslandOverlayService.EXTRA_MODE, IslandMode.MUSIC.name)
-            putExtra(IslandOverlayService.EXTRA_TITLE, title)
-            putExtra(IslandOverlayService.EXTRA_SUBTITLE, artist)
-            putExtra(IslandOverlayService.EXTRA_KEY, sbn.key)
-            putExtra(IslandOverlayService.EXTRA_CONTENT_INTENT, notification.contentIntent)
-            putParcelableArrayListExtra(
-                IslandOverlayService.EXTRA_ACTION_INTENTS,
-                ArrayList<PendingIntent>(notification.actions.orEmpty().mapNotNull { it.actionIntent })
-            )
-            putStringArrayListExtra(
-                IslandOverlayService.EXTRA_ACTION_LABELS,
-                ArrayList(notification.actions.orEmpty().map { it.title.toString() })
-            )
-            putExtra(EXTRA_MEDIA_IS_PLAYING, playbackState?.state == PlaybackState.STATE_PLAYING)
-            putExtra(EXTRA_MEDIA_POSITION, position)
-            putExtra(EXTRA_MEDIA_DURATION, duration)
-            putExtra(EXTRA_HAS_MEDIA_SESSION, currentMediaController != null)
-            if (artwork != null) putExtra(EXTRA_MEDIA_ARTWORK, artwork)
-        })
+        // Artwork + its colour only change with the track, so cache them.
+        val key = "$title|$artist"
+        if (key != artKey || artBitmap == null) {
+            artKey = key
+            artBitmap = mediaArtwork(metadata, n)
+            artAccent = artBitmap?.let(AppStyle::fromBitmap)
+        }
+
+        IslandBus.post(LiveActivity(
+            key = sbn.key,
+            packageName = sbn.packageName,
+            mode = IslandMode.MUSIC,
+            title = title,
+            subtitle = artist,
+            appLabel = AppStyle.label(this, sbn.packageName),
+            appIcon = AppStyle.icon(this, sbn.packageName),
+            artwork = artBitmap,
+            accent = artAccent ?: AppStyle.accent(this, sbn.packageName),
+            contentIntent = n.contentIntent ?: controller?.sessionActivity,
+            actions = n.actions.orEmpty().filter { it.actionIntent != null }
+                .map { IslandAction(it.title?.toString().orEmpty(), it.actionIntent) },
+            isPlaying = state?.state == PlaybackState.STATE_PLAYING || state?.state == PlaybackState.STATE_BUFFERING,
+            positionMs = state?.position?.coerceAtLeast(0L) ?: 0L,
+            positionUpdatedAt = state?.lastPositionUpdateTime?.takeIf { it > 0L } ?: SystemClock.elapsedRealtime(),
+            playbackSpeed = state?.playbackSpeed?.takeIf { it > 0f } ?: 1f,
+            durationMs = duration,
+            hasMediaSession = controller != null,
+        ))
     }
 
-    private fun mediaArtwork(metadata: MediaMetadata?, notification: Notification): ByteArray? {
-        val bitmap = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+    private fun largeIcon(n: Notification): Bitmap? = runCatching {
+        n.getLargeIcon()?.loadDrawable(this)?.toBitmap(160, 160)
+    }.getOrNull()
+
+    private fun mediaArtwork(metadata: MediaMetadata?, n: Notification): Bitmap? {
+        val raw = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
             ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
             ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
-            ?: notification.extras.getBitmapCompat(Notification.EXTRA_LARGE_ICON)
-            ?: notification.extras.getBitmapCompat(Notification.EXTRA_LARGE_ICON_BIG)
             ?: artworkFromUri(metadata)
+            ?: largeIcon(n)
             ?: return null
-
-        val scaled = Bitmap.createScaledBitmap(bitmap, 192, 192, true)
-        return ByteArrayOutputStream().use { output ->
-            if (scaled.compress(Bitmap.CompressFormat.JPEG, 82, output)) output.toByteArray() else null
-        }
+        return runCatching {
+            val soft = if (raw.config == Bitmap.Config.HARDWARE) raw.copy(Bitmap.Config.ARGB_8888, false) else raw
+            if (soft.width > 320 || soft.height > 320) Bitmap.createScaledBitmap(soft, 320, 320, true) else soft
+        }.getOrNull()
     }
 
     private fun artworkFromUri(metadata: MediaMetadata?): Bitmap? {
@@ -252,33 +257,11 @@ class IslandNotificationListener : NotificationListenerService() {
         val uri = runCatching { Uri.parse(uriText) }.getOrNull() ?: return null
         return runCatching {
             val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            contentResolver.openInputStream(uri)?.use {
-                BitmapFactory.decodeStream(it, null, bounds)
-            }
-            var sampleSize = 1
-            while (maxOf(bounds.outWidth, bounds.outHeight) / sampleSize > 384) sampleSize *= 2
-            val options = BitmapFactory.Options().apply { inSampleSize = sampleSize }
-            contentResolver.openInputStream(uri)?.use {
-                BitmapFactory.decodeStream(it, null, options)
-            }
+            contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
+            var sample = 1
+            while (maxOf(bounds.outWidth, bounds.outHeight) / sample > 400) sample *= 2
+            val options = BitmapFactory.Options().apply { inSampleSize = sample }
+            contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
         }.getOrNull()
-    }
-
-    @Suppress("DEPRECATION")
-    private fun android.os.Bundle.getBitmapCompat(key: String): Bitmap? =
-        if (Build.VERSION.SDK_INT >= 33) getParcelable(key, Bitmap::class.java) else getParcelable(key)
-
-    companion object {
-        const val ACTION_MEDIA_CONTROL = "com.dynamicdroid.app.MEDIA_CONTROL"
-        const val EXTRA_MEDIA_COMMAND = "media_command"
-        const val EXTRA_MEDIA_IS_PLAYING = "media_is_playing"
-        const val EXTRA_MEDIA_POSITION = "media_position"
-        const val EXTRA_MEDIA_DURATION = "media_duration"
-        const val EXTRA_MEDIA_ARTWORK = "media_artwork"
-        const val EXTRA_HAS_MEDIA_SESSION = "has_media_session"
-        const val MEDIA_TOGGLE = "toggle"
-        const val MEDIA_PREVIOUS = "previous"
-        const val MEDIA_NEXT = "next"
-        const val MEDIA_SEEK = "seek"
     }
 }
