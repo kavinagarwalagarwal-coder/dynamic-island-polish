@@ -99,7 +99,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // Idle status bar data (time, network, battery). Redrawn only when it actually changes.
     private var status = StatusInfo()
     private val statusPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-        typeface = NothingStyle.mono; textSize = v(13f); fontFeatureSettings = "tnum"
+        typeface = NothingStyle.mono; textSize = v(15f); fontFeatureSettings = "tnum"
     }
     private fun v(x: Float) = x * resources.displayMetrics.density
 
@@ -137,24 +137,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun updateAnchor() {
         val physicalTop = if (anchorToCutout && fit.alignCamera) cameraTop ?: dp(8f) else dp(8f)
         baseTop = max(0f, physicalTop + dp(fit.offsetY)) / fit.scale
-        if (!isAbsorbing) topS.target = topTargetFor(presentation)
+        if (!isAbsorbing) topS.target = baseTop
     }
 
-    /**
-     * Idle and compact are a full-width bar flush with the top of the screen, covering the
-     * system status bar (the island draws its own time/network/battery instead). Only the
-     * expanded card floats lower, below the camera.
-     */
-    private fun topTargetFor(p: Presentation) = if (p == Presentation.EXPANDED) max(baseTop, dp(2f)) else 0f
-
-    // Shape. Softer, slower springs (~0.5s response) with a touch of bounce, like iOS.
-    private val widthS = Spring(dp(104f), SHAPE_K, WIDTH_DAMP, 0.5f)
-    private val heightS = Spring(dp(32f), SHAPE_K, HEIGHT_DAMP, 0.5f)
-    private val radiusS = Spring(dp(16f), SHAPE_K, 0.9f, 0.5f)
-    private val topS = Spring(baseTop, SHAPE_K, 0.86f, 0.5f)
+    // Shape. Same interpolating springs as Sources/IslandUI (Skip / SwiftUI).
+    private val widthS = Spring(dp(104f), IslandMotion.SHAPE_K, IslandMotion.WIDTH_DAMPING_RATIO, 0.5f)
+    private val heightS = Spring(dp(32f), IslandMotion.SHAPE_K, IslandMotion.HEIGHT_DAMPING_RATIO, 0.5f)
+    private val radiusS = Spring(dp(16f), IslandMotion.SHAPE_K, IslandMotion.RADIUS_DAMPING_RATIO, 0.5f)
+    private val topS = Spring(baseTop, IslandMotion.SHAPE_K, 0.86f, 0.5f)
+    private val centerS = Spring(resources.displayMetrics.widthPixels / 2f / fit.scale, IslandMotion.SHAPE_K, IslandMotion.CENTER_DAMPING_RATIO, 0.5f)
     // Content and gesture feedback
-    private val expandedA = Spring(0f, CONTENT_IN_K, 1f, 0.004f)
-    private val compactA = Spring(0f, CONTENT_IN_K, 1f, 0.004f)
+    private val expandedA = Spring(0f, IslandMotion.CONTENT_IN_K, 1f, 0.004f)
+    private val compactA = Spring(0f, IslandMotion.CONTENT_IN_K, 1f, 0.004f)
     // Stiffer press so the squish lands on the finger's first frame.
     private val pressS = Spring(1f, 760f, 0.62f, 0.0008f)
     private val stretchS = Spring(0f, 360f, 0.62f, 0.5f)
@@ -162,7 +156,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // Wake/unlock intro: 0 = hidden dot, 1 = fully present
     private val introS = Spring(1f, 160f, 0.7f, 0.002f)
     // Status-bar content of the idle pill
-    private val idleA = Spring(0f, CONTENT_IN_K, 1f, 0.004f)
+    private val idleA = Spring(0f, IslandMotion.CONTENT_IN_K, 1f, 0.004f)
     // 1 = shown, 0 = tucked away (fullscreen media)
     private val concealS = Spring(1f, 230f, 0.9f, 0.003f)
     // Sheen that sweeps across the pill once the intro lands
@@ -170,8 +164,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // While the intro's first stage (dot -> circle) runs, show() must not widen the shape yet.
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
-    private val shapeSprings = listOf(widthS, heightS, radiusS, topS)
-    private val springs = listOf(widthS, heightS, radiusS, topS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS)
+    private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -290,7 +284,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         widthS.target = spec.w
         heightS.target = spec.h
         radiusS.target = spec.r
-        topS.target = topTargetFor(p)
+        centerS.target = spec.cx
+        topS.target = baseTop
         absorbS.target = 0f
         setContentTargets(p)
         settled = false
@@ -300,11 +295,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     /** Content fades in slowly once the shape has room, and fades out fast so it never squashes. */
     private fun setContentTargets(p: Presentation) {
         expandedA.target = if (p == Presentation.EXPANDED) 1f else 0f
-        expandedA.stiffness = if (p == Presentation.EXPANDED) CONTENT_IN_K else CONTENT_OUT_K
+        expandedA.stiffness = if (p == Presentation.EXPANDED) IslandMotion.CONTENT_IN_K else IslandMotion.CONTENT_OUT_K
         compactA.target = if (p == Presentation.COMPACT) 1f else 0f
-        compactA.stiffness = if (p == Presentation.COMPACT) CONTENT_IN_K else CONTENT_OUT_K
+        compactA.stiffness = if (p == Presentation.COMPACT) IslandMotion.CONTENT_IN_K else IslandMotion.CONTENT_OUT_K
         idleA.target = if (p == Presentation.IDLE) 1f else 0f
-        idleA.stiffness = if (p == Presentation.IDLE) CONTENT_IN_K else CONTENT_OUT_K
+        idleA.stiffness = if (p == Presentation.IDLE) IslandMotion.CONTENT_IN_K else IslandMotion.CONTENT_OUT_K
     }
 
     /** Screen went off: collapse into an invisible dot so the next wake can grow out of it. */
@@ -319,6 +314,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         introHoldUntil = 0L
         introS.snap(0f)
         widthS.snap(dp(10f)); heightS.snap(dp(10f)); radiusS.snap(dp(5f))
+        centerS.snap(cameraCenter())
         topS.snap(baseTop + dp(12f))
         compactA.snap(0f); expandedA.snap(0f); idleA.snap(0f)
         sheenStart = 0L
@@ -338,6 +334,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val d = min(spec.h, dp(34f))
         shapeSprings.forEach { it.stiffness = 260f; it.dampingRatio = 0.55f }
         widthS.target = d; heightS.target = d; radiusS.target = d / 2f
+        centerS.target = cameraCenter()
         topS.target = baseTop
         introS.target = 1f
         introHoldUntil = SystemClock.uptimeMillis() + INTRO_HOLD_MS
@@ -352,8 +349,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         widthS.stiffness = 150f; widthS.dampingRatio = 0.6f
         heightS.stiffness = 170f; heightS.dampingRatio = 0.72f
         radiusS.stiffness = 170f; radiusS.dampingRatio = 0.85f
+        centerS.stiffness = IslandMotion.SHAPE_K; centerS.dampingRatio = IslandMotion.CENTER_DAMPING_RATIO
         widthS.target = spec.w; heightS.target = spec.h; radiusS.target = spec.r
-        topS.target = topTargetFor(presentation)
+        centerS.target = spec.cx
+        topS.target = baseTop
         setContentTargets(presentation)
         sheenStart = SystemClock.uptimeMillis() + 300L
         settled = false
@@ -361,10 +360,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     private fun restoreShapeSprings() {
-        shapeSprings.forEach { it.stiffness = SHAPE_K }
-        widthS.dampingRatio = WIDTH_DAMP
-        heightS.dampingRatio = HEIGHT_DAMP
-        radiusS.dampingRatio = 0.9f
+        shapeSprings.forEach { it.stiffness = IslandMotion.SHAPE_K }
+        widthS.dampingRatio = IslandMotion.WIDTH_DAMPING_RATIO
+        heightS.dampingRatio = IslandMotion.HEIGHT_DAMPING_RATIO
+        radiusS.dampingRatio = IslandMotion.RADIUS_DAMPING_RATIO
+        centerS.dampingRatio = IslandMotion.CENTER_DAMPING_RATIO
         topS.dampingRatio = 0.86f
     }
 
@@ -375,34 +375,48 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         // A fixed horizontal origin avoids one-frame jumps when WindowManager relayouts.
         // Keep the bottom slack tiny: the window eats touches wherever it covers, so a tall
         // idle window would deaden a strip of the screen under the island.
-        return Pair(resources.displayMetrics.widthPixels, ((topTargetFor(effective) + spec.h + dp(14f)) * fit.scale).toInt())
+        return Pair(resources.displayMetrics.widthPixels, ((baseTop + spec.h + dp(14f)) * fit.scale).toInt())
     }
 
     val isAbsorbing: Boolean get() = absorbS.value > 0.002f
 
     // ---------------------------------------------------------------- layout specs
 
-    private data class Spec(val w: Float, val h: Float, val r: Float)
+    private data class Spec(val w: Float, val h: Float, val r: Float, val cx: Float)
 
-    private fun expandedWidth() = min((resources.displayMetrics.widthPixels - dp(16f)) / fit.scale, dp(372f))
+    /** Idle bar is edge-to-edge; expanded cards keep a slightly larger inset. */
+    private fun idleWidth() = IslandMotion.idleWidth(resources.displayMetrics.widthPixels.toFloat(), density) / fit.scale
+
+    private fun expandedWidth() = (resources.displayMetrics.widthPixels - dp(16f)) / fit.scale
+
+    private fun screenCenter() = resources.displayMetrics.widthPixels / 2f / fit.scale
+
+    private fun cameraCenter(): Float {
+        val viewX = if (anchorToCutout && fit.alignCamera) cameraX ?: (resources.displayMetrics.widthPixels / 2f)
+        else resources.displayMetrics.widthPixels / 2f
+        return (viewX + dp(fit.offsetX)) / fit.scale
+    }
 
     private fun visibleActions(a: LiveActivity) = a.actions.take(3)
 
     private fun specFor(p: Presentation, a: LiveActivity?): Spec {
-        val maxWidth = (resources.displayMetrics.widthPixels - dp(16f)) / fit.scale
-        // Idle and compact are a full-width bar over the status bar: the island draws its
-        // own time, network and battery, so it replaces what it covers.
-        val fullWidth = resources.displayMetrics.widthPixels / fit.scale
-        if (p == Presentation.IDLE || a == null) return Spec(fullWidth, dp(30f), 0f)
-        if (p == Presentation.COMPACT) return Spec(fullWidth, dp(36f), 0f)
+        val maxWidth = idleWidth()
+        if (p == Presentation.IDLE || a == null) {
+            val h = dp(IslandMotion.IDLE_HEIGHT_DP)
+            return Spec(maxWidth, h, h / 2f, screenCenter())
+        }
+        if (p == Presentation.COMPACT) {
+            val h = dp(IslandMotion.COMPACT_HEIGHT_DP)
+            return Spec(min(dp(IslandMotion.COMPACT_WIDTH_DP) * fit.pillWidth, maxWidth), h, h / 2f, cameraCenter())
+        }
         val w = expandedWidth()
         return when (a.mode) {
-            IslandMode.MUSIC -> Spec(w, dp(178f), dp(46f))
-            IslandMode.CALL -> Spec(w, dp(88f), dp(44f))
-            IslandMode.MESSAGE -> Spec(w, dp(if (visibleActions(a).isEmpty()) 84f else 134f), dp(40f))
-            IslandMode.CHARGING -> Spec(w, dp(64f), dp(32f))
-            IslandMode.TIMER -> Spec(w, dp(if (visibleActions(a).isEmpty()) 88f else 138f), dp(44f))
-            else -> Spec(w, dp(84f), dp(42f))
+            IslandMode.MUSIC -> Spec(w, dp(178f), dp(46f), screenCenter())
+            IslandMode.CALL -> Spec(w, dp(88f), dp(44f), screenCenter())
+            IslandMode.MESSAGE -> Spec(w, dp(if (visibleActions(a).isEmpty()) 84f else 134f), dp(40f), screenCenter())
+            IslandMode.CHARGING -> Spec(w, dp(64f), dp(32f), screenCenter())
+            IslandMode.TIMER -> Spec(w, dp(if (visibleActions(a).isEmpty()) 88f else 138f), dp(44f), screenCenter())
+            else -> Spec(w, dp(84f), dp(42f), screenCenter())
         }
     }
 
@@ -525,8 +539,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         canvas.save()
         canvas.scale(fit.scale, fit.scale)
         val a = activity
-        val desired = (if (anchorToCutout && fit.alignCamera) cameraX ?: width / 2f else width / 2f) + dp(fit.offsetX)
-        val cx = IslandFit.center(width.toFloat(), widthS.value * fit.scale, desired, dp(4f)) / fit.scale
+        // Center is a spring, same as width/height, so idle (full-width) → compact (camera)
+        // does not jump. Clamp so a wide pill cannot sit off-screen.
+        val cx = IslandFit.center(
+            width.toFloat() / fit.scale,
+            widthS.value,
+            centerS.value,
+            dp(4f),
+        )
         val intro = introS.value.coerceIn(0f, 1f)
         val press = pressS.value
         // Hiding shrinks the island back into the camera as it fades.
@@ -560,7 +580,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         actionHits.clear()
         if (ea > 0.01f) {
             // Nothing-inspired island stays monochrome; no coloured content glow.
-            val alpha = (((ea - 0.35f) / 0.65f).coerceIn(0f, 1f) * 255 * intro).toInt()
+            val alpha = (((ea - 0.45f) / 0.55f).coerceIn(0f, 1f) * 255 * intro).toInt()
             // Content rises and scales in slightly as the shape opens, like iOS.
             val lift = (1f - ea) * dp(10f)
             val sc = 0.94f + 0.06f * ea
@@ -581,7 +601,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             barY = -1000f
         }
         if (ca > 0.01f && !liveTimer) {
-            val alpha = (((ca - 0.3f) / 0.7f).coerceIn(0f, 1f) * 255).toInt()
+            val alpha = (((ca - 0.42f) / 0.58f).coerceIn(0f, 1f) * 255).toInt()
             if (alpha > 2) {
                 // Compact glyphs slide in from the centre as the pill widens.
                 canvas.save()
@@ -613,7 +633,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     /**
      * Battery + network (and optionally the time), right-aligned at [rightEdge].
-     * Shared by the idle bar and the compact music bar, which shortens its music
+     * Shared by the idle pill and the compact music pill, which shortens its music
      * content to make room for this readout. Returns the left edge of what was drawn.
      */
     private fun drawStatusCluster(canvas: Canvas, rightEdge: Float, cy: Float, alpha: Int, withTime: Boolean = false): Float {
@@ -741,8 +761,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val right = rect.right - dp(12f)
         when (a.mode) {
             IslandMode.MUSIC -> {
-                // The bar covers the system status bar, so the compact music layout is
-                // shortened: artwork + wave on the left, time/network/battery on the right.
+                // Compact music keeps the status readout: artwork + wave on the left,
+                // time/network/battery on the right.
                 drawWave(canvas, l + s + dp(10f), cy, dp(20f), dp(14f), waveColor, a.isPlaying, alpha)
                 drawStatusCluster(canvas, right, cy, alpha, withTime = true)
             }
@@ -1360,10 +1380,5 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val SHEEN_MS = 800L
         private const val INTRO_HOLD_MS = 190L
         private const val ROLL_MS = 320L
-        private const val SHAPE_K = 190f
-        private const val WIDTH_DAMP = 0.72f
-        private const val HEIGHT_DAMP = 0.8f
-        private const val CONTENT_IN_K = 150f
-        private const val CONTENT_OUT_K = 420f
     }
 }

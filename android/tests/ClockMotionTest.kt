@@ -2,7 +2,7 @@ package com.dynamicdroid.app
 
 import kotlin.math.abs
 
-/** Run with kotlinc ClockTimeline.kt Spring.kt IslandTheme.kt ClockMotionTest.kt -include-runtime -d tests.jar. */
+/** Run with kotlinc IslandFit.kt IslandMotion.kt ClockTimeline.kt Spring.kt IslandTheme.kt ClockMotionTest.kt -include-runtime -d tests.jar. */
 fun main() {
     val fit = IslandFit(scale = 2f, pillWidth = 2f, offsetX = -900f, offsetY = 900f).safe()
     check(fit.scale == 1.3f && fit.pillWidth == 1.5f)
@@ -18,6 +18,8 @@ fun main() {
     check(IslandFit.center(360f, 214f, 500f, 4f) == 249f)
     check(IslandFit.center(360f, 344f, 40f, 4f) == 176f)
     check(IslandFit.center(360f, 400f, 500f, 4f) == 180f)
+    check(abs(IslandMotion.idleWidth(360f, 1f) - 356f) < 0.01f)
+    check(abs(IslandMotion.dampingRatio(180f, 16f) - IslandMotion.WIDTH_DAMPING_RATIO) < 0.02f)
     check(ClockTimeline.parseRemaining("Time left 9:00") == 540_000L)
     check(ClockTimeline.parseRemaining("1:02:03 remaining") == 3_723_000L)
     check(ClockTimeline.parseRemaining("Timer paused") == null)
