@@ -598,7 +598,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (layered) canvas.restore()
     }
 
-    /** Idle island as a mini status bar: time on the left, network and battery on the right. */
+    /** Idle island as a status bar: time on the left, network and battery on the right. */
     private fun drawStatus(canvas: Canvas, alpha: Int, t: Float) {
         val s = status
         val cy = rect.centerY()
@@ -608,8 +608,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             statusPaint.color = withAlpha(NothingStyle.foreground, alpha)
             canvas.drawText(s.time, rect.left + inset, cy + statusPaint.textSize * 0.36f, statusPaint)
         }
+        drawStatusCluster(canvas, rect.right - inset, cy, alpha)
+    }
+
+    /**
+     * Battery + network (and optionally the time), right-aligned at [rightEdge].
+     * Shared by the idle bar and the compact music bar, which shortens its music
+     * content to make room for this readout. Returns the left edge of what was drawn.
+     */
+    private fun drawStatusCluster(canvas: Canvas, rightEdge: Float, cy: Float, alpha: Int, withTime: Boolean = false): Float {
+        val s = status
         // Battery: outline, cap, level fill.
-        var right = rect.right - inset
+        var right = rightEdge
         if (s.battery >= 0) {
             val bw = dp(21f); val bh = dp(10.5f)
             val l = right - bw - dp(2f)
