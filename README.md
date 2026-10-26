@@ -1,24 +1,47 @@
-# Dynamic Island Polish
+# Dynamic Droid
 
-in my git repository i need you to work and do polish it make it smoother for example it glitches in and out often and doesnt respond to my clicks also make it so that like on IOS if we swipe out of an app which has smth that it could display in the island it animates into the island. BBasically look at IOS and copy it ccompletely. i also need u to i need u to makke all the windows of the island polished with art cover from repective apps and just like IOS remove the dismiss and open bbutton or make them actually functional , also for eg, if a msg is from whatsapp the colors of the island shld contian green etc. so that it matches the app
+Android Dynamic Island. The **shape and motion** are authored in SwiftUI (`Sources/IslandUI`) so they can be compiled to Android with [Skip](https://skip.tools). The live overlay (permissions, notifications, accessibility) stays in `android/`.
 
-This project was built with [Lovable](https://lovable.dev).
+## What changed
 
-## Build with Lovable
+- Idle island is a **full-width** status bar: time on the left, wifi/cellular and battery on the right.
+- Width, height, radius, and **horizontal center** all use the same interpolating spring. Idle → compact no longer jumps from screen-center to the camera hole.
+- Compact and expanded live activities still morph from that bar (music, calls, timers, messages).
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/9732cb0b-f148-41f2-bddb-1770bf50c02b).
+## Run on a phone
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+1. Open `android/` in Android Studio (SDK 35).
+2. Install the app, then grant **Display over other apps**, **Notification access**, and **Allow tapping over the status bar**.
+3. Tap **Start Dynamic Island**.
 
-## Development
+Or use **Actions → Build Android APK** after this repo is on GitHub.
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+## SwiftUI + Skip
+
+```
+Sources/IslandUI/     SwiftUI island (source of motion)
+android/              Overlay, listeners, Canvas port of the same springs
+Package.swift         Builds IslandUI on Swift 5.7+
+skip.yml              Skip module mapping
+```
+
+This Mac is on Swift 5.7 (macOS 12), which cannot run the current Skip CLI (needs Swift 5.9 / Xcode 15). The Android Canvas island is a hand port of the SwiftUI springs so the phone app works today.
+
+On a newer Mac:
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+brew install skiptools/skip/skip
+skip checkup
+swift build
+skip export --module IslandUI
+```
+
+Then host the exported Compose view from `IslandOverlayService` in place of `IslandView` when you are ready to switch renderers.
+
+## Preview the island on macOS / iOS
+
+Open `Package.swift` in Xcode and preview `IslandPlayground` in `DynamicIslandView.swift`, or:
+
+```sh
+swift build
 ```

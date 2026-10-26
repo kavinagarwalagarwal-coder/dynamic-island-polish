@@ -1,0 +1,15 @@
+# Skip (https://skip.tools) — SwiftUI → Android Compose
+#
+# The island UI lives in Sources/IslandUI. On a Mac with Xcode 15+ / Swift 5.9+:
+#
+#   brew install skiptools/skip/skip
+#   skip checkup
+#   skip export --module IslandUI
+#
+# Overlay permissions, notification listener, and accessibility still stay in
+# android/ — Skip does not replace those system services. The exported Compose
+# view is what IslandOverlayService should host once Skip is available.
+skip:
+  appName: DynamicDroid
+  appIdentifier: com.dynamicdroid.app
+  module: IslandUI
