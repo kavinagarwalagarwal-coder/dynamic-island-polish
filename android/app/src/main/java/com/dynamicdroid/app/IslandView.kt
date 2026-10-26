@@ -639,7 +639,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             fillPaint.color = withAlpha(color, alpha)
             val pad = dp(2.1f)
             canvas.drawRoundRect(l + pad, cy - bh / 2f + pad, l + pad + (bw - pad * 2) * max(0.08f, level), cy + bh / 2f - pad, dp(1.5f), dp(1.5f), fillPaint)
-            if (s.charging) drawBolt(canvas, l + bw / 2f, cy, dp(8f), withAlpha(NothingStyle.background, alpha))
+            if (s.charging) drawBolt(canvas, l + bw / 2f, cy, dp(8f), withAlpha(baseColor, alpha))
             right = l - dp(7f)
         }
         // Network: wifi fan or four signal bars; a dim "x" style empty bars when offline.
@@ -663,7 +663,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 fillPaint.color = withAlpha(if (s.bars > i) NothingStyle.foreground else NothingStyle.line, alpha)
                 canvas.drawRoundRect(l, cy + dp(5f) - bh, l + bw, cy + dp(5f), dp(1f), dp(1f), fillPaint)
             }
+            right -= 4 * (bw + gap) + dp(7f)
         }
+        if (withTime && s.time.isNotEmpty()) {
+            statusPaint.color = withAlpha(NothingStyle.foreground, alpha)
+            val w = statusPaint.measureText(s.time)
+            canvas.drawText(s.time, right - w, cy + statusPaint.textSize * 0.36f, statusPaint)
+            right -= w + dp(10f)
+        }
+        return right
     }
 
     /** Soft wash of the app's colour (WhatsApp green, Spotify green, YouTube red...). */
@@ -731,7 +739,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
         val right = rect.right - dp(12f)
         when (a.mode) {
-            IslandMode.MUSIC -> drawWave(canvas, right - dp(20f), cy, dp(20f), dp(14f), waveColor, a.isPlaying, alpha)
+            IslandMode.MUSIC -> {
+                // The bar covers the system status bar, so the compact music layout is
+                // shortened: artwork + wave on the left, time/network/battery on the right.
+                drawWave(canvas, l + s + dp(10f), cy, dp(20f), dp(14f), waveColor, a.isPlaying, alpha)
+                drawStatusCluster(canvas, right, cy, alpha, withTime = true)
+            }
             IslandMode.CALL -> {
                 val t = a.chronometerText()
                 if (t != null) text(canvas, t, right, cy + dp(4.5f), dp(80f), smallPaint, NothingStyle.muted, alpha, alignRight = true)
