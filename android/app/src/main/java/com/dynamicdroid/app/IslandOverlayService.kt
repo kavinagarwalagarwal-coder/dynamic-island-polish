@@ -1,6 +1,7 @@
 package com.dynamicdroid.app
 
 import android.app.ActivityOptions
+import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -16,6 +17,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
@@ -43,9 +45,15 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private var presentation = Presentation.COMPACT
     private var foregroundPkg: String? = null
     private var watcher: ForegroundWatcher? = null
+    /** A newly started timer opens briefly, then morphs up into the pill. */
+    private var timerPeek = false
+    /** Foreground app hid the status bar (video, photos, games): tuck the island away. */
+    private var fullscreen = false
+    private var status: StatusMonitor? = null
 
     private val clearTransient = Runnable { transient = null; render() }
     private val autoCollapse = Runnable {
+        timerPeek = false
         if (transient == null && presentation == Presentation.EXPANDED) {
             presentation = Presentation.COMPACT
             render()
@@ -65,6 +73,48 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
     }
 
+    // ---------------------------------------------------------------- wake / unlock intro
+    //
+    // The intro used to fire on SCREEN_ON, i.e. behind the lock screen, so it was never seen.
+    // Now the island hides as a dot when the screen turns off and grows out once the phone is
+    // actually unlocked and the unlock animation has cleared.
+
+    private var introArmed = false
+    private val playIntro = Runnable { island?.playIntro() }
+    private val waitForUnlock = object : Runnable {
+        override fun run() {
+            if (!introArmed) return
+            val locked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
+            val screenOn = getSystemService(PowerManager::class.java)?.isInteractive != false
+            when {
+                !screenOn -> Unit
+                !locked -> {
+                    introArmed = false
+                    handler.postDelayed(playIntro, UNLOCK_SETTLE_MS)
+                }
+                else -> handler.postDelayed(this, 200L)
+            }
+        }
+    }
+
+    private val wakeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            when (intent?.action) {
+                Intent.ACTION_SCREEN_OFF -> {
+                    handler.removeCallbacks(waitForUnlock)
+                    handler.removeCallbacks(playIntro)
+                    introArmed = true
+                    fullscreen = false
+                    island?.hideForIntro()
+                }
+                Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> {
+                    handler.removeCallbacks(waitForUnlock)
+                    handler.post(waitForUnlock)
+                }
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         createChannel()
@@ -79,28 +129,59 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         ContextCompat.registerReceiver(
             this, powerReceiver, IntentFilter(Intent.ACTION_POWER_CONNECTED), ContextCompat.RECEIVER_EXPORTED
         )
+        ContextCompat.registerReceiver(
+            this, wakeReceiver,
+            IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+            },
+            ContextCompat.RECEIVER_EXPORTED
+        )
         watcher = ForegroundWatcher(this, ::onForegroundChanged)
-        if (Settings.canDrawOverlays(this)) showOverlay()
+        status = StatusMonitor(this) { info -> island?.applyStatus(info) }.also { it.start() }
+        IslandAccessibilityService.onChanged = { handler.post { reattach() } }
+        attachWindow()
         IslandBus.listener = this
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        if (island == null && Settings.canDrawOverlays(this)) {
-            showOverlay()
-            render()
+        if (island == null && attachWindow()) render()
+        if (intent?.action == ACTION_FIT) {
+            island?.let { view ->
+                // Reserve vertical room before moving or scaling the island.
+                growWindow(resources.displayMetrics.widthPixels to resources.displayMetrics.heightPixels, false)
+                view.applyFit(IslandPreferences.read(this))
+                render()
+            }
+        }
+        if (intent?.action == ACTION_THEME) {
+            island?.applyTheme(IslandPreferences.readTheme(this))
         }
         if (ongoing != null) watcher?.start()
         return START_STICKY
     }
 
-    private fun showOverlay() {
-        val wm = getSystemService(WINDOW_SERVICE) as WindowManager
+    /**
+     * Prefers an accessibility overlay (above the status bar, so taps at the top reach the island)
+     * and falls back to a normal overlay (below the status bar) when that isn't switched on.
+     */
+    private fun attachWindow(): Boolean {
+        val a11y = IslandAccessibilityService.instance
+        if (a11y == null && !Settings.canDrawOverlays(this)) return false
+        val host: Context = a11y ?: this
+        val wm = host.getSystemService(WINDOW_SERVICE) as WindowManager
         windowManager = wm
-        val view = IslandView(this).also { it.callbacks = this }
+        val view = IslandView(host).also {
+            it.callbacks = this
+            it.applyFit(IslandPreferences.read(this))
+            it.applyTheme(IslandPreferences.readTheme(this))
+            status?.let { m -> it.applyStatus(m.current) }
+        }
         island = view
         val (w, h) = view.windowSizeFor(null, Presentation.IDLE)
-        val type = if (Build.VERSION.SDK_INT >= 26) WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        else @Suppress("DEPRECATION") WindowManager.LayoutParams.TYPE_PHONE
+        val type = if (a11y != null) WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        else WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         val lp = WindowManager.LayoutParams(
             w, h, type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -118,7 +199,24 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             }
         }
         params = lp
-        wm.addView(view, lp)
+        if (runCatching { wm.addView(view, lp) }.isFailure) {
+            island = null; params = null
+            return false
+        }
+        view.hideForIntro()
+        view.post { view.playIntro() }
+        return true
+    }
+
+    private fun detachWindow() {
+        island?.let { v -> runCatching { windowManager?.removeView(v) } }
+        island = null
+        params = null
+    }
+
+    private fun reattach() {
+        detachWindow()
+        if (attachWindow()) render()
     }
 
     // ---------------------------------------------------------------- state
@@ -132,9 +230,27 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             o != null -> o to presentation
             else -> null to Presentation.IDLE
         }
-        handler.removeCallbacks(autoCollapse)
-        if (t == null && p == Presentation.EXPANDED && a?.mode != IslandMode.CALL) {
-            handler.postDelayed(autoCollapse, EXPANDED_TIMEOUT_MS)
+        // Calls stay visible even over fullscreen video; everything else steps aside.
+        val concealed = fullscreen && a?.mode != IslandMode.CALL
+        view.setConcealed(concealed)
+        // A settled idle or hidden window is touch-through; restore touches the moment something shows.
+        params?.let { lp ->
+            val touchable = a != null && !concealed
+            val isOff = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0
+            if (touchable == isOff) {
+                lp.flags = if (touchable) lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+                else lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                runCatching { windowManager?.updateViewLayout(view, lp) }
+            }
+        }
+        val changedPresentation = view.activity?.key != a?.key || view.presentation != p
+        // Per-second notification updates must not keep restarting the timer's peek.
+        if (changedPresentation) {
+            handler.removeCallbacks(autoCollapse)
+            if (t == null && p == Presentation.EXPANDED && a?.mode != IslandMode.CALL) {
+                val delay = if (timerPeek && a?.mode == IslandMode.TIMER) TIMER_PEEK_MS else EXPANDED_TIMEOUT_MS
+                handler.postDelayed(autoCollapse, delay)
+            }
         }
         growWindow(view.windowSizeFor(a, p), absorb)
         view.show(a, p, absorb)
@@ -148,7 +264,13 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         } else {
             val isNew = ongoing?.key != activity.key
             ongoing = activity
-            if (isNew) presentation = if (activity.mode == IslandMode.CALL) Presentation.EXPANDED else Presentation.COMPACT
+            if (isNew) {
+                timerPeek = activity.mode == IslandMode.TIMER
+                presentation = when (activity.mode) {
+                    IslandMode.CALL, IslandMode.TIMER -> Presentation.EXPANDED
+                    else -> Presentation.COMPACT
+                }
+            }
             watcher?.start()
         }
         render()
@@ -174,7 +296,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         if (previous == o.packageName && pkg != o.packageName && transient == null) {
             // Swiped away from the app: fly it into the island.
             presentation = Presentation.COMPACT
-            render(absorb = true)
+            render(absorb = island?.activity == null &&
+                getSystemService(PowerManager::class.java)?.isInteractive == true &&
+                getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false)
         } else if (pkg == o.packageName || previous == o.packageName) {
             render()
         }
@@ -217,6 +341,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     override fun onExpandRequest() {
         if (transient != null || ongoing == null) return
+        timerPeek = false
         presentation = Presentation.EXPANDED
         render()
     }
@@ -232,6 +357,12 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     override fun onDismiss(activity: LiveActivity) = onCollapseRequest()
+
+    override fun onFullscreenChanged(fullscreen: Boolean) {
+        if (this.fullscreen == fullscreen) return
+        this.fullscreen = fullscreen
+        render()
+    }
 
     override fun onInteraction() {
         // Keep things open while the user is touching them.
@@ -258,6 +389,12 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         if (lp.width != w || lp.height != h) {
             lp.width = w
             lp.height = h
+            changed = true
+        }
+        // Idle island: the window still spans the top for the next intro, so let touches
+        // fall through to the app underneath instead of deadening that strip.
+        if ((a == null || view.isConcealed) && lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
+            lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             changed = true
         }
         if (changed) runCatching { windowManager?.updateViewLayout(view, lp) }
@@ -318,10 +455,13 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     override fun onDestroy() {
         if (IslandBus.listener === this) IslandBus.listener = null
+        IslandAccessibilityService.onChanged = null
         watcher?.stop()
+        status?.stop()
         handler.removeCallbacksAndMessages(null)
-        island?.let { v -> runCatching { windowManager?.removeView(v) } }
+        detachWindow()
         runCatching { unregisterReceiver(powerReceiver) }
+        runCatching { unregisterReceiver(wakeReceiver) }
         super.onDestroy()
     }
 
@@ -336,9 +476,14 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     companion object {
+        const val ACTION_FIT = "com.dynamicdroid.app.UPDATE_FIT"
+        const val ACTION_THEME = "com.dynamicdroid.app.UPDATE_THEME"
         private const val CHANNEL_ID = "dynamic_island"
         private const val NOTIFICATION_ID = 7104
         private const val EXPANDED_TIMEOUT_MS = 6_000L
         private const val MESSAGE_TIMEOUT_MS = 5_000L
+        private const val TIMER_PEEK_MS = 2_600L
+        /** Lets the system's unlock animation finish so the intro is actually visible. */
+        private const val UNLOCK_SETTLE_MS = 320L
     }
 }
