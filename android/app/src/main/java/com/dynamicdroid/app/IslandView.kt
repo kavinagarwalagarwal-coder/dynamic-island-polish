@@ -655,6 +655,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             }
             fillPaint.color = withAlpha(NothingStyle.foreground, alpha)
             canvas.drawCircle(ox, oy - dp(0.4f), dp(1.3f), fillPaint)
+            right -= dp(24f)
         } else {
             val bw = dp(2.6f); val gap = dp(1.5f)
             for (i in 0 until 4) {
