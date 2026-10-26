@@ -1032,7 +1032,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             val b = size * 0.42f
             val bx = l + size - b * 0.8f
             val by = t + size - b * 0.8f
-            fillPaint.color = withAlpha(Color.BLACK, alpha)
+            fillPaint.color = withAlpha(baseColor, alpha)
             canvas.drawCircle(bx + b / 2, by + b / 2, b / 2 + dp(2f), fillPaint)
             drawImage(canvas, icon, bx, by, b, b / 2, alpha)
         } else {
