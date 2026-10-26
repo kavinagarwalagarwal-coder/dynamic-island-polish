@@ -79,17 +79,20 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         invalidate()
     }
 
-    // Wallpaper theme: the island stays monochrome, but accents (timer ring, waves,
-    // progress, supporting buttons) take the wallpaper's colours when enabled.
+    // Wallpaper theme: accents (timer ring, waves, progress, supporting buttons) take the
+    // wallpaper's colours when enabled, and the pill body itself becomes a very dark
+    // version of the wallpaper's main colour instead of plain black.
     private var accent = NothingStyle.red
     private var accentSoft = NothingStyle.muted
     private var waveColor = NothingStyle.foreground
+    private var baseColor = NothingStyle.background
 
     fun applyTheme(theme: IslandTheme) {
         val t = theme.safe()
         accent = if (t.enabled) t.accent else NothingStyle.red
         accentSoft = if (t.enabled) t.secondary else NothingStyle.muted
         waveColor = if (t.enabled) t.accent else NothingStyle.foreground
+        baseColor = if (t.enabled) t.base else NothingStyle.background
         invalidate()
     }
 
@@ -134,8 +137,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun updateAnchor() {
         val physicalTop = if (anchorToCutout && fit.alignCamera) cameraTop ?: dp(8f) else dp(8f)
         baseTop = max(0f, physicalTop + dp(fit.offsetY)) / fit.scale
-        if (!isAbsorbing) topS.target = baseTop
+        if (!isAbsorbing) topS.target = topTargetFor(presentation)
     }
+
+    /**
+     * Idle and compact are a full-width bar flush with the top of the screen, covering the
+     * system status bar (the island draws its own time/network/battery instead). Only the
+     * expanded card floats lower, below the camera.
+     */
+    private fun topTargetFor(p: Presentation) = if (p == Presentation.EXPANDED) max(baseTop, dp(2f)) else 0f
 
     // Shape. Softer, slower springs (~0.5s response) with a touch of bounce, like iOS.
     private val widthS = Spring(dp(104f), SHAPE_K, WIDTH_DAMP, 0.5f)
@@ -280,7 +290,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         widthS.target = spec.w
         heightS.target = spec.h
         radiusS.target = spec.r
-        topS.target = baseTop
+        topS.target = topTargetFor(p)
         absorbS.target = 0f
         setContentTargets(p)
         settled = false
@@ -342,7 +352,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         widthS.stiffness = 150f; widthS.dampingRatio = 0.6f
         heightS.stiffness = 170f; heightS.dampingRatio = 0.72f
         radiusS.stiffness = 170f; radiusS.dampingRatio = 0.85f
-        widthS.target = spec.w; heightS.target = spec.h; radiusS.target = spec.r; topS.target = baseTop
+        widthS.target = spec.w; heightS.target = spec.h; radiusS.target = spec.r
+        topS.target = topTargetFor(presentation)
         setContentTargets(presentation)
         sheenStart = SystemClock.uptimeMillis() + 300L
         settled = false
