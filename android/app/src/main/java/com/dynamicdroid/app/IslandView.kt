@@ -370,11 +370,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     /** Pixel size the overlay window needs for the current target state. */
     fun windowSizeFor(next: LiveActivity?, p: Presentation): Pair<Int, Int> {
-        val spec = specFor(if (next == null) Presentation.IDLE else p, next)
+        val effective = if (next == null) Presentation.IDLE else p
+        val spec = specFor(effective, next)
         // A fixed horizontal origin avoids one-frame jumps when WindowManager relayouts.
         // Keep the bottom slack tiny: the window eats touches wherever it covers, so a tall
         // idle window would deaden a strip of the screen under the island.
-        return Pair(resources.displayMetrics.widthPixels, ((baseTop + spec.h + dp(14f)) * fit.scale).toInt())
+        return Pair(resources.displayMetrics.widthPixels, ((topTargetFor(effective) + spec.h + dp(14f)) * fit.scale).toInt())
     }
 
     val isAbsorbing: Boolean get() = absorbS.value > 0.002f
@@ -389,9 +390,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun specFor(p: Presentation, a: LiveActivity?): Spec {
         val maxWidth = (resources.displayMetrics.widthPixels - dp(16f)) / fit.scale
-        // Idle = mini status bar, wide enough for time | camera | network + battery.
-        if (p == Presentation.IDLE || a == null) return Spec(min(dp(176f) * fit.pillWidth, maxWidth), dp(30f), dp(15f))
-        if (p == Presentation.COMPACT) return Spec(min(dp(214f) * fit.pillWidth, maxWidth), dp(34f), dp(17f))
+        // Idle and compact are a full-width bar over the status bar: the island draws its
+        // own time, network and battery, so it replaces what it covers.
+        val fullWidth = resources.displayMetrics.widthPixels / fit.scale
+        if (p == Presentation.IDLE || a == null) return Spec(fullWidth, dp(30f), 0f)
+        if (p == Presentation.COMPACT) return Spec(fullWidth, dp(36f), 0f)
         val w = expandedWidth()
         return when (a.mode) {
             IslandMode.MUSIC -> Spec(w, dp(178f), dp(46f))
@@ -535,6 +538,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val r = min(radiusS.value * press, h / 2f)
         val absorb = absorbS.value.coerceIn(0f, 1f)
 
+        shapePaint.color = baseColor
         shapePaint.alpha = (255 * (1f - absorb * 0.3f) * min(1f, intro * 2.5f)).toInt()
         canvas.drawRoundRect(rect, r, r, shapePaint)
         drawSheen(canvas, r)
