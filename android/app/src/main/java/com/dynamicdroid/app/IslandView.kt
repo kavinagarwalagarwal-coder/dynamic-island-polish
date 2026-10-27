@@ -86,6 +86,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var accentSoft = NothingStyle.muted
     private var waveColor = NothingStyle.foreground
     private var baseColor = NothingStyle.background
+    private var glassTint = Color.rgb(140, 140, 140)
 
     fun applyTheme(theme: IslandTheme) {
         val t = theme.safe()
@@ -93,6 +94,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         accentSoft = if (t.enabled) t.secondary else NothingStyle.muted
         waveColor = if (t.enabled) t.accent else NothingStyle.foreground
         baseColor = if (t.enabled) t.base else NothingStyle.background
+        glassTint = if (t.enabled) t.accent else Color.rgb(140, 140, 140)
         invalidate()
     }
 
@@ -168,6 +170,45 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
+    private val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val glassRect = RectF()
+
+    /**
+     * Liquid-glass body in the style of Kyant0/AndroidLiquidGlass, drawn on Canvas: a system
+     * overlay cannot sample other apps' pixels, so refraction/blur is approximated with a
+     * wallpaper-tinted vertical body gradient, a bright specular top rim and a dark lower lip.
+     */
+    private fun drawGlass(canvas: Canvas, r: Float, alpha: Int) {
+        if (alpha <= 0) return
+        val tint = glassTint
+        val top = blend(baseColor, tint, 0.28f)
+        val bottom = blend(baseColor, Color.BLACK, 0.35f)
+        glassPaint.shader = LinearGradient(0f, rect.top, 0f, rect.bottom,
+            intArrayOf(top, baseColor, bottom), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
+        glassPaint.alpha = alpha
+        canvas.drawRoundRect(rect, r, r, glassPaint)
+        // Inner refraction glow: soft tinted lens near the top edge.
+        glassPaint.shader = LinearGradient(0f, rect.top, 0f, rect.top + rect.height() * 0.5f,
+            intArrayOf(withAlpha(blend(tint, Color.WHITE, 0.4f), 70), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
+        glassPaint.alpha = alpha
+        canvas.drawRoundRect(rect, r, r, glassPaint)
+        // Specular rim: bright on top, fading toward the bottom.
+        val sw = dp(1f)
+        rimPaint.strokeWidth = sw
+        glassRect.set(rect.left + sw / 2, rect.top + sw / 2, rect.right - sw / 2, rect.bottom - sw / 2)
+        rimPaint.shader = LinearGradient(0f, rect.top, 0f, rect.bottom,
+            intArrayOf(withAlpha(blend(tint, Color.WHITE, 0.7f), 150), withAlpha(tint, 30), withAlpha(Color.WHITE, 45)),
+            floatArrayOf(0f, 0.6f, 1f), Shader.TileMode.CLAMP)
+        rimPaint.alpha = alpha
+        val rr = (r - sw / 2).coerceAtLeast(0f)
+        canvas.drawRoundRect(glassRect, rr, rr, rimPaint)
+    }
+
+    private fun blend(a: Int, b: Int, t: Float): Int {
+        fun ch(x: Int, y: Int) = (x + (y - x) * t).toInt().coerceIn(0, 255)
+        return Color.rgb(ch(Color.red(a), Color.red(b)), ch(Color.green(a), Color.green(b)), ch(Color.blue(a), Color.blue(b)))
+    }
     private val fillPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val glowPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val imagePaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
@@ -558,9 +599,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val r = min(radiusS.value * press, h / 2f)
         val absorb = absorbS.value.coerceIn(0f, 1f)
 
-        shapePaint.color = baseColor
-        shapePaint.alpha = (255 * (1f - absorb * 0.3f) * min(1f, intro * 2.5f)).toInt()
-        canvas.drawRoundRect(rect, r, r, shapePaint)
+        val bodyAlpha = (255 * (1f - absorb * 0.3f) * min(1f, intro * 2.5f)).toInt()
+        drawGlass(canvas, r, bodyAlpha)
         drawSheen(canvas, r)
         val sa = idleA.value.coerceIn(0f, 1f)
         if (sa > 0.01f) {
