@@ -551,12 +551,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val a = activity ?: return null
         if (presentation == Presentation.IDLE) return null
         if (isConcealed) return null
+        // Scheduling runs before onDraw updates rollAt. Include a pending text change so the
+        // last 0:01 → 0:00 roll (and paused updates) gets frames all the way to completion.
+        if (isLiveTimer(a) && (a.chronometerText() != rollText ||
+                rollAt != 0L && SystemClock.uptimeMillis() - rollAt < ROLL_MS)) return 16L
         return when {
             a.mode == IslandMode.MUSIC && a.isPlaying -> 16L
             a.mode == IslandMode.CALL -> 33L
             a.clockBaseElapsed != null && a.pausedTimerMs == null -> {
-                // Smooth frames while a digit rolls, otherwise wake exactly at the next second.
-                if (rollAt != 0L && SystemClock.uptimeMillis() - rollAt < ROLL_MS) return 16L
                 val ms = a.clockMs() ?: return null
                 if (a.chronometerCountDown && ms == 0L) return null
                 // Keep the progress ring continuous; digits still change only at second boundaries.
