@@ -60,7 +60,7 @@ struct CellularGlyph: View {
         HStack(alignment: .bottom, spacing: 1.5) {
             ForEach(0..<4, id: \.self) { i in
                 RoundedRectangle(cornerRadius: 0.8)
-                    .frame(width: 2.6, height: CGFloat(4 + i * 2.4))
+                    .frame(width: 2.6, height: 4 + CGFloat(i) * 2.4)
                     .opacity(bars > i ? 1 : 0.22)
             }
         }

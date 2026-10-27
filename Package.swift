@@ -15,5 +15,6 @@ let package = Package(
             name: "IslandUI",
             path: "Sources/IslandUI"
         ),
+        .testTarget(name: "IslandUITests", dependencies: ["IslandUI"], path: "Tests/IslandUITests"),
     ]
 )

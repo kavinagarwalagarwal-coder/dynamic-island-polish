@@ -10,9 +10,9 @@ import kotlin.math.sqrt
  */
 object IslandMotion {
     const val SHAPE_K = 180f
-    const val WIDTH_DAMPING_RATIO = 0.58f
-    const val HEIGHT_DAMPING_RATIO = 0.68f
-    const val CENTER_DAMPING_RATIO = 0.72f
+    const val WIDTH_DAMPING_RATIO = 0.76f
+    const val HEIGHT_DAMPING_RATIO = 0.82f
+    const val CENTER_DAMPING_RATIO = 0.86f
     const val RADIUS_DAMPING_RATIO = 0.90f
     const val CONTENT_IN_K = 140f
     const val CONTENT_OUT_K = 380f

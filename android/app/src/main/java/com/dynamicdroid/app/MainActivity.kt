@@ -84,12 +84,26 @@ class MainActivity : AppCompatActivity() {
 
     private val previewCallbacks = object : IslandView.Callbacks {
         override fun onOpen(activity: LiveActivity) = toast("Opens ${activity.appLabel}")
-        override fun onAction(activity: LiveActivity, action: IslandAction) = toast(action.label)
+        override fun onAction(activity: LiveActivity, action: IslandAction) {
+            if (activity.mode != IslandMode.TIMER) { toast(action.label); return }
+            if (action.label == "Cancel") { demo = null; preview.setSecondary(null); preview.show(null, Presentation.IDLE); return }
+            val paused = activity.pausedTimerMs == null
+            val ms = activity.clockMs() ?: 0L
+            val next = activity.copy(pausedTimerMs = if (paused) ms else null,
+                clockBaseElapsed = if (paused) activity.clockBaseElapsed else SystemClock.elapsedRealtime() + ms,
+                actions = listOf(IslandAction(if (paused) "Resume" else "Pause", selfIntent()), IslandAction("Cancel", selfIntent())))
+            showDemo(next, demoPresentation)
+        }
         override fun onMedia(activity: LiveActivity, command: String, positionMs: Long?) {
             val a = demo ?: return
             if (command == IslandBus.MEDIA_TOGGLE) showDemo(demoMusic(!a.isPlaying, a.livePositionMs()), demoPresentation)
             if (command == IslandBus.MEDIA_SEEK && positionMs != null) showDemo(demoMusic(a.isPlaying, positionMs), demoPresentation)
             if (command == IslandBus.MEDIA_NEXT || command == IslandBus.MEDIA_PREVIOUS) showDemo(demoMusic(a.isPlaying, 0L), demoPresentation)
+        }
+        override fun onSecondaryExpand(activity: LiveActivity) {
+            val previous = demo
+            showDemo(activity, Presentation.EXPANDED)
+            preview.setSecondary(previous)
         }
         override fun onExpandRequest() { demo?.let { showDemo(it, Presentation.EXPANDED) } }
         override fun onCollapseRequest() { demo?.let { showDemo(it, Presentation.COMPACT) } }
@@ -171,7 +185,11 @@ class MainActivity : AppCompatActivity() {
         musicRow.addView(chip("Chat") { showDemo(demoMessage(), Presentation.EXPANDED) })
         val activityRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         activityRow.addView(chip("Call") { showDemo(demoCall(), Presentation.EXPANDED) })
-        activityRow.addView(chip("Timer") { showDemo(demoTimer(), Presentation.EXPANDED) })
+        activityRow.addView(chip("Timer") { preview.setSecondary(null); showDemo(demoTimer(), Presentation.EXPANDED) })
+        activityRow.addView(chip("Two live") {
+            preview.setSecondary(demoMusic(true))
+            showDemo(demoTimer(), Presentation.COMPACT)
+        })
         column.addView(musicRow, row(-2).apply { topMargin = dp(14) })
         column.addView(activityRow, row(-2).apply { topMargin = dp(8) })
 
