@@ -65,6 +65,7 @@ public struct TimerIsland: View {
                             }
                         }
                         .foregroundColor(activity.accent)
+                        .buttonStyle(.plain)
                         .padding(.horizontal, 20).offset(y: 86)
                         .transition(reduceMotion ? .opacity : .opacity.combined(with: .scale(scale: 0.96)))
                     }
