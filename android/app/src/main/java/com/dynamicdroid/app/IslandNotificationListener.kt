@@ -53,7 +53,8 @@ class IslandNotificationListener : NotificationListenerService() {
         runCatching { activeNotifications }.getOrNull()
             ?.sortedBy { it.postTime }
             ?.filter { it.isOngoing || it.notification.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER) ||
-                it.notification.extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN) || it.packageName.contains("clock", true) }
+                it.notification.extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN) || it.packageName.contains("clock", true) ||
+                it.notification.category == Notification.CATEGORY_ALARM || it.notification.contentView != null || it.notification.bigContentView != null }
             ?.forEach(::onNotificationPosted)
     }
 
@@ -77,6 +78,9 @@ class IslandNotificationListener : NotificationListenerService() {
             return
         }
 
+        val appLabel = AppStyle.label(this, sbn.packageName)
+        val clockApp = sbn.packageName.contains("clock", true) || appLabel.contains("clock", true) || appLabel.contains("timer", true)
+        val customClock = NotificationClockReader.read(this, n, clockApp, sbn.key in timers)
         val title = (extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
             ?: extras.getCharSequence(Notification.EXTRA_TITLE))?.toString()?.takeIf { it.isNotBlank() }
             ?: AppStyle.label(this, sbn.packageName)
@@ -84,11 +88,15 @@ class IslandNotificationListener : NotificationListenerService() {
             ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT))?.toString().orEmpty()
         val chronometer = extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)
         val nativeCountDown = extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN)
-        val recognizedTimer = TimerRecognition.matches(sbn.key in timers, chronometer, nativeCountDown,
+        val recognizedTimer = TimerRecognition.matches(sbn.key in timers || customClock != null, chronometer, nativeCountDown,
             sbn.isOngoing, n.category == Notification.CATEGORY_ALARM || n.category == "stopwatch",
-            sbn.packageName.contains("clock", true),
+            clockApp,
             ClockTimeline.parseRemaining(text) != null || ClockTimeline.parseRemaining(title) != null,
             n.actions.orEmpty().any { a -> listOf("pause", "resume", "cancel", "stop").any { a.title.toString().contains(it, true) } })
+        if (clockApp || customClock != null || sbn.key in timers) {
+            TimerDiagnostics.record(this, sbn.packageName, customClock?.source ?: "standard fields",
+                recognizedTimer, n.contentView != null || n.bigContentView != null)
+        }
         val mode = when {
             n.category == Notification.CATEGORY_CALL -> IslandMode.CALL
             n.category == Notification.CATEGORY_NAVIGATION && sbn.isOngoing -> IslandMode.NAVIGATION
@@ -114,10 +122,10 @@ class IslandNotificationListener : NotificationListenerService() {
         val parsedRemaining = if (mode == IslandMode.TIMER && !chronometer) {
             ClockTimeline.parseRemaining(text) ?: ClockTimeline.parseRemaining(title)
         } else null
-        val paused = mode == IslandMode.TIMER && !chronometer &&
+        val paused = customClock?.paused == true || mode == IslandMode.TIMER && !chronometer &&
             (actions.any { it.label.equals("Resume", ignoreCase = true) || it.label.equals("Start", ignoreCase = true) } ||
                 text.contains("paused", ignoreCase = true))
-        val remaining = parsedRemaining ?: previousTimer?.clockMs()
+        val remaining = parsedRemaining ?: customClock?.remainingMs ?: previousTimer?.clockMs()
         val base = when {
             chronometer || mode == IslandMode.CALL -> n.`when`.takeIf { it > 0L }
             remaining != null && !paused -> System.currentTimeMillis() + remaining
@@ -137,7 +145,10 @@ class IslandNotificationListener : NotificationListenerService() {
             contentIntent = n.contentIntent,
             actions = actions,
             chronometerBase = base,
-            chronometerCountDown = nativeCountDown || parsedRemaining != null || previousTimer?.chronometerCountDown == true,
+            chronometerCountDown = nativeCountDown || customClock?.countDown == true || parsedRemaining != null || previousTimer?.chronometerCountDown == true,
+            clockBaseElapsed = if (paused) null else customClock?.baseElapsed ?: base?.let {
+                SystemClock.elapsedRealtime() + (it - System.currentTimeMillis())
+            },
             pausedTimerMs = if (paused) remaining else null,
         )
         if (mode == IslandMode.TIMER) timers[sbn.key] = activity

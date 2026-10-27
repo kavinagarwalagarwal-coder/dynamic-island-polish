@@ -42,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private var fit = IslandFit()
     private val fitSliders = ArrayList<SeekBar>()
     private var cameraSwitch: SwitchCompat? = null
+    private var clockDiagnostic: TextView? = null
     private var theme = IslandTheme()
     private var themeSwitch: SwitchCompat? = null
     private var swatchA: View? = null
@@ -66,6 +67,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        clockDiagnostic?.text = TimerDiagnostics.read(this)
         val overlay = Settings.canDrawOverlays(this)
         buttons["overlay"]?.text = if (overlay) "Display over other apps: allowed" else "Allow display over other apps"
         buttons["usage"]?.text = if (ForegroundWatcher.hasPermission(this)) "Usage access: allowed" else "Allow usage access (optional)"
@@ -249,6 +251,10 @@ class MainActivity : AppCompatActivity() {
         }, row(-2).apply { topMargin = dp(10) })
 
         column.addView(heading("( 04 )  CONNECTIONS"), row(-2).apply { topMargin = dp(28) })
+        column.addView(heading("CLOCK NOTIFICATION STATUS"), row(-2).apply { topMargin = dp(16) })
+        clockDiagnostic = label(TimerDiagnostics.read(this), 13f, NothingStyle.muted)
+        column.addView(clockDiagnostic, row(-2).apply { topMargin = dp(8) })
+
 
         column.addView(action("overlay", "Allow display over other apps") {
             if (!Settings.canDrawOverlays(this)) {
