@@ -24,6 +24,15 @@ object NotificationClockReader {
             return Clock(base, ClockTimeline.remaining(base, now, nativeDown), nativeDown, false, "notification chronometer")
         }
         if (!clockApp && !known && n.category != Notification.CATEGORY_ALARM) return null
+        val actionLabels = n.actions.orEmpty().map { it.title.toString() }
+        val hasControl = actionLabels.any { label -> listOf("pause", "resume", "cancel", "stop").any { label.contains(it, true) } }
+        val extraText = listOf(Notification.EXTRA_TEXT, Notification.EXTRA_BIG_TEXT, Notification.EXTRA_SUB_TEXT,
+            Notification.EXTRA_SUMMARY_TEXT, "android.shortCriticalText").mapNotNull { n.extras.getCharSequence(it)?.toString() }
+        val extraDuration = extraText.firstNotNullOfOrNull(ClockTimeline::parseRemaining)
+        if ((known || clockApp && hasControl) && extraDuration != null) {
+            val paused = actionLabels.any { it.contains("resume", true) } || extraText.any { it.contains("paused", true) }
+            return Clock(if (paused) null else now + extraDuration, extraDuration, true, paused, "notification timer text")
+        }
         val layouts = listOfNotNull(n.bigContentView, n.contentView, n.headsUpContentView).distinct()
         for (layout in layouts) {
             val root = runCatching { layout.apply(context, FrameLayout(context)) }.getOrNull() ?: continue

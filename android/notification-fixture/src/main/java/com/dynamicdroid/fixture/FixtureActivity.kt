@@ -39,9 +39,14 @@ class FixtureActivity : Activity() {
                 setTextViewText(R.id.remaining, if (paused) "5:00" else "")
                 setTextViewText(R.id.control, if (paused) "Resume" else "Pause")
             }
-            nm.notify(202, Notification.Builder(this, "fixture").setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
-                .setContentTitle("Tea").setShowWhen(false).setCustomContentView(remote).setCustomBigContentView(remote)
-                .setStyle(Notification.DecoratedCustomViewStyle()).build())
+            val builder = Notification.Builder(this, "fixture").setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+                .setContentTitle("Tea").setShowWhen(false)
+            if (kind == "chip") {
+                builder.addExtras(Bundle().apply { putCharSequence("android.shortCriticalText", "5:00") })
+                val action = PendingIntent.getActivity(this, 0, Intent(this, FixtureActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+                builder.addAction(Notification.Action.Builder(null, "Pause", action).build())
+            } else builder.setCustomContentView(remote).setCustomBigContentView(remote).setStyle(Notification.DecoratedCustomViewStyle())
+            nm.notify(202, builder.build())
         }
         startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         finish()

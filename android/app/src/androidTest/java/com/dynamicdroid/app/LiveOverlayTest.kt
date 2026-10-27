@@ -16,7 +16,8 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class LiveOverlayTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
-    private fun shell(command: String) = instrumentation.uiAutomation.executeShellCommand(command).let {
+    private val automation = instrumentation.getUiAutomation(android.app.UiAutomation.FLAG_DONT_SUPPRESS_ACCESSIBILITY_SERVICES)
+    private fun shell(command: String) = automation.executeShellCommand(command).let {
         ParcelFileDescriptor.AutoCloseInputStream(it).use { input -> String(input.readBytes()) }
     }
     @Suppress("UNCHECKED_CAST")
@@ -32,7 +33,7 @@ class LiveOverlayTest {
         fail(message)
     }
     private fun capture(name: String) {
-        val b = instrumentation.uiAutomation.takeScreenshot() ?: error("Missing screenshot")
+        val b = automation.takeScreenshot() ?: error("Missing screenshot")
         val r = instrumentation.targetContext.contentResolver
         val v = android.content.ContentValues().apply {
             put(android.provider.MediaStore.Images.Media.DISPLAY_NAME, "$name.png")
@@ -70,6 +71,11 @@ class LiveOverlayTest {
                 shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind custom")
                 await("Resumed custom timer lost its detached bubble") { visible(false) }
                 capture("live-overlay-resumed-clock")
+                shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind chip")
+                await("Android 16 timer chip text was not recognised") {
+                    visible(false) && TimerDiagnostics.read(instrumentation.targetContext).contains("notification timer text")
+                }
+                capture("live-overlay-timer-chip")
             } finally {
                 shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind clear")
                 shell("cmd notification disallow_listener com.dynamicdroid.app/com.dynamicdroid.app.IslandNotificationListener")
