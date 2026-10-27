@@ -6,7 +6,7 @@ Android Dynamic Island. The **shape and motion** are authored in SwiftUI (`Sourc
 
 - Idle is **invisible inside the camera cutout**; activity arrival expands the island out of that point.
 - Width, height, radius, center, opacity, and detached-bubble position use interruptible springs. Idle → compact → split → expanded transitions preserve motion.
-- Compact and expanded live activities still morph from that bar (music, calls, timers, messages).
+- Compact and expanded live activities morph from the camera (music, calls, timers, messages).
 
 ## Run on a phone
 
