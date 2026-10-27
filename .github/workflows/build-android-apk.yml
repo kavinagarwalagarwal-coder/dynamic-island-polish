@@ -48,3 +48,39 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build SwiftUI source
         run: swift test
+
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+      - name: Enable emulator acceleration
+        run: sudo chmod 666 /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: false
+          script: |
+            gradle --no-daemon -p android connectedDebugAndroidTest
+      - name: Collect rendered island screenshots
+        if: always()
+        run: |
+          mkdir -p island-screenshots
+          adb pull /sdcard/Android/data/com.dynamicdroid.app/files/island-smoke island-screenshots
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: island-render-checks
+          path: |
+            island-screenshots
+            android/app/build/reports/androidTests
+            android/app/build/outputs/androidTest-results

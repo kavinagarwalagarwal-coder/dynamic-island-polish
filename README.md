@@ -4,8 +4,8 @@ Android Dynamic Island. The **shape and motion** are authored in SwiftUI (`Sourc
 
 ## What changed
 
-- Idle island is a **full-width** status bar: time on the left, wifi/cellular and battery on the right.
-- Width, height, radius, and **horizontal center** all use the same interpolating spring. Idle → compact no longer jumps from screen-center to the camera hole.
+- Idle is **invisible inside the camera cutout**; activity arrival expands the island out of that point.
+- Width, height, radius, center, opacity, and detached-bubble position use interruptible springs. Idle → compact → split → expanded transitions preserve motion.
 - Compact and expanded live activities still morph from that bar (music, calls, timers, messages).
 
 ## Run on a phone
@@ -62,3 +62,12 @@ The island uses an opaque black surface. Liquid Glass, screen capture, refractio
 GitHub Actions runs Android regression tests and builds the debug APK, then runs SwiftUI package tests on macOS. Tests cover focus stability under repeated updates, explicit selection, foreground filtering, activity removal, incoming-call priority, bubble geometry on narrow/scaled screens, one completion per timer run, countdown rounding, and interrupted springs at 30–120 Hz.
 
 Physical-device visual verification is still required: music + timer together, rapidly interrupt expansion/collapse, hold each bubble, pause/resume/cancel real Clock notifications, let a short timer expire, rotate/change fit, and lock/unlock. Available actions and timer metadata depend on the clock app. This recreates supported iOS-style behavior; exact Apple system animations and integrations are not claimed.
+
+## Camera idle and detached timer correction
+
+- Idle contracts and fades into the detected camera hole, stays touch-through, and does not replay a bar animation on an empty unlock.
+- Timers default to the detached countdown bubble when another normal activity is present, in either arrival order. Holding the timer explicitly focuses it; collapsing restores the normal pill + timer arrangement. Side-swipes switch the visible activities without opening an app.
+- Timer recognition accepts chronometer/countdown notifications without the ongoing flag, and retains known paused timers. Running timers stay eligible while Clock is foreground. Notifications without usable timer data remain limited by what the source app publishes.
+- The two surfaces detach/reattach with independent position/scale/opacity springs. The small timer shows remaining time rather than a static logo. Geometry uses the actual view width and stays bounded at scaled calibration values.
+- Reference design: Apple’s [Design dynamic Live Activities](https://developer.apple.com/videos/play/wwdc2023/10194/) and [Live Activities guidance](https://developer.apple.com/design/human-interface-guidelines/live-activities). These guide compact/minimal/expanded states, numeric transitions, elastic motion, and content placement; this does not claim access to Apple's private animation implementation.
+- CI now renders the native Canvas view on an Android 35 emulator and checks visible, non-overlapping split pills at 70/100/130% scale, expansion, reattachment, and invisible camera idle. Screenshots are uploaded as `island-render-checks`, alongside the debug APK artifact. Physical-device/OEM notification checks remain necessary.

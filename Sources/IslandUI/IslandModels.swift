@@ -98,7 +98,9 @@ public struct IslandShapeSpec: Equatable {
         let screenCenter = screenWidth / 2
         if presentation == .idle || activity == nil {
             let h = IslandMotion.idleHeight
-            return IslandShapeSpec(width: maxWidth, height: h, radius: h / 2, centerX: screenCenter, top: top)
+            return IslandShapeSpec(width: h, height: h, radius: h / 2,
+                                   centerX: min(max(cameraX, h / 2), max(h / 2, screenWidth - h / 2)),
+                                   top: top + IslandMotion.compactHeight / 2 - h / 2)
         }
         if presentation == .compact {
             let w = min(IslandMotion.compactWidth * pillWidth, maxWidth)

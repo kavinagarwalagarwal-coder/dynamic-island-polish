@@ -20,6 +20,14 @@ final class IslandUITests: XCTestCase {
         XCTAssertGreaterThan(timer().remainingTime, 57)
         XCTAssertEqual(timer(remaining: 1).remainingTime, 0)
     }
+    func testIdleContractsIntoCameraInsteadOfStatusBar() {
+        let shape = IslandShapeSpec.spec(presentation: .idle, activity: nil, screenWidth: 360,
+                                         cameraX: 83, top: 8)
+        XCTAssertEqual(shape.width, 14)
+        XCTAssertEqual(shape.height, 14)
+        XCTAssertEqual(shape.centerX, 83)
+        XCTAssertEqual(shape.top + shape.height / 2, 26)
+    }
     func testCompactStaysInsideNarrowScreens() {
         for width in [CGFloat(240), 320, 360] {
             for camera in [CGFloat(-180), width / 2, width + 180] {

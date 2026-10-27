@@ -182,13 +182,14 @@ class MainActivity : AppCompatActivity() {
         column.addView(FrameLayout(this).apply { addView(preview, FrameLayout.LayoutParams(-1, -1)) }, row(dp(270)))
         val musicRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         musicRow.addView(chip("Music") { showDemo(demoMusic(true), Presentation.EXPANDED) })
+        musicRow.addView(chip("Idle") { demo = null; preview.setSecondary(null); preview.show(null, Presentation.IDLE) })
         musicRow.addView(chip("Chat") { showDemo(demoMessage(), Presentation.EXPANDED) })
         val activityRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         activityRow.addView(chip("Call") { showDemo(demoCall(), Presentation.EXPANDED) })
         activityRow.addView(chip("Timer") { preview.setSecondary(null); showDemo(demoTimer(), Presentation.EXPANDED) })
         activityRow.addView(chip("Two live") {
-            preview.setSecondary(demoMusic(true))
-            showDemo(demoTimer(), Presentation.COMPACT)
+            preview.setSecondary(demoTimer())
+            showDemo(demoMusic(true), Presentation.COMPACT)
         })
         column.addView(musicRow, row(-2).apply { topMargin = dp(14) })
         column.addView(activityRow, row(-2).apply { topMargin = dp(8) })

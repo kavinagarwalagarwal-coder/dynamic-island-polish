@@ -30,6 +30,32 @@ class ActivityShelfTest {
         shelf.select("missing")
         assertEquals("call", shelf.pair().first?.key)
     }
+    @Test fun timerDetachesFromNormalActivityInEitherArrivalOrder() {
+        for (timerFirst in listOf(true, false)) {
+            val shelf = ActivityShelf<Item>({ it.key }, { it.rank }, { it.key == "timer" })
+            if (timerFirst) { shelf.put(Item("timer", 2)); shelf.put(Item("music", 1)) }
+            else { shelf.put(Item("music", 1)); shelf.put(Item("timer", 2)) }
+            repeat(50) { shelf.put(Item("timer", 2, revision = it)); shelf.put(Item("music", 1, revision = it)) }
+            assertEquals("music", shelf.pair().first?.key)
+            assertEquals("timer", shelf.pair().second?.key)
+            shelf.select("timer")
+            assertEquals("timer", shelf.pair().first?.key)
+            shelf.restoreAutomaticSelection()
+            assertEquals("music", shelf.pair().first?.key)
+            assertEquals("timer", shelf.pair().second?.key)
+            shelf.remove("music")
+            assertEquals("timer", shelf.pair().first?.key)
+            assertNull(shelf.pair().second)
+        }
+    }
+    @Test fun timerRecognitionDoesNotRequireOngoingFlag() {
+        assertTrue(TimerRecognition.matches(false, false, true, false, false, false, false, false))
+        assertTrue(TimerRecognition.matches(false, true, false, false, false, false, false, false))
+        assertTrue(TimerRecognition.matches(false, false, false, false, false, true, true, true))
+        assertTrue(TimerRecognition.matches(true, false, false, false, false, false, false, false))
+        assertFalse(TimerRecognition.matches(false, false, false, false, true, false, false, false))
+        assertFalse(TimerRecognition.matches(false, false, false, false, false, false, true, true))
+    }
     @Test fun compactAndBubbleFitAtBothEdgesAndAllPhoneScales() {
         for (scale in listOf(0.7f, 1f, 1.3f)) for (physicalWidth in listOf(240f, 320f, 360f, 480f)) {
             val screen = physicalWidth / scale
