@@ -18,11 +18,15 @@ import kotlin.math.ceil
 import kotlin.math.min
 
 class WallpaperLiquidGlass {
+    internal val hasRuntimeShader get() = backend != null
+    internal var wasHardwareRendered = false
+        private set
     private val backend = if (Build.VERSION.SDK_INT >= 33) runCatching { Backend() }.getOrNull() else null
     fun draw(canvas: Canvas, rect: RectF, radius: Float, alpha: Int, renderer: WallpaperSkinRenderer) {
         if (!renderer.enabled) return
         if (renderer.motion.glass && canvas.isHardwareAccelerated && backend != null) {
             backend.draw(canvas, rect, radius, alpha, renderer)
+            wasHardwareRendered = true
         } else renderer.draw(canvas, rect, alpha)
     }
 

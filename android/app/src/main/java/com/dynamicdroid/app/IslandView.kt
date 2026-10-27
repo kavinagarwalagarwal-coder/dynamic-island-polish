@@ -138,6 +138,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     private val wallpaperSkin = WallpaperSkinRenderer()
+    private var wallpaperFrameAt = 0L
+    private val wallpaperVisibleRect = android.graphics.Rect()
     private val liquidGlass = WallpaperLiquidGlass()
     private val powerManager = context.getSystemService(PowerManager::class.java)
 
@@ -153,7 +155,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun wallpaperAnimating() = wallpaperSkin.enabled && !reduceMotion &&
         presentation != Presentation.IDLE && !isConcealed && introS.value > 0.01f &&
-        isShown && powerManager?.isInteractive != false &&
+        isShown && getLocalVisibleRect(wallpaperVisibleRect) && powerManager?.isInteractive != false &&
         (activity?.mode != IslandMode.MUSIC || activity?.isPlaying == true)
 
     // Idle status bar data (time, network, battery). Redrawn only when it actually changes.
@@ -533,7 +535,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             if (reduceMotion) s.snap(s.target) else s.step(dt)
             if (!s.isAtRest) rest = false
         }
-        if (wallpaperAnimating()) wallpaperSkin.advance(dt)
+        val wallpaperNow = frameTimeNanos / 1_000_000L
+        if (wallpaperAnimating()) {
+            if (wallpaperFrameAt != 0L) wallpaperSkin.advance((wallpaperNow - wallpaperFrameAt).coerceIn(0L, 100L) / 1000f)
+            wallpaperFrameAt = wallpaperNow
+        } else wallpaperFrameAt = 0L
         invalidate()
         if (rest && !settled && !tracking) {
             settled = true
@@ -632,6 +638,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // ---------------------------------------------------------------- drawing
 
     override fun onDraw(canvas: Canvas) {
+        if (wallpaperAnimating() && !running) kick()
         // Fully hidden (fullscreen video/photos): draw nothing at all.
         val conceal = concealS.value.coerceIn(0f, 1f)
         if (conceal < 0.01f) return

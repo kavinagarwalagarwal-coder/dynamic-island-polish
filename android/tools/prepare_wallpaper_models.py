@@ -27,3 +27,17 @@ for filename, source, digest, labels, destination in models:
     with zipfile.ZipFile(target) as archive:
         (output / destination).write_bytes(archive.read(labels))
 print('Verified and bundled two offline wallpaper models.')
+
+# Download a real model test photo only for instrumentation builds, never into the app APK.
+import sys
+if '--test' in sys.argv:
+    tests = output.parent / 'wallpaperTestAssets'
+    tests.mkdir(exist_ok=True)
+    target = tests / 'cat.jpg'
+    digest = '2533197401eebe9410ea4d063f86c43fbd2666f3e8165a38aca155c0d09c21be'
+    data = target.read_bytes() if target.exists() else b''
+    if hashlib.sha256(data).hexdigest() != digest:
+        data = urllib.request.urlopen('https://storage.googleapis.com/mediapipe-assets/cat.jpg', timeout=60).read()
+        if hashlib.sha256(data).hexdigest() != digest:
+            raise RuntimeError('Test photo checksum mismatch')
+        target.write_bytes(data)

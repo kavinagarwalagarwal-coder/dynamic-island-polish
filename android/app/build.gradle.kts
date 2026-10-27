@@ -18,6 +18,7 @@ android {
 
     buildFeatures { viewBinding = false }
     sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/wallpaperAssets"))
+    sourceSets.getByName("androidTest").assets.srcDir(layout.buildDirectory.dir("generated/wallpaperTestAssets"))
     androidResources { noCompress += "tflite" }
     sourceSets.getByName("test").java.srcDir("../tests")
 
@@ -37,6 +38,13 @@ val prepareWallpaperModels by tasks.registering(Exec::class) {
     outputs.dir(layout.buildDirectory.dir("generated/wallpaperAssets"))
 }
 tasks.named("preBuild").configure { dependsOn(prepareWallpaperModels) }
+val prepareWallpaperTestAssets by tasks.registering(Exec::class) {
+    dependsOn(prepareWallpaperModels)
+    commandLine("python3", rootProject.file("tools/prepare_wallpaper_models.py").absolutePath, "--test")
+    inputs.file(rootProject.file("tools/prepare_wallpaper_models.py"))
+    outputs.dir(layout.buildDirectory.dir("generated/wallpaperTestAssets"))
+}
+tasks.matching { it.name == "preDebugAndroidTestBuild" }.configureEach { dependsOn(prepareWallpaperTestAssets) }
 
 dependencies {
     implementation("com.google.ai.edge.litert:litert:1.4.2")

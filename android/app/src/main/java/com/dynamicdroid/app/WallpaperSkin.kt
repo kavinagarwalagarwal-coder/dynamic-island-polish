@@ -24,7 +24,7 @@ object WallpaperSkinStore {
     }
     @Synchronized fun saveAnalysis(context: Context, analysis: LocalWallpaperAnalyzer.Analysis) {
         for ((kind, bitmap) in listOf("background" to analysis.background, "subject" to analysis.subject)) {
-            if (bitmap == null) layerFile(context, kind).delete() else {
+            if (bitmap == null) AtomicFile(layerFile(context, kind)).delete() else {
                 val atomic = AtomicFile(layerFile(context, kind)); val stream = atomic.startWrite()
                 try { check(bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)); atomic.finishWrite(stream) }
                 catch (e: Exception) { atomic.failWrite(stream); throw e }
@@ -55,11 +55,11 @@ object WallpaperSkinStore {
         return cached
     }
     @Synchronized fun remove(context: Context) {
-        file(context).delete()
+        AtomicFile(file(context)).delete()
         // Existing views can retain the old bitmap until their next settings refresh.
         cached = null
         cachedSubject = null; cachedBackground = null
-        layerFile(context, "subject").delete(); layerFile(context, "background").delete()
+        AtomicFile(layerFile(context, "subject")).delete(); AtomicFile(layerFile(context, "background")).delete()
         save(context, read(context).copy(enabled = false, autoLabel = "Choose an image to recognise its subject", autoConfidence = 0f, autoEffect = "drift"))
     }
     fun importImage(context: Context, uri: Uri): Bitmap {
@@ -96,7 +96,7 @@ object WallpaperSkinStore {
         } catch (e: Exception) { atomic.failWrite(stream); throw e }
         synchronized(this) {
             cached = bitmap; cachedSubject = null; cachedBackground = null
-            layerFile(context, "subject").delete(); layerFile(context, "background").delete()
+            AtomicFile(layerFile(context, "subject")).delete(); AtomicFile(layerFile(context, "background")).delete()
         }
         return bitmap
     }

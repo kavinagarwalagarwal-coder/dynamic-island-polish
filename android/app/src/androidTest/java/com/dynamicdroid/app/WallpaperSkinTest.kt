@@ -11,6 +11,35 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class WallpaperSkinTest {
+    @Test fun realBundledModelsRecogniseAndSeparateCatOffline() {
+        val instrumentation = InstrumentationRegistry.getInstrumentation()
+        val context = instrumentation.targetContext
+        assertEquals(android.content.pm.PackageManager.PERMISSION_DENIED,
+            context.packageManager.checkPermission("android.permission.INTERNET", context.packageName))
+        val photo = instrumentation.context.assets.open("cat.jpg").use { BitmapFactory.decodeStream(it) }
+        try {
+            val result = LocalWallpaperAnalyzer.analyze(context, photo)
+            assertTrue("Wrong subject: ${result.label}", result.label.contains("cat", true))
+            assertEquals("breathe", result.effect)
+            assertNotNull("Foreground mask missing", result.subject)
+            assertNotNull("Separated background missing", result.background)
+            assertTrue(result.confidence > .1f)
+            result.subject?.recycle(); result.background?.recycle()
+        } finally { photo.recycle() }
+    }
+
+    @Test fun circleSearchFindsTheRecordWithoutUserCoordinates() {
+        val image = Bitmap.createBitmap(240, 240, Bitmap.Config.ARGB_8888)
+        val c = Canvas(image); c.drawColor(Color.WHITE)
+        c.drawCircle(120f, 120f, 70f, Paint().apply { color = Color.BLACK })
+        val disc = DiscLocator.locate(image)
+        assertNotNull("Circular record was not located", disc)
+        assertEquals(.5f, disc!![0], .06f)
+        assertEquals(.5f, disc[1], .06f)
+        assertEquals(70f / 240, disc[2], .06f)
+        image.recycle()
+    }
+
     @Test fun selectedDiscMovesWhileTheRestOfThePhotoStaysStill() {
         val image = Bitmap.createBitmap(240, 160, Bitmap.Config.ARGB_8888)
         val c = Canvas(image)
