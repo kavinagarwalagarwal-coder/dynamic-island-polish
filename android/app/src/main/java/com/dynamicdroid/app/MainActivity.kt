@@ -65,6 +65,7 @@ class MainActivity : AppCompatActivity() {
     private val pickWallpaper = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
             buttons["motion-pick"]?.isEnabled = false
+            buttons["motion-remove"]?.isEnabled = false
             toast("Preparing wallpaper…")
             wallpaperWorker.execute {
                 val result = runCatching {
@@ -72,11 +73,15 @@ class MainActivity : AppCompatActivity() {
                     val analysis = runCatching { LocalWallpaperAnalyzer.analyze(applicationContext, bitmap) }
                         .getOrElse { LocalWallpaperAnalyzer.Analysis("Recognition unavailable · gentle drift", 0f, "drift") }
                     WallpaperSkinStore.saveAnalysis(applicationContext, analysis)
+                    WallpaperSkinStore.save(applicationContext, WallpaperSkinStore.read(applicationContext).copy(
+                        enabled = true, autoEffect = analysis.effect, autoLabel = analysis.label,
+                        autoConfidence = analysis.confidence, x = analysis.x, y = analysis.y, radius = analysis.radius))
                     bitmap to analysis
                 }
                 runOnUiThread {
                     if (!isDestroyed) {
                         buttons["motion-pick"]?.isEnabled = true
+                        buttons["motion-remove"]?.isEnabled = true
                         if (result.isSuccess) {
                             val (bitmap, analysis) = result.getOrThrow()
                             wallpaperMotion = wallpaperMotion.copy(enabled = true, autoEffect = analysis.effect,
@@ -86,7 +91,7 @@ class MainActivity : AppCompatActivity() {
                             focusX?.progress = (analysis.x * 100).toInt(); focusY?.progress = (analysis.y * 100).toInt()
                             wallpaperSwitch?.isChecked = true
                             applyWallpaperUpdate()
-                            toast("Recognised: ${analysis.label}. Motion: ${analysis.effect}.")
+                            toast("Wallpaper ready · ${analysis.effect}")
                         } else toast("Couldn't read that image. Try a JPG or PNG.")
                     }
                 }

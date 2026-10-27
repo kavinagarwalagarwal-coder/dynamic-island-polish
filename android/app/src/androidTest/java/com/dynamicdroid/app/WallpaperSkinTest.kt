@@ -58,11 +58,11 @@ class WallpaperSkinTest {
         val before = frame()
         renderer.advance(4f)
         val after = frame()
-        assertNotEquals("Selected record did not rotate", before.getPixel(100, 60), after.getPixel(100, 60))
+        assertNotEquals("Selected record did not rotate", before.getPixel(100, 90), after.getPixel(100, 90))
         assertEquals("Outside the record moved", before.getPixel(20, 80), after.getPixel(20, 80))
         renderer.motion = renderer.motion.copy(enabled = false)
         val disabled = frame()
-        assertEquals(Color.BLACK, disabled.getPixel(100, 60))
+        assertEquals(Color.BLACK, disabled.getPixel(100, 90))
         listOf(image, before, after, disabled).forEach(Bitmap::recycle)
     }
 
