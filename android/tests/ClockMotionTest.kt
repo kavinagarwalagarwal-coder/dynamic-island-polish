@@ -19,7 +19,7 @@ fun main() {
     check(IslandFit.center(360f, 344f, 40f, 4f) == 176f)
     check(IslandFit.center(360f, 400f, 500f, 4f) == 180f)
     check(abs(IslandMotion.idleWidth(360f, 1f) - 356f) < 0.01f)
-    check(abs(IslandMotion.dampingRatio(180f, 16f) - IslandMotion.WIDTH_DAMPING_RATIO) < 0.02f)
+    check(abs(IslandMotion.dampingRatio(180f, 20.4f) - IslandMotion.WIDTH_DAMPING_RATIO) < 0.02f)
     check(ClockTimeline.parseRemaining("Time left 9:00") == 540_000L)
     check(ClockTimeline.parseRemaining("1:02:03 remaining") == 3_723_000L)
     check(ClockTimeline.parseRemaining("Timer paused") == null)
@@ -44,5 +44,18 @@ fun main() {
     check(spring.value.isFinite() && spring.value in 0f..180f)
     repeat(240) { spring.step(1f / 120f) }
     check(spring.isAtRest && abs(spring.value - 34f) < 0.5f)
+    // Refresh-rate independence and reversal at high velocity must converge without snapping.
+    for (hz in listOf(30, 60, 90, 120)) {
+        val motion = Spring(36f, IslandMotion.SHAPE_K, IslandMotion.HEIGHT_DAMPING_RATIO, 0.01f)
+        motion.target = 138f
+        repeat(hz / 5) { motion.step(1f / hz) }
+        val interrupted = motion.value
+        motion.target = 36f
+        check(motion.value == interrupted)
+        repeat(hz * 3) { motion.step(1f / hz) }
+        check(motion.isAtRest && abs(motion.value - 36f) < 0.01f)
+    }
+    check(ClockTimeline.display(3_600_001L, true) == "1:00:01")
+    check(ClockTimeline.display(60_001L, true) == "1:01")
     println("Phone fit, countdown and interrupted spring regressions passed")
 }

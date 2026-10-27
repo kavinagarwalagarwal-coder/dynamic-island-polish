@@ -86,15 +86,48 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var accentSoft = NothingStyle.muted
     private var waveColor = NothingStyle.foreground
     private var baseColor = NothingStyle.background
+    private var wallpaperAccents = false
+    private val timerColor: Int get() = if (wallpaperAccents) accent else Color.rgb(255, 159, 10)
+    private var glassSettings = GlassSettings.read(context)
+    private val liquidGlass = if (Build.VERSION.SDK_INT >= 33) runCatching { LiquidGlass() }.getOrNull() else null
+    private val screenLocation = IntArray(2)
+    private var backdropAt = 0L
+
+    fun applyGlass(settings: GlassSettings) {
+        glassSettings = settings
+        if (!settings.enabled) clearBackdrop()
+        invalidate()
+    }
+
+    fun updateBackdrop(bitmap: Bitmap, bounds: android.graphics.Rect) {
+        if (Build.VERSION.SDK_INT >= 33 && glassSettings.enabled && isAttachedToWindow) {
+            liquidGlass?.update(bitmap, bounds)
+            backdropAt = SystemClock.uptimeMillis()
+            invalidate()
+        }
+    }
+
+    fun clearBackdrop() {
+        if (Build.VERSION.SDK_INT >= 33) liquidGlass?.clear()
+        if (backdropAt != 0L) { backdropAt = 0L; invalidate() }
+    }
+
+    fun backdropRegion(): android.graphics.Rect {
+        getLocationOnScreen(screenLocation)
+        return android.graphics.Rect(screenLocation[0], screenLocation[1],
+            screenLocation[0] + width, screenLocation[1] + height)
+    }
+
     private var glassTint = Color.rgb(140, 140, 140)
 
     fun applyTheme(theme: IslandTheme) {
         val t = theme.safe()
+        wallpaperAccents = t.enabled
         accent = if (t.enabled) t.accent else NothingStyle.red
         accentSoft = if (t.enabled) t.secondary else NothingStyle.muted
         waveColor = if (t.enabled) t.accent else NothingStyle.foreground
         baseColor = if (t.enabled) t.base else NothingStyle.background
-        glassTint = if (t.enabled) t.accent else Color.rgb(140, 140, 140)
+        glassTint = t.accent
         invalidate()
     }
 
@@ -116,6 +149,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private set
 
     fun setConcealed(hidden: Boolean) {
+        if (hidden) clearBackdrop()
         if (hidden == isConcealed) return
         isConcealed = hidden
         if (hidden) {
@@ -174,20 +208,21 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val rimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val glassRect = RectF()
 
-    /**
-     * Liquid-glass body in the style of Kyant0/AndroidLiquidGlass, drawn on Canvas: a system
-     * overlay cannot sample other apps' pixels, so refraction/blur is approximated with a
-     * wallpaper-tinted vertical body gradient, a bright specular top rim and a dark lower lip.
-     */
+    /** Refract the captured window when available; otherwise retain the readable material. */
     private fun drawGlass(canvas: Canvas, r: Float, alpha: Int) {
         if (alpha <= 0) return
-        val tint = glassTint
+        val tint = if (glassSettings.wallpaperTint) glassTint else Color.rgb(160, 160, 160)
+        getLocationOnScreen(screenLocation)
+        val refracted = Build.VERSION.SDK_INT >= 33 && glassSettings.enabled &&
+            backdropAt != 0L && SystemClock.uptimeMillis() - backdropAt < 750L &&
+            liquidGlass?.draw(canvas, rect, r, fit.scale, screenLocation[0], screenLocation[1],
+                tint, if (glassSettings.wallpaperTint) 0.18f else 0f, alpha) == true
         val top = blend(baseColor, tint, 0.28f)
         val bottom = blend(baseColor, Color.BLACK, 0.35f)
         glassPaint.shader = LinearGradient(0f, rect.top, 0f, rect.bottom,
             intArrayOf(top, baseColor, bottom), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         glassPaint.alpha = alpha
-        canvas.drawRoundRect(rect, r, r, glassPaint)
+        if (!refracted) canvas.drawRoundRect(rect, r, r, glassPaint)
         // Inner refraction glow: soft tinted lens near the top edge.
         glassPaint.shader = LinearGradient(0f, rect.top, 0f, rect.top + rect.height() * 0.5f,
             intArrayOf(withAlpha(blend(tint, Color.WHITE, 0.4f), 70), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)
@@ -345,6 +380,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     /** Screen went off: collapse into an invisible dot so the next wake can grow out of it. */
     fun hideForIntro() {
+        clearBackdrop()
         Choreographer.getInstance().removeFrameCallback(this)
         running = false; delayedFrame = false; lastFrame = 0L
         tracking = false; seeking = false
@@ -513,6 +549,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun continuousDelay(): Long? {
         val a = activity ?: return null
         if (presentation == Presentation.IDLE) return null
+        if (isConcealed) return null
         return when {
             a.mode == IslandMode.MUSIC && a.isPlaying -> 16L
             a.mode == IslandMode.CALL -> 33L
@@ -521,7 +558,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 if (rollAt != 0L && SystemClock.uptimeMillis() - rollAt < ROLL_MS) return 16L
                 val ms = a.clockMs() ?: return null
                 if (a.chronometerCountDown && ms == 0L) return null
-                ClockTimeline.nextTick(ms, a.chronometerCountDown).coerceIn(16L, 1000L)
+                // Keep the progress ring continuous; digits still change only at second boundaries.
+                33L
             }
             else -> null
         }
@@ -538,6 +576,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     override fun onDetachedFromWindow() {
+        clearBackdrop()
         pendingTap?.let { removeCallbacks(it) }; pendingTap = null
         removeCallbacks(introWiden); introHoldUntil = 0L
         Choreographer.getInstance().removeFrameCallback(this)
@@ -949,41 +988,74 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun drawTimerExpanded(canvas: Canvas, a: LiveActivity, alpha: Int, late: Int) {
         val l = rect.left + dp(20f)
         val rr = rect.right - dp(20f)
-        val cy = rect.top + dp(44f)
-        val tx = l + dp(42f) + dp(14f)
-        val maxW = rr - dp(132f) - tx
-        text(canvas, a.title, tx, cy - dp(3f), maxW, titlePaint, Color.WHITE, alpha)
-        text(canvas, if (a.pausedTimerMs != null) "Paused" else if (a.chronometerCountDown) "Timer" else a.appLabel, tx, cy + dp(16f), maxW, bodyPaint, GREY, alpha)
-        drawActions(canvas, a, l, rect.top + dp(88f), rr, late)
+        text(canvas, a.title, l, rect.top + dp(27f), rr - l, titlePaint, Color.WHITE, alpha)
+        val status = when {
+            a.pausedTimerMs != null -> "Paused"
+            a.chronometerCountDown && a.clockMs() == 0L -> "Time’s up"
+            a.chronometerCountDown -> "Timer"
+            else -> "Stopwatch"
+        }
+        text(canvas, status, l + dp(34f), rect.top + dp(64f), dp(76f), smallPaint, GREY, alpha)
+        drawTimerActions(canvas, a, l, rect.top + dp(86f), rr, late)
+    }
+
+    /** Real notification actions only; no local fake pause or guessed PendingIntent. */
+    private fun drawTimerActions(canvas: Canvas, a: LiveActivity, left: Float, top: Float, right: Float, alpha: Int) {
+        val toggle = findAction(a, "pause", "resume", "start", "continue")
+        val stop = findAction(a, "cancel", "stop", "delete", "dismiss", "reset")
+        if (toggle == null && stop == null) { drawActions(canvas, a, left, top, right, alpha); return }
+        val items = listOfNotNull(stop, toggle).distinct()
+        val size = dp(44f)
+        items.forEachIndexed { index, action ->
+            val cx = if (index == 0) left + size / 2 else right - size / 2
+            val cy = top + size / 2
+            fillPaint.color = withAlpha(if (action == toggle) timerColor else Color.DKGRAY, alpha * 55 / 255)
+            canvas.drawCircle(cx, cy, size / 2, fillPaint)
+            if (action == toggle) {
+                val paused = a.pausedTimerMs != null || action.label.contains("resume", true) || action.label.contains("start", true)
+                // drawPlayPause takes a playing flag.
+                drawPlayPause(canvas, cx, cy, !paused, alpha)
+            } else {
+                ringPaint.color = withAlpha(Color.WHITE, alpha)
+                ringPaint.strokeWidth = dp(2f)
+                canvas.drawLine(cx - dp(5f), cy - dp(5f), cx + dp(5f), cy + dp(5f), ringPaint)
+                canvas.drawLine(cx - dp(5f), cy + dp(5f), cx + dp(5f), cy - dp(5f), ringPaint)
+            }
+            actionHits.add(RectF(cx - size / 2, top, cx + size / 2, top + size) to action)
+        }
     }
 
     private fun drawTimerMorph(canvas: Canvas, a: LiveActivity, ea: Float, ca: Float, intro: Float) {
         val vis = (ea + ca).coerceIn(0f, 1f)
         val alpha = (((vis - 0.2f) / 0.8f).coerceIn(0f, 1f) * 255 * intro).toInt()
         if (alpha < 3) return
-        // 0 = compact layout, 1 = expanded layout
         val expandedHeight = specFor(Presentation.EXPANDED, a).h
-        val m = ((heightS.value - dp(34f)) / (expandedHeight - dp(34f))).coerceIn(0f, 1f)
-        val eRing = dp(21f)
-        val ringR = lerp(dp(8.5f), eRing, m)
-        val ringX = lerp(rect.left + dp(18f), rect.left + dp(20f) + eRing, m)
-        val ringY = lerp(rect.centerY(), rect.top + dp(44f), m)
-        drawRing(canvas, ringX, ringY, ringR, lerp(dp(2.6f), dp(4f), m), timerFraction(a), alpha)
-
+        val m = ((heightS.value - dp(36f)) / (expandedHeight - dp(36f))).coerceIn(0f, 1f)
+        val ringR = lerp(dp(8.5f), dp(11f), m)
+        val ringX = lerp(rect.left + dp(18f), rect.left + dp(31f), m)
+        val ringY = lerp(rect.centerY(), rect.top + dp(60f), m)
+        drawRing(canvas, ringX, ringY, ringR, dp(2.6f), timerFraction(a), alpha)
         updateRoll(a)
-        digitPaint.textSize = lerp(dp(13.5f), dp(32f), m)
         val right = lerp(rect.right - dp(13f), rect.right - dp(20f), m)
-        val baseline = lerp(rect.centerY() + dp(4.8f), rect.top + dp(55f), m)
+        digitPaint.textSize = lerp(dp(14f), dp(36f), m)
+        // Fit hours without clipping the label or the camera cutout in the compact layout.
+        val available = lerp(max(dp(64f), rect.width() / 2f - dp(20f)), max(dp(70f), rect.width() - dp(150f)), m)
+        val measured = digitPaint.measureText(rollText)
+        if (measured > available) digitPaint.textSize *= available / measured
+        val baseline = lerp(rect.centerY() + dp(4.8f), rect.top + dp(72f), m)
+        canvas.save()
+        canvas.clipRect(right - available, baseline + digitPaint.ascent(), right + dp(1f), baseline + digitPaint.descent())
         drawRolling(canvas, right, baseline, alpha, a.chronometerCountDown)
+        canvas.restore()
     }
 
     private fun drawRing(canvas: Canvas, cx: Float, cy: Float, r: Float, stroke: Float, fraction: Float, alpha: Int) {
         ringPaint.strokeWidth = stroke
         arcRect.set(cx - r, cy - r, cx + r, cy + r)
-        ringPaint.color = withAlpha(accent, alpha * 70 / 255)
+        ringPaint.color = withAlpha(timerColor, alpha * 70 / 255)
         canvas.drawOval(arcRect, ringPaint)
         if (fraction > 0.001f) {
-            ringPaint.color = withAlpha(accent, alpha)
+            ringPaint.color = withAlpha(timerColor, alpha)
             canvas.drawArc(arcRect, -90f, 360f * fraction, false, ringPaint)
         }
     }
@@ -1025,12 +1097,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             val w = p.measureText(s)
             val old = if (sameShape) prev[i] else ch
             if (old != ch && e < 1f) {
-                p.color = withAlpha(accent, (alpha * (1f - e)).toInt())
+                p.color = withAlpha(timerColor, (alpha * (1f - e)).toInt())
                 canvas.drawText(old.toString(), x, baseline + dir * e * shift, p)
-                p.color = withAlpha(accent, (alpha * e).toInt())
+                p.color = withAlpha(timerColor, (alpha * e).toInt())
                 canvas.drawText(s, x, baseline - dir * (1f - e) * shift, p)
             } else {
-                p.color = withAlpha(accent, alpha)
+                p.color = withAlpha(timerColor, alpha)
                 canvas.drawText(s, x, baseline, p)
             }
             x += w

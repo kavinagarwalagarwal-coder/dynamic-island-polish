@@ -7,9 +7,9 @@ import SwiftUI
 /// (`dampingRatio = damping / (2 * sqrt(stiffness))`).
 public enum IslandMotion {
     public static let shapeStiffness: Double = 180
-    public static let widthDamping: Double = 16.0
-    public static let heightDamping: Double = 18.2
-    public static let centerDamping: Double = 19.3
+    public static let widthDamping: Double = 20.4
+    public static let heightDamping: Double = 22.0
+    public static let centerDamping: Double = 23.1
     public static let radiusDamping: Double = 24.1
     public static let contentResponse: Double = 0.38
     public static let contentDampingFraction: Double = 0.92

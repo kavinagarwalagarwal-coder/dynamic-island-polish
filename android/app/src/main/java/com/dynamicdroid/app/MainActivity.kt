@@ -42,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private var fit = IslandFit()
     private val fitSliders = ArrayList<SeekBar>()
     private var cameraSwitch: SwitchCompat? = null
+    private var glass = GlassSettings()
     private var theme = IslandTheme()
     private var themeSwitch: SwitchCompat? = null
     private var swatchA: View? = null
@@ -56,6 +57,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         fit = IslandPreferences.read(this)
+        glass = GlassSettings.read(this)
         theme = IslandPreferences.readTheme(this)
         window.statusBarColor = BG
         setContentView(buildScreen())
@@ -200,6 +202,32 @@ class MainActivity : AppCompatActivity() {
             updateFit()
         }, row(-2))
 
+        column.addView(heading("LIQUID GLASS"), row(-2).apply { topMargin = dp(24) })
+        column.addView(label("Live refraction uses local screenshots of the app behind the island. Android 14+ and accessibility access required. Frames are never saved or sent. Protected screens and uncovered system areas use the material fallback.", 13f, NothingStyle.muted), row(-2))
+        column.addView(SwitchCompat(this).apply {
+            text = "Refract the background"
+            minHeight = dp(56)
+            setTextColor(NothingStyle.foreground)
+            isChecked = glass.enabled
+            isEnabled = Build.VERSION.SDK_INT >= 34
+            setOnCheckedChangeListener { _, checked ->
+                glass = glass.copy(enabled = checked)
+                applyThemeUpdate()
+            }
+        }, row(-2))
+        column.addView(SwitchCompat(this).apply {
+            text = "Tint glass with wallpaper colour"
+            minHeight = dp(56)
+            setTextColor(NothingStyle.foreground)
+            isChecked = glass.wallpaperTint
+            setOnCheckedChangeListener { _, checked ->
+                if (checked) WallpaperTheme.fromSystem(this@MainActivity)?.let {
+                    theme = theme.copy(accent = it.accent, secondary = it.secondary, base = it.base)
+                }
+                glass = glass.copy(wallpaperTint = checked)
+                applyThemeUpdate()
+            }
+        }, row(-2))
         column.addView(heading("( 03 )  WALLPAPER THEME"), row(-2).apply { topMargin = dp(28) })
         themeSwitch = SwitchCompat(this).apply {
             text = "Match island to wallpaper"
@@ -356,6 +384,8 @@ class MainActivity : AppCompatActivity() {
     private fun applyThemeUpdate() {
         theme = theme.safe()
         IslandPreferences.saveTheme(this, theme)
+        glass.save(this)
+        preview.applyGlass(glass)
         preview.applyTheme(theme)
         swatchA?.background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL

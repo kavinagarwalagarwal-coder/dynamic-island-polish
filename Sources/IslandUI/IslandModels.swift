@@ -37,6 +37,15 @@ public struct IslandActivity: Equatable, Identifiable {
     public var accent: Color
     public var isPlaying: Bool
     public var progress: Double
+    public var timerRemaining: TimeInterval?
+    public var timerDuration: TimeInterval
+    public var timerPaused: Bool
+    public var timerUpdatedAt: TimeInterval
+
+    public var remainingTime: TimeInterval {
+        guard let timerRemaining else { return 0 }
+        return max(0, timerRemaining - (timerPaused ? 0 : max(0, ProcessInfo.processInfo.systemUptime - timerUpdatedAt)))
+    }
 
     public init(
         key: String,
@@ -47,7 +56,11 @@ public struct IslandActivity: Equatable, Identifiable {
         appLabel: String,
         accent: Color,
         isPlaying: Bool = false,
-        progress: Double = 0.4
+        progress: Double = 0.4,
+        timerRemaining: TimeInterval? = nil,
+        timerDuration: TimeInterval = 0,
+        timerPaused: Bool = false,
+        timerUpdatedAt: TimeInterval = ProcessInfo.processInfo.systemUptime
     ) {
         self.key = key
         self.packageName = packageName
@@ -58,6 +71,10 @@ public struct IslandActivity: Equatable, Identifiable {
         self.accent = accent
         self.isPlaying = isPlaying
         self.progress = progress
+        self.timerRemaining = timerRemaining
+        self.timerDuration = timerDuration
+        self.timerPaused = timerPaused
+        self.timerUpdatedAt = timerUpdatedAt
     }
 }
 

@@ -50,6 +50,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     /** Foreground app hid the status bar (video, photos, games): tuck the island away. */
     private var fullscreen = false
     private var status: StatusMonitor? = null
+    private var backdrop: GlassBackdrop? = null
 
     private val clearTransient = Runnable { transient = null; render() }
     private val autoCollapse = Runnable {
@@ -157,6 +158,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         if (intent?.action == ACTION_THEME) {
             island?.applyTheme(IslandPreferences.readTheme(this))
+            island?.applyGlass(GlassSettings.read(this))
         }
         if (ongoing != null) watcher?.start()
         return START_STICKY
@@ -203,12 +205,18 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             island = null; params = null
             return false
         }
+        if (a11y != null && Build.VERSION.SDK_INT >= 34) {
+            backdrop = GlassBackdrop(a11y, view).also { it.start() }
+            a11y.onWindowsChanged = { backdrop?.invalidateWindow() }
+        }
         view.hideForIntro()
         view.post { view.playIntro() }
         return true
     }
 
     private fun detachWindow() {
+        backdrop?.stop(); backdrop = null
+        IslandAccessibilityService.instance?.onWindowsChanged = null
         island?.let { v -> runCatching { windowManager?.removeView(v) } }
         island = null
         params = null

@@ -15,6 +15,11 @@ public struct DynamicIslandView: View {
     public var pillWidth: CGFloat
     public var baseColor: Color
     public var concealed: Bool
+    public var glassEnabled: Bool
+    public var glassTint: Color?
+    public var onTimerToggle: (() -> Void)?
+    public var onTimerCancel: (() -> Void)?
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     public init(
         presentation: IslandPresentation,
@@ -25,7 +30,11 @@ public struct DynamicIslandView: View {
         top: CGFloat = 8,
         pillWidth: CGFloat = 1,
         baseColor: Color = Color(red: 0.05, green: 0.05, blue: 0.05),
-        concealed: Bool = false
+        concealed: Bool = false,
+        glassEnabled: Bool = false,
+        glassTint: Color? = nil,
+        onTimerToggle: (() -> Void)? = nil,
+        onTimerCancel: (() -> Void)? = nil
     ) {
         self.presentation = presentation
         self.activity = activity
@@ -36,6 +45,10 @@ public struct DynamicIslandView: View {
         self.pillWidth = pillWidth
         self.baseColor = baseColor
         self.concealed = concealed
+        self.glassEnabled = glassEnabled
+        self.glassTint = glassTint
+        self.onTimerToggle = onTimerToggle
+        self.onTimerCancel = onTimerCancel
     }
 
     private var spec: IslandShapeSpec {
@@ -52,7 +65,18 @@ public struct DynamicIslandView: View {
     public var body: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: spec.radius, style: .continuous)
-                .fill(baseColor)
+                .fill(glassEnabled ? Color.clear : baseColor)
+                .overlay {
+                    if glassEnabled {
+                        RoundedRectangle(cornerRadius: spec.radius, style: .continuous)
+                            .fill(.ultraThinMaterial)
+                            .overlay((glassTint ?? .clear).opacity(0.18))
+                            .overlay {
+                                RoundedRectangle(cornerRadius: spec.radius, style: .continuous)
+                                    .strokeBorder(LinearGradient(colors: [.white.opacity(0.55), .white.opacity(0.05), .white.opacity(0.18)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.75)
+                            }
+                    }
+                }
                 .frame(width: spec.width, height: spec.height)
                 .overlay(content)
                 .clipShape(RoundedRectangle(cornerRadius: spec.radius, style: .continuous))
@@ -61,9 +85,8 @@ public struct DynamicIslandView: View {
                 .scaleEffect(concealed ? 0.35 : 1, anchor: .top)
         }
         .frame(width: screenWidth, height: spec.top + spec.height + 14, alignment: .topLeading)
-        .animation(IslandMotion.shapeAnimation, value: presentation)
-        .animation(IslandMotion.shapeAnimation, value: activity?.key)
-        .animation(IslandMotion.contentAnimation, value: presentation)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : IslandMotion.shapeAnimation, value: presentation)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : IslandMotion.shapeAnimation, value: activity?.key)
         .animation(.spring(response: 0.32, dampingFraction: 0.9), value: concealed)
         .allowsHitTesting(!concealed && presentation != .idle)
     }
@@ -73,8 +96,14 @@ public struct DynamicIslandView: View {
         ZStack {
             IdleStatusBar(status: status, opacity: presentation == .idle ? 1 : 0)
             if let activity {
-                CompactIsland(activity: activity, opacity: presentation == .compact ? 1 : 0)
-                ExpandedIsland(activity: activity, opacity: presentation == .expanded ? 1 : 0)
+                if activity.mode == .timer {
+                    TimerIsland(activity: activity, expanded: presentation == .expanded,
+                                onToggle: onTimerToggle, onCancel: onTimerCancel)
+                        .opacity(presentation == .idle ? 0 : 1)
+                } else {
+                    CompactIsland(activity: activity, opacity: presentation == .compact ? 1 : 0)
+                    ExpandedIsland(activity: activity, opacity: presentation == .expanded ? 1 : 0)
+                }
             }
         }
     }
