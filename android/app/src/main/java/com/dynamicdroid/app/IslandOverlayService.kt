@@ -165,6 +165,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         if (intent?.action == ACTION_THEME) {
             island?.applyTheme(IslandPreferences.readTheme(this))
         }
+        if (intent?.action == ACTION_WALLPAPER) {
+            island?.applyWallpaper(WallpaperSkinStore.read(this), WallpaperSkinStore.image(this), WallpaperSkinStore.background(this), WallpaperSkinStore.subject(this))
+        }
         if (ongoing != null) watcher?.start()
         return START_STICKY
     }
@@ -183,6 +186,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             it.callbacks = this
             it.applyFit(IslandPreferences.read(this))
             it.applyTheme(IslandPreferences.readTheme(this))
+            it.applyWallpaper(WallpaperSkinStore.read(this), WallpaperSkinStore.image(this), WallpaperSkinStore.background(this), WallpaperSkinStore.subject(this))
             status?.let { m -> it.applyStatus(m.current) }
         }
         island = view
@@ -522,6 +526,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     companion object {
         const val ACTION_FIT = "com.dynamicdroid.app.UPDATE_FIT"
+        const val ACTION_WALLPAPER = "com.dynamicdroid.app.UPDATE_WALLPAPER"
         const val ACTION_THEME = "com.dynamicdroid.app.UPDATE_THEME"
         private const val CHANNEL_ID = "dynamic_island"
         private const val NOTIFICATION_ID = 7104

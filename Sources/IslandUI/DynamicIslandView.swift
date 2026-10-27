@@ -140,7 +140,7 @@ public struct DynamicIslandView: View {
         .animation(reduceMotion ? .easeOut(duration: 0.15) : IslandMotion.shapeAnimation, value: activity?.key)
         .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.32, dampingFraction: 0.9), value: concealed)
         .animation(reduceMotion ? .easeOut(duration: 0.15) : IslandMotion.shapeAnimation, value: secondaryActivity?.key)
-        .animation(reduceMotion ? nil : .spring(response: 0.18, dampingFraction: 0.72), value: pressed)
+        .animation(reduceMotion ? nil : .spring(response: IslandMotion.pressResponse, dampingFraction: IslandMotion.pressDampingFraction), value: pressed)
         .animation(reduceMotion ? nil : IslandMotion.contentAnimation, value: dragOffset)
         .allowsHitTesting(!concealed && presentation != .idle)
     }

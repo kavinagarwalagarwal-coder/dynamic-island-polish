@@ -30,3 +30,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Native Android generated outputs and downloaded model assets
+android/**/build/
+android/.gradle/
