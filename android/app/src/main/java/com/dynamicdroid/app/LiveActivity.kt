@@ -83,7 +83,7 @@ object IslandBus {
     var listener: Listener? = null
         set(value) {
             field = value
-            value?.let { l -> ongoing.values.lastOrNull()?.let(l::onActivity) }
+            value?.let { l -> ongoing.values.toList().forEach(l::onActivity) }
         }
 
     /** Set by the notification listener; returns true when a media session handled it. */
@@ -91,7 +91,6 @@ object IslandBus {
 
     fun post(activity: LiveActivity) = main.post {
         if (!activity.isTransient) {
-            ongoing.remove(activity.key)
             ongoing[activity.key] = activity
         }
         listener?.onActivity(activity)

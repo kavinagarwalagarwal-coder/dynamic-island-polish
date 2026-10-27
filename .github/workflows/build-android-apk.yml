@@ -6,6 +6,8 @@ on:
     paths:
       - "android/**"
       - "Sources/**"
+      - "Tests/**"
+      - "Package.swift"
       - ".github/workflows/build-android-apk.yml"
   push:
     branches: [main]
@@ -45,4 +47,4 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build SwiftUI source
-        run: swift build
+        run: swift test

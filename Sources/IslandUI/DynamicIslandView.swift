@@ -14,9 +14,13 @@ public struct DynamicIslandView: View {
     public var top: CGFloat
     public var pillWidth: CGFloat
     public var baseColor: Color
+    public var secondaryActivity: IslandActivity?
+    public var onOpen: ((IslandActivity) -> Void)?
+    public var onExpand: ((IslandActivity) -> Void)?
+    public var onCollapse: (() -> Void)?
+    @State private var pressed = false
+    @State private var dragOffset: CGFloat = 0
     public var concealed: Bool
-    public var glassEnabled: Bool
-    public var glassTint: Color?
     public var onTimerToggle: (() -> Void)?
     public var onTimerCancel: (() -> Void)?
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -31,11 +35,17 @@ public struct DynamicIslandView: View {
         pillWidth: CGFloat = 1,
         baseColor: Color = Color(red: 0.05, green: 0.05, blue: 0.05),
         concealed: Bool = false,
-        glassEnabled: Bool = false,
-        glassTint: Color? = nil,
         onTimerToggle: (() -> Void)? = nil,
-        onTimerCancel: (() -> Void)? = nil
+        onTimerCancel: (() -> Void)? = nil,
+        secondaryActivity: IslandActivity? = nil,
+        onOpen: ((IslandActivity) -> Void)? = nil,
+        onExpand: ((IslandActivity) -> Void)? = nil,
+        onCollapse: (() -> Void)? = nil
     ) {
+        self.secondaryActivity = secondaryActivity
+        self.onOpen = onOpen
+        self.onExpand = onExpand
+        self.onCollapse = onCollapse
         self.presentation = presentation
         self.activity = activity
         self.status = status
@@ -45,14 +55,12 @@ public struct DynamicIslandView: View {
         self.pillWidth = pillWidth
         self.baseColor = baseColor
         self.concealed = concealed
-        self.glassEnabled = glassEnabled
-        self.glassTint = glassTint
         self.onTimerToggle = onTimerToggle
         self.onTimerCancel = onTimerCancel
     }
 
     private var spec: IslandShapeSpec {
-        IslandShapeSpec.spec(
+        let shape = IslandShapeSpec.spec(
             presentation: presentation,
             activity: activity,
             screenWidth: screenWidth,
@@ -60,35 +68,76 @@ public struct DynamicIslandView: View {
             top: top,
             pillWidth: pillWidth
         )
+        guard presentation == .compact, secondaryActivity != nil else { return shape }
+        let width = min(shape.width, max(0, screenWidth - 52))
+        let center = min(max(shape.centerX, 4 + width / 2), max(4 + width / 2, screenWidth - 48 - width / 2))
+        return IslandShapeSpec(width: width, height: shape.height, radius: shape.radius, centerX: center, top: shape.top)
     }
 
     public var body: some View {
         ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: spec.radius, style: .continuous)
-                .fill(glassEnabled ? Color.clear : baseColor)
-                .overlay {
-                    if glassEnabled {
-                        RoundedRectangle(cornerRadius: spec.radius, style: .continuous)
-                            .fill(.ultraThinMaterial)
-                            .overlay((glassTint ?? .clear).opacity(0.18))
-                            .overlay {
-                                RoundedRectangle(cornerRadius: spec.radius, style: .continuous)
-                                    .strokeBorder(LinearGradient(colors: [.white.opacity(0.55), .white.opacity(0.05), .white.opacity(0.18)], startPoint: .topLeading, endPoint: .bottomTrailing), lineWidth: 0.75)
-                            }
-                    }
-                }
+                .fill(Color.black)
                 .frame(width: spec.width, height: spec.height)
+                .contentShape(RoundedRectangle(cornerRadius: spec.radius, style: .continuous))
+                .onTapGesture { if let activity { onOpen?(activity) } }
+                .onLongPressGesture(minimumDuration: 0.35, maximumDistance: 12, pressing: { pressing in
+                    pressed = pressing
+                }) {
+                    if let activity { onExpand?(activity) }
+                }
+                .simultaneousGesture(DragGesture(minimumDistance: 8)
+                    .onChanged { value in
+                        dragOffset = reduceMotion ? 0 : 24 * tanh(value.translation.height / 100)
+                    }
+                    .onEnded { value in
+                        dragOffset = 0; pressed = false
+                        if abs(value.translation.height) > abs(value.translation.width) {
+                            if value.translation.height < -26 { onCollapse?() }
+                            else if value.translation.height > 26, let activity { onExpand?(activity) }
+                        }
+                    })
                 .overlay(content)
                 .clipShape(RoundedRectangle(cornerRadius: spec.radius, style: .continuous))
                 .offset(x: spec.centerX - spec.width / 2, y: spec.top)
                 .opacity(concealed ? 0 : 1)
-                .scaleEffect(concealed ? 0.35 : 1, anchor: .top)
+                .scaleEffect(concealed ? 0.35 : pressed && !reduceMotion ? 0.96 : 1, anchor: .top)
+                .offset(y: dragOffset)
+            if presentation == .compact, let secondaryActivity {
+                Circle().fill(Color.black)
+                    .overlay {
+                        Image(systemName: secondarySymbol(secondaryActivity.mode))
+                            .font(.system(size: 16, weight: .semibold))
+                            .foregroundColor(secondaryActivity.accent)
+                    }
+                    .frame(width: 36, height: 36)
+                    .contentShape(Circle())
+                    .onTapGesture { onOpen?(secondaryActivity) }
+                    .onLongPressGesture(minimumDuration: 0.35) { onExpand?(secondaryActivity) }
+                    .accessibilityLabel("\(secondaryActivity.appLabel): \(secondaryActivity.title)")
+                    .offset(x: spec.centerX + spec.width / 2 + 8, y: spec.top)
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.6).combined(with: .opacity))
+            }
         }
         .frame(width: screenWidth, height: spec.top + spec.height + 14, alignment: .topLeading)
         .animation(reduceMotion ? .easeOut(duration: 0.15) : IslandMotion.shapeAnimation, value: presentation)
         .animation(reduceMotion ? .easeOut(duration: 0.15) : IslandMotion.shapeAnimation, value: activity?.key)
-        .animation(.spring(response: 0.32, dampingFraction: 0.9), value: concealed)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.32, dampingFraction: 0.9), value: concealed)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : IslandMotion.shapeAnimation, value: secondaryActivity?.key)
+        .animation(reduceMotion ? nil : .spring(response: 0.18, dampingFraction: 0.72), value: pressed)
+        .animation(reduceMotion ? nil : IslandMotion.contentAnimation, value: dragOffset)
         .allowsHitTesting(!concealed && presentation != .idle)
+    }
+
+    private func secondarySymbol(_ mode: IslandMode) -> String {
+        switch mode {
+        case .timer: return "timer"
+        case .music: return "waveform"
+        case .call: return "phone.fill"
+        case .navigation: return "location.fill"
+        case .charging: return "bolt.fill"
+        case .message: return "message.fill"
+        }
     }
 
     @ViewBuilder

@@ -32,10 +32,9 @@ public struct TimerIsland: View {
                         }
                         .frame(width: expanded ? 22 : 17, height: expanded ? 22 : 17)
                         .position(x: expanded ? 31 : 18, y: expanded ? 60 : geo.size.height / 2)
-                    Text(activity.timerRemaining == nil ? activity.subtitle : Self.display(remaining))
-                        .font(.system(size: expanded ? 36 : 14, weight: .medium, design: .rounded))
-                        .monospacedDigit()
-                        .foregroundColor(activity.accent)
+                    RollingTimerDigits(value: activity.timerRemaining == nil ? activity.subtitle : Self.display(remaining),
+                                       size: expanded ? 36 : 14, color: activity.accent)
+                        .opacity(activity.timerPaused ? 0.55 : 1)
                         .lineLimit(1).minimumScaleFactor(0.55)
                         .frame(width: expanded ? max(70, geo.size.width - 150) : max(64, geo.size.width / 2 - 20), alignment: .trailing)
                         .position(x: expanded ? geo.size.width - 20 - max(70, geo.size.width - 150) / 2

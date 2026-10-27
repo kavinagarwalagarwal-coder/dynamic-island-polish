@@ -103,7 +103,8 @@ public struct IslandShapeSpec: Equatable {
         if presentation == .compact {
             let w = min(IslandMotion.compactWidth * pillWidth, maxWidth)
             let h = IslandMotion.compactHeight
-            return IslandShapeSpec(width: w, height: h, radius: h / 2, centerX: cameraX, top: top)
+            let center = min(max(cameraX, margin + w / 2), max(margin + w / 2, screenWidth - margin - w / 2))
+            return IslandShapeSpec(width: w, height: h, radius: h / 2, centerX: center, top: top)
         }
         let w = maxWidth
         let h: CGFloat

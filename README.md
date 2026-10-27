@@ -46,15 +46,19 @@ Open `Package.swift` in Xcode and preview `IslandPlayground` in `DynamicIslandVi
 swift build
 ```
 
-## Liquid Glass and timer refinement
+## Island interaction and timer refinement
 
-- Enable **Refract the background** in settings, then enable or re-enable the accessibility service if Android requests the updated screenshot capability. On Android 14+ the renderer uses `takeScreenshotOfWindow` and an AGSL rounded lens shader: bevel refraction, a small chromatic fringe, and directional edge highlights. Foreground controls stay crisp.
-- **Tint glass with wallpaper colour** is independent of **Match island to wallpaper** (accent colours). Use **Use my current wallpaper** or **Pick an image instead** to refresh the palette after changing wallpaper.
-- Capture is opt-in, local and memory-only. The underlying active app window is sampled at most every 400 ms; this is a sampled backdrop, not a full-frame-rate compositor effect. No screenshot is written or transmitted. Capture pauses when locked, screen-off, concealed, or disabled; detach/window switches clear the previous frame.
-- True refraction requires Android 14+, accessibility access, a hardware Canvas, and an unprotected application window covering the island. System status-bar areas, older versions, secure apps, unsupported OEMs, and unavailable captures use the existing material treatment. The normal application-overlay fallback cannot capture a clean backdrop.
-- SwiftUI remains the authored motion source. SwiftUI gets the same damping refinement, a shared morphing timer ring/digits, optional real control callbacks, a monotonic countdown, and an optional system material. The live Android implementation remains the existing native Canvas port. The SwiftUI system material is not a custom cross-app refractive shader.
-- Timer controls invoke only notification actions supplied by the clock app; unsupported/localized action labels fall back to existing labelled notification actions. No control pretends to pause a timer. Remaining-time rings use the longest observed remaining duration when the clock app does not publish the original total.
+The island uses an opaque black surface. Liquid Glass, screen capture, refraction, and their settings/permissions have been removed. Wallpaper matching affects accents only.
+
+- Motion remains authored in SwiftUI with the existing interruptible Android Canvas spring port. Tighter damping, elastic dragging, press feedback, and system reduced-motion support keep transitions responsive without restarting shape velocity.
+- Tap a compact activity or its separate minimal bubble to open its app immediately. Hold either activity for 350 ms, or pull down, to expand it. Swipe upward or tap outside the expanded Android overlay to collapse. Notification controls remain immediate; no double-tap delay is imposed on opening an app.
+- Two concurrent activities appear as compact + minimal. Stable activity selection prevents per-second timer/music refreshes from stealing focus. Holding the second bubble promotes it into the expanded card; removal and foreground filtering promote a remaining activity. Incoming calls take priority on arrival. More than two activities are retained, but only two appear simultaneously.
+- Timers have a shared morphing ring/digit layout, tabular rolling digits, a frozen/dimmed paused state, real notification pause/resume/cancel actions, and a single completion expansion per run. The original clock app remains responsible for alarms and sound. The service tracks monotonic deadlines; notification updates do not restart the expanded timeout. Rings use the longest observed remaining duration when an app does not provide the original total.
+- The native settings preview includes a **Two live** example and working demo timer pause/resume/cancel controls.
+- SwiftUI exposes open/expand/collapse callbacks, secondary activity rendering, live countdowns, rolling digits, and timer action callbacks. Android continues to use its native overlay/services; SwiftUI has not been replaced.
 
 ### Validation
 
-The APK workflow runs countdown/fit/interrupted-spring regression tests and `assembleDebug`; the macOS job builds the SwiftUI package. Manual device checks: expand/collapse rapidly at 60/120 Hz; pause/resume/cancel a real clock timer; test 1:00 → 0:59 and hour-long timers; switch foreground apps, lock/unlock, rotate, change fit/tint, and open a secure app. Verify fallback and no previous-app frame on a window switch. API/OEM screenshot behavior and shader appearance still need physical-device validation.
+GitHub Actions runs Android regression tests and builds the debug APK, then runs SwiftUI package tests on macOS. Tests cover focus stability under repeated updates, explicit selection, foreground filtering, activity removal, incoming-call priority, bubble geometry on narrow/scaled screens, one completion per timer run, countdown rounding, and interrupted springs at 30–120 Hz.
+
+Physical-device visual verification is still required: music + timer together, rapidly interrupt expansion/collapse, hold each bubble, pause/resume/cancel real Clock notifications, let a short timer expire, rotate/change fit, and lock/unlock. Available actions and timer metadata depend on the clock app. This recreates supported iOS-style behavior; exact Apple system animations and integrations are not claimed.

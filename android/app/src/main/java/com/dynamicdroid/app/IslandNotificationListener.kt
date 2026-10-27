@@ -28,6 +28,7 @@ class IslandNotificationListener : NotificationListenerService() {
     private val main = Handler(Looper.getMainLooper())
     private var mediaNotification: StatusBarNotification? = null
     private var controller: MediaController? = null
+    private val timers = HashMap<String, LiveActivity>()
     private val lastMessageText = HashMap<String, String>()
 
     private var artKey: String? = null
@@ -79,6 +80,7 @@ class IslandNotificationListener : NotificationListenerService() {
         val mode = when {
             n.category == Notification.CATEGORY_CALL -> IslandMode.CALL
             n.category == Notification.CATEGORY_NAVIGATION && sbn.isOngoing -> IslandMode.NAVIGATION
+            sbn.key in timers -> IslandMode.TIMER
             sbn.isOngoing && (chronometer || n.category == Notification.CATEGORY_ALARM || n.category == "stopwatch") -> IslandMode.TIMER
             sbn.isOngoing -> return // downloads, "app is running", etc.
             else -> IslandMode.MESSAGE
@@ -104,19 +106,21 @@ class IslandNotificationListener : NotificationListenerService() {
             .filter { it.label.isNotBlank() }
 
         val nativeCountDown = Build.VERSION.SDK_INT >= 24 && extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN)
+        val previousTimer = timers[sbn.key]
         val parsedRemaining = if (mode == IslandMode.TIMER && !chronometer) {
             ClockTimeline.parseRemaining(text) ?: ClockTimeline.parseRemaining(title)
         } else null
         val paused = mode == IslandMode.TIMER && !chronometer &&
             (actions.any { it.label.equals("Resume", ignoreCase = true) || it.label.equals("Start", ignoreCase = true) } ||
                 text.contains("paused", ignoreCase = true))
+        val remaining = parsedRemaining ?: previousTimer?.clockMs()
         val base = when {
             chronometer || mode == IslandMode.CALL -> n.`when`.takeIf { it > 0L }
-            parsedRemaining != null && !paused -> System.currentTimeMillis() + parsedRemaining
+            remaining != null && !paused -> System.currentTimeMillis() + remaining
             else -> null
         }
 
-        IslandBus.post(LiveActivity(
+        val activity = LiveActivity(
             key = sbn.key,
             packageName = sbn.packageName,
             mode = mode,
@@ -129,12 +133,15 @@ class IslandNotificationListener : NotificationListenerService() {
             contentIntent = n.contentIntent,
             actions = actions,
             chronometerBase = base,
-            chronometerCountDown = nativeCountDown || parsedRemaining != null,
-            pausedTimerMs = if (paused) parsedRemaining else null,
-        ))
+            chronometerCountDown = nativeCountDown || parsedRemaining != null || previousTimer?.chronometerCountDown == true,
+            pausedTimerMs = if (paused) remaining else null,
+        )
+        if (mode == IslandMode.TIMER) timers[sbn.key] = activity
+        IslandBus.post(activity)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
+        timers.remove(sbn.key)
         lastMessageText.remove(sbn.key)
         IslandBus.remove(sbn.key)
         if (sbn.key == mediaNotification?.key) {

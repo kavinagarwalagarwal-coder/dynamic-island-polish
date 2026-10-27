@@ -41,6 +41,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private val handler = Handler(Looper.getMainLooper())
 
     private var ongoing: LiveActivity? = null
+    private val activities = ActivityShelf<LiveActivity>({ it.key }, {
+        when (it.mode) { IslandMode.CALL -> 3; IslandMode.TIMER -> 2; else -> 1 }
+    })
     private var transient: LiveActivity? = null
     private var presentation = Presentation.COMPACT
     private var foregroundPkg: String? = null
@@ -50,7 +53,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     /** Foreground app hid the status bar (video, photos, games): tuck the island away. */
     private var fullscreen = false
     private var status: StatusMonitor? = null
-    private var backdrop: GlassBackdrop? = null
+
+    private val completions = TimerCompletion()
+    private val checkCompletion = Runnable { render() }
 
     private val clearTransient = Runnable { transient = null; render() }
     private val autoCollapse = Runnable {
@@ -158,7 +163,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         if (intent?.action == ACTION_THEME) {
             island?.applyTheme(IslandPreferences.readTheme(this))
-            island?.applyGlass(GlassSettings.read(this))
         }
         if (ongoing != null) watcher?.start()
         return START_STICKY
@@ -205,18 +209,12 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             island = null; params = null
             return false
         }
-        if (a11y != null && Build.VERSION.SDK_INT >= 34) {
-            backdrop = GlassBackdrop(a11y, view).also { it.start() }
-            a11y.onWindowsChanged = { backdrop?.invalidateWindow() }
-        }
         view.hideForIntro()
         view.post { view.playIntro() }
         return true
     }
 
     private fun detachWindow() {
-        backdrop?.stop(); backdrop = null
-        IslandAccessibilityService.instance?.onWindowsChanged = null
         island?.let { v -> runCatching { windowManager?.removeView(v) } }
         island = null
         params = null
@@ -232,7 +230,27 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private fun render(absorb: Boolean = false) {
         val view = island ?: return
         val t = transient
-        val o = ongoing?.takeIf { it.packageName != foregroundPkg }
+        handler.removeCallbacks(checkCompletion)
+        var nextDeadline: Long? = null
+        for (candidate in activities.all()) {
+            if (candidate.mode != IslandMode.TIMER) continue
+            val remaining = candidate.clockMs()
+            if (completions.observe(candidate.key, remaining, candidate.pausedTimerMs != null, candidate.chronometerCountDown)) {
+                if (candidate.packageName != foregroundPkg && t == null) {
+                    activities.select(candidate.key)
+                    presentation = Presentation.EXPANDED
+                    timerPeek = false
+                    view.timerDidComplete()
+                }
+            }
+            if (candidate.chronometerCountDown && candidate.pausedTimerMs == null && remaining != null && remaining > 0) {
+                nextDeadline = minOf(nextDeadline ?: Long.MAX_VALUE, remaining + 16L)
+            }
+        }
+        nextDeadline?.let { handler.postDelayed(checkCompletion, it) }
+        val (o, secondary) = activities.pair { it.packageName != foregroundPkg }
+        ongoing = o
+        view.setSecondary(if (t == null) secondary else null)
         val (a, p) = when {
             t != null -> t to Presentation.EXPANDED
             o != null -> o to presentation
@@ -270,9 +288,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             handler.removeCallbacks(clearTransient)
             handler.postDelayed(clearTransient, if (activity.mode == IslandMode.CHARGING) 3_000L else MESSAGE_TIMEOUT_MS)
         } else {
-            val isNew = ongoing?.key != activity.key
-            ongoing = activity
-            if (isNew) {
+            val isNew = activities.put(activity)
+            ongoing = activities.pair { it.packageName != foregroundPkg }.first
+            if (isNew && ongoing?.key == activity.key) {
                 timerPeek = activity.mode == IslandMode.TIMER
                 presentation = when (activity.mode) {
                     IslandMode.CALL, IslandMode.TIMER -> Presentation.EXPANDED
@@ -289,10 +307,12 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             transient = null
             handler.removeCallbacks(clearTransient)
         }
+        activities.remove(key)
+        completions.remove(key)
         if (ongoing?.key == key) {
-            ongoing = IslandBus.latestOngoing()
+            ongoing = activities.pair { it.packageName != foregroundPkg }.first
             presentation = Presentation.COMPACT
-            if (ongoing == null) watcher?.stop()
+            if (activities.all().isEmpty()) watcher?.stop()
         }
         render()
     }
@@ -300,16 +320,11 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private fun onForegroundChanged(pkg: String) {
         val previous = foregroundPkg
         foregroundPkg = pkg
-        val o = ongoing ?: return
-        if (previous == o.packageName && pkg != o.packageName && transient == null) {
-            // Swiped away from the app: fly it into the island.
-            presentation = Presentation.COMPACT
-            render(absorb = island?.activity == null &&
-                getSystemService(PowerManager::class.java)?.isInteractive == true &&
-                getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false)
-        } else if (pkg == o.packageName || previous == o.packageName) {
-            render()
-        }
+        val leaving = ongoing?.packageName == previous && previous != pkg
+        if (leaving) presentation = Presentation.COMPACT
+        render(absorb = leaving && island?.activity == null &&
+            getSystemService(PowerManager::class.java)?.isInteractive == true &&
+            getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false)
     }
 
     // ---------------------------------------------------------------- island callbacks
@@ -345,6 +360,13 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         activity.actions.firstOrNull { a -> words.any { a.label.contains(it, ignoreCase = true) } }
             ?.let { send(it.intent) }
+    }
+
+    override fun onSecondaryExpand(activity: LiveActivity) {
+        activities.select(activity.key)
+        timerPeek = false
+        presentation = Presentation.EXPANDED
+        render()
     }
 
     override fun onExpandRequest() {

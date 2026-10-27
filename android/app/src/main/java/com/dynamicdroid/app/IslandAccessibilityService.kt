@@ -13,7 +13,7 @@ import androidx.core.content.ContextCompat
  *
  * Normal "display over other apps" windows sit *below* the status bar, so taps at the very top
  * of the screen go to the system and pull down the notification shade. Accessibility overlays
- * sit *above* the status bar, so the island gets its own touches there. Optional glass uses local, transient window screenshots.
+ * sit *above* the status bar, so the island gets its own touches there. It reads no screen content.
  */
 class IslandAccessibilityService : AccessibilityService() {
 
@@ -25,12 +25,7 @@ class IslandAccessibilityService : AccessibilityService() {
         runCatching { ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java)) }
     }
 
-    var onWindowsChanged: (() -> Unit)? = null
-
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED ||
-            event?.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) onWindowsChanged?.invoke()
-    }
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
     override fun onInterrupt() = Unit
 
     override fun onUnbind(intent: Intent?): Boolean {
