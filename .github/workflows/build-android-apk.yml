@@ -70,12 +70,9 @@ jobs:
           profile: pixel_2
           disable-animations: false
           script: |
+            mkdir -p island-screenshots
             gradle --no-daemon -p android connectedDebugAndroidTest
-      - name: Collect rendered island screenshots
-        if: always()
-        run: |
-          mkdir -p island-screenshots
-          adb pull /sdcard/Android/data/com.dynamicdroid.app/files/island-smoke island-screenshots
+            adb pull /sdcard/Android/data/com.dynamicdroid.app/files/island-smoke island-screenshots
       - uses: actions/upload-artifact@v4
         if: always()
         with:

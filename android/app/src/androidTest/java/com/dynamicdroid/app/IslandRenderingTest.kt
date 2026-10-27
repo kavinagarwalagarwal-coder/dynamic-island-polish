@@ -41,6 +41,9 @@ class IslandRenderingTest {
         val timer = LiveActivity("timer", "clock.test", IslandMode.TIMER, "Tea", "Timer", "Clock", null, null,
             0xFFFF9F0A.toInt(), chronometerCountDown = true,
             clockBaseElapsed = SystemClock.elapsedRealtime() + 300_000L)
+        instrumentation.uiAutomation.executeShellCommand(
+            "pm grant com.dynamicdroid.app android.permission.POST_NOTIFICATIONS"
+        ).let { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).use { input -> input.readBytes() } }
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             fun present(primary: LiveActivity?, secondary: LiveActivity?, p: Presentation, scale: Float = 1f) {
                 val settled = CountDownLatch(1)
