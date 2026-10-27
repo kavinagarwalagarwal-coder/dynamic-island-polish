@@ -213,16 +213,17 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (alpha <= 0) return
         val tint = if (glassSettings.wallpaperTint) glassTint else Color.rgb(160, 160, 160)
         getLocationOnScreen(screenLocation)
-        val refracted = Build.VERSION.SDK_INT >= 33 && glassSettings.enabled &&
-            backdropAt != 0L && SystemClock.uptimeMillis() - backdropAt < 750L &&
-            liquidGlass?.draw(canvas, rect, r, fit.scale, screenLocation[0], screenLocation[1],
-                tint, if (glassSettings.wallpaperTint) 0.18f else 0f, alpha) == true
         val top = blend(baseColor, tint, 0.28f)
         val bottom = blend(baseColor, Color.BLACK, 0.35f)
         glassPaint.shader = LinearGradient(0f, rect.top, 0f, rect.bottom,
             intArrayOf(top, baseColor, bottom), floatArrayOf(0f, 0.55f, 1f), Shader.TileMode.CLAMP)
         glassPaint.alpha = alpha
-        if (!refracted) canvas.drawRoundRect(rect, r, r, glassPaint)
+        canvas.drawRoundRect(rect, r, r, glassPaint)
+        if (Build.VERSION.SDK_INT >= 33 && glassSettings.enabled &&
+            backdropAt != 0L && SystemClock.uptimeMillis() - backdropAt < 750L) {
+            liquidGlass?.draw(canvas, rect, r, fit.scale, screenLocation[0], screenLocation[1],
+                tint, if (glassSettings.wallpaperTint) 0.18f else 0f, alpha)
+        }
         // Inner refraction glow: soft tinted lens near the top edge.
         glassPaint.shader = LinearGradient(0f, rect.top, 0f, rect.top + rect.height() * 0.5f,
             intArrayOf(withAlpha(blend(tint, Color.WHITE, 0.4f), 70), Color.TRANSPARENT), null, Shader.TileMode.CLAMP)

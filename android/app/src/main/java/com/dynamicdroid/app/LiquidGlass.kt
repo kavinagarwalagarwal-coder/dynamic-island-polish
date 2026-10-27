@@ -31,7 +31,7 @@ class LiquidGlass {
         val screenRect = Rect((rect.left * scale + screenX).toInt(), (rect.top * scale + screenY).toInt(),
             kotlin.math.ceil((rect.right * scale + screenX).toDouble()).toInt(),
             kotlin.math.ceil((rect.bottom * scale + screenY).toDouble()).toInt())
-        if (!bounds.contains(screenRect)) return false
+        if (!Rect.intersects(bounds, screenRect)) return false
         shader.setFloatUniform("center", rect.centerX(), rect.centerY())
         shader.setFloatUniform("halfSize", rect.width() / 2f, rect.height() / 2f)
         shader.setFloatUniform("radius", radius)
@@ -40,7 +40,13 @@ class LiquidGlass {
         shader.setFloatUniform("tint", Color.red(tint) / 255f, Color.green(tint) / 255f, Color.blue(tint) / 255f)
         shader.setFloatUniform("tintAmount", tintAmount)
         paint.alpha = alpha
+        // Refract only pixels actually covered by the captured app. Keep the material under
+        // the status-bar portion instead of clamping/smearing the app's top row across it.
+        canvas.save()
+        canvas.clipRect((bounds.left - screenX) / scale, (bounds.top - screenY) / scale,
+            (bounds.right - screenX) / scale, (bounds.bottom - screenY) / scale)
         canvas.drawRoundRect(rect, radius, radius, paint)
+        canvas.restore()
         return true
     }
 
