@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "DynamicDroid"
-include(":app")
+include(":app", ":notification-fixture")

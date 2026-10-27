@@ -71,3 +71,11 @@ Physical-device visual verification is still required: music + timer together, r
 - The two surfaces detach/reattach with independent position/scale/opacity springs. The small timer shows remaining time rather than a static logo. Geometry uses the actual view width and stays bounded at scaled calibration values.
 - Reference design: Apple’s [Design dynamic Live Activities](https://developer.apple.com/videos/play/wwdc2023/10194/) and [Live Activities guidance](https://developer.apple.com/design/human-interface-guidelines/live-activities). These guide compact/minimal/expanded states, numeric transitions, elastic motion, and content placement; this does not claim access to Apple's private animation implementation.
 - CI now renders the native Canvas view on an Android 35 emulator and checks visible, non-overlapping split pills at 70/100/130% scale, expansion, reattachment, and invisible camera idle. Screenshots are uploaded as `island-render-checks`, alongside the debug APK artifact. Physical-device/OEM notification checks remain necessary.
+
+## Android 16 Clock notification compatibility
+
+Custom Clock notifications may contain a running `Chronometer` only inside their `RemoteViews`, with no standard chronometer extras, duration text, or ongoing flag. `NotificationClockReader` reads the supplied notification layout in memory, extracts its monotonic clock base or paused duration, stops the temporary widgets, and passes that real timing data to the overlay. It never reads the screen or guesses a countdown duration.
+
+Settings includes **Clock notification status** with the last package and recognised format, without saving notification text or images. This helps distinguish missing notification access from an unsupported Clock format on a physical device.
+
+The Android 16 emulator test installs a separate `notification-fixture` app. It posts a real media-session notification and a custom Clock notification with no normal timer fields, then verifies the actual accessibility overlay receives and visibly detaches the timer during running, paused, and resumed states. The fixture is test-only and is not included in the shipped app APK.

@@ -35,7 +35,7 @@ jobs:
           gradle-version: "8.9"
 
       - name: Build APK
-        run: gradle --no-daemon -Pkotlin.jvm.target.validation.mode=warning -p android testDebugUnitTest assembleDebug
+        run: gradle --no-daemon -Pkotlin.jvm.target.validation.mode=warning -p android :app:testDebugUnitTest :app:assembleDebug
 
       - uses: actions/upload-artifact@v4
         with:
@@ -65,13 +65,16 @@ jobs:
         run: sudo chmod 666 /dev/kvm
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 35
+          api-level: 36
           arch: x86_64
           profile: pixel_2
           disable-animations: false
           script: |
             mkdir -p island-screenshots
-            gradle --no-daemon -p android connectedDebugAndroidTest
+            gradle --no-daemon -p android :notification-fixture:assembleDebug
+            adb install -r android/notification-fixture/build/outputs/apk/debug/notification-fixture-debug.apk
+            adb shell pm grant com.dynamicdroid.fixture android.permission.POST_NOTIFICATIONS
+            gradle --no-daemon -p android :app:connectedDebugAndroidTest
             adb pull /sdcard/Pictures/IslandSmoke island-screenshots
       - uses: actions/upload-artifact@v4
         if: always()
