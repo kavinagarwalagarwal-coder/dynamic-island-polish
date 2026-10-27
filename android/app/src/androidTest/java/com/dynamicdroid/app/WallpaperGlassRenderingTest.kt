@@ -61,7 +61,26 @@ class WallpaperGlassRenderingTest {
                 assertTrue("Lens never executed on GPU", glass.wasHardwareRendered)
                 view.show(music, Presentation.EXPANDED)
             }
-            android.os.SystemClock.sleep(1000); capture("wallpaper-glass-expanded")
+            android.os.SystemClock.sleep(1000)
+            val area = Rect()
+            scenario.onActivity { activity ->
+                val view = find(activity.window.decorView)!!
+                val location = IntArray(2); view.getLocationOnScreen(location)
+                val rect = IslandView::class.java.getDeclaredField("rect").apply { isAccessible = true }.get(view) as RectF
+                area.set((location[0] + rect.left).toInt(), (location[1] + rect.top).toInt(),
+                    (location[0] + rect.right).toInt(), (location[1] + rect.bottom).toInt())
+            }
+            val screen = instrumentation.uiAutomation.takeScreenshot()!!
+            var coloured = 0
+            for (y in area.top.coerceAtLeast(0) until area.bottom.coerceAtMost(screen.height) step 5)
+                for (x in area.left.coerceAtLeast(0) until area.right.coerceAtMost(screen.width) step 5) {
+                    val pixel = screen.getPixel(x, y)
+                    if (kotlin.math.abs(Color.red(pixel) - Color.blue(pixel)) > 25 &&
+                        kotlin.math.abs(Color.green(pixel) - Color.blue(pixel)) > 15) coloured++
+                }
+            screen.recycle()
+            assertTrue("GPU lens drew no coloured wallpaper", coloured > 20)
+            capture("wallpaper-glass-expanded")
             scenario.onActivity { find(it.window.decorView)!!.show(music, Presentation.COMPACT) }
             android.os.SystemClock.sleep(90)
             scenario.onActivity { find(it.window.decorView)!!.show(music, Presentation.EXPANDED) }

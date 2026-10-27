@@ -34,7 +34,6 @@ class WallpaperLiquidGlass {
     private class Backend {
         private val node = RenderNode("Wallpaper liquid glass")
         private val shader = RuntimeShader(SHADER)
-        private val effect = RenderEffect.createRuntimeShaderEffect(shader, "content")
         private val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
         private val local = RectF()
         fun draw(canvas: Canvas, rect: RectF, radius: Float, alpha: Int, renderer: WallpaperSkinRenderer) {
@@ -53,7 +52,8 @@ class WallpaperLiquidGlass {
             shader.setFloatUniform("refractionAmount", -min(height * .16f, 16f))
             shader.setFloatUniform("depthEffect", .35f)
             shader.setFloatUniform("chromaticAberration", .45f)
-            node.setRenderEffect(effect)
+            // RenderEffect snapshots uniforms: rebuild after geometry updates during every morph.
+            node.setRenderEffect(RenderEffect.createRuntimeShaderEffect(shader, "content"))
             canvas.save()
             canvas.translate(rect.left, rect.top)
             // Preserve reveal/fade alpha even while the render node itself is opaque.
