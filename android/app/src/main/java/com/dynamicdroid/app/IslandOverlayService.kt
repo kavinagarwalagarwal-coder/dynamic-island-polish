@@ -43,7 +43,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private var ongoing: LiveActivity? = null
     private val activities = ActivityShelf<LiveActivity>({ it.key }, {
         when (it.mode) { IslandMode.CALL -> 3; IslandMode.TIMER -> 2; else -> 1 }
-    })
+    }, { it.mode == IslandMode.TIMER })
     private var transient: LiveActivity? = null
     private var presentation = Presentation.COMPACT
     private var foregroundPkg: String? = null
@@ -62,6 +62,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         timerPeek = false
         if (transient == null && presentation == Presentation.EXPANDED) {
             presentation = Presentation.COMPACT
+            activities.restoreAutomaticSelection()
             render()
         }
     }
@@ -248,7 +249,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             }
         }
         nextDeadline?.let { handler.postDelayed(checkCompletion, it) }
-        val (o, secondary) = activities.pair { it.packageName != foregroundPkg }
+        // A running timer remains visible beside other activities, including while Clock is open.
+        val (o, secondary) = activities.pair { it.mode == IslandMode.TIMER || it.packageName != foregroundPkg }
         ongoing = o
         view.setSecondary(if (t == null) secondary else null)
         val (a, p) = when {
@@ -289,7 +291,11 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             handler.postDelayed(clearTransient, if (activity.mode == IslandMode.CHARGING) 3_000L else MESSAGE_TIMEOUT_MS)
         } else {
             val isNew = activities.put(activity)
-            ongoing = activities.pair { it.packageName != foregroundPkg }.first
+            ongoing = activities.pair { it.mode == IslandMode.TIMER || it.packageName != foregroundPkg }.first
+            if (isNew && activity.mode == IslandMode.TIMER && ongoing?.key != activity.key) {
+                presentation = Presentation.COMPACT
+                timerPeek = false
+            }
             if (isNew && ongoing?.key == activity.key) {
                 timerPeek = activity.mode == IslandMode.TIMER
                 presentation = when (activity.mode) {
@@ -310,7 +316,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         activities.remove(key)
         completions.remove(key)
         if (ongoing?.key == key) {
-            ongoing = activities.pair { it.packageName != foregroundPkg }.first
+            ongoing = activities.pair { it.mode == IslandMode.TIMER || it.packageName != foregroundPkg }.first
             presentation = Presentation.COMPACT
             if (activities.all().isEmpty()) watcher?.stop()
         }
@@ -362,6 +368,14 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             ?.let { send(it.intent) }
     }
 
+    override fun onSwitchActivity() {
+        val (_, other) = activities.pair { it.mode == IslandMode.TIMER || it.packageName != foregroundPkg }
+        other?.let { activities.select(it.key) }
+        presentation = Presentation.COMPACT
+        timerPeek = false
+        render()
+    }
+
     override fun onSecondaryExpand(activity: LiveActivity) {
         activities.select(activity.key)
         timerPeek = false
@@ -377,6 +391,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     override fun onCollapseRequest() {
+        activities.restoreAutomaticSelection()
         if (transient != null) {
             transient = null
             handler.removeCallbacks(clearTransient)

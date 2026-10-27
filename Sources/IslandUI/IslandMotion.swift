@@ -17,8 +17,9 @@ public enum IslandMotion {
     public static let pressDampingFraction: Double = 0.62
 
     public static let idleSideMargin: CGFloat = 2
-    public static let idleHeight: CGFloat = 34
+    public static let idleHeight: CGFloat = 14
     public static let compactHeight: CGFloat = 36
+    public static let splitWidth: CGFloat = 180
     public static let compactWidth: CGFloat = 232
 
     public static var shapeAnimation: Animation {

@@ -1,27 +1,34 @@
 package com.dynamicdroid.app
 
 /** Stable activity selection: refreshes never steal focus or change creation order. */
-class ActivityShelf<T>(private val keyOf: (T) -> String, private val priorityOf: (T) -> Int) {
+class ActivityShelf<T>(private val keyOf: (T) -> String, private val priorityOf: (T) -> Int,
+                       private val prefersBubble: (T) -> Boolean = { false }) {
     private val entries = LinkedHashMap<String, T>()
     private var selected: String? = null
+    private var explicitSelection = false
 
     fun put(value: T): Boolean {
         val key = keyOf(value)
         val fresh = key !in entries
         val current = selected?.let(entries::get)
         entries[key] = value
-        if (fresh && (current == null || priorityOf(value) >= priorityOf(current))) selected = key
+        if (fresh && (current == null || !prefersBubble(value) &&
+                (prefersBubble(current) || priorityOf(value) >= priorityOf(current)))) {
+            selected = key; explicitSelection = false
+        }
         return fresh
     }
     fun all(): List<T> = entries.values.toList()
-    fun select(key: String) { if (key in entries) selected = key }
+    fun select(key: String) { if (key in entries) { selected = key; explicitSelection = true } }
+    fun restoreAutomaticSelection() { selected = null; explicitSelection = false }
     fun remove(key: String) { entries.remove(key); if (selected == key) selected = null }
     fun pair(visible: (T) -> Boolean = { true }): Pair<T?, T?> {
         val values = entries.values.filter(visible).reversed()
-        val chosen = values.firstOrNull { keyOf(it) == selected }
-        val urgent = values.maxByOrNull(priorityOf)
-        val primary = chosen ?: urgent
-        return primary to values.firstOrNull { keyOf(it) != primary?.let(keyOf) }
+        val primaryCandidates = if (explicitSelection) values else values.filterNot(prefersBubble).ifEmpty { values }
+        val chosen = primaryCandidates.firstOrNull { keyOf(it) == selected }
+        val primary = chosen ?: primaryCandidates.maxByOrNull(priorityOf)
+        val remaining = values.filter { keyOf(it) != primary?.let(keyOf) }
+        return primary to (remaining.firstOrNull(prefersBubble) ?: remaining.firstOrNull())
     }
 }
 

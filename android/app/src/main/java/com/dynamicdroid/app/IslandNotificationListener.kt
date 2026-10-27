@@ -52,7 +52,8 @@ class IslandNotificationListener : NotificationListenerService() {
         IslandBus.mediaControl = ::handleMedia
         runCatching { activeNotifications }.getOrNull()
             ?.sortedBy { it.postTime }
-            ?.filter { it.isOngoing }
+            ?.filter { it.isOngoing || it.notification.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER) ||
+                it.notification.extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN) || it.packageName.contains("clock", true) }
             ?.forEach(::onNotificationPosted)
     }
 
@@ -76,21 +77,25 @@ class IslandNotificationListener : NotificationListenerService() {
             return
         }
 
-        val chronometer = extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)
-        val mode = when {
-            n.category == Notification.CATEGORY_CALL -> IslandMode.CALL
-            n.category == Notification.CATEGORY_NAVIGATION && sbn.isOngoing -> IslandMode.NAVIGATION
-            sbn.key in timers -> IslandMode.TIMER
-            sbn.isOngoing && (chronometer || n.category == Notification.CATEGORY_ALARM || n.category == "stopwatch") -> IslandMode.TIMER
-            sbn.isOngoing -> return // downloads, "app is running", etc.
-            else -> IslandMode.MESSAGE
-        }
-
         val title = (extras.getCharSequence(Notification.EXTRA_CONVERSATION_TITLE)
             ?: extras.getCharSequence(Notification.EXTRA_TITLE))?.toString()?.takeIf { it.isNotBlank() }
             ?: AppStyle.label(this, sbn.packageName)
         val text = (extras.getCharSequence(Notification.EXTRA_TEXT)
             ?: extras.getCharSequence(Notification.EXTRA_BIG_TEXT))?.toString().orEmpty()
+        val chronometer = extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER)
+        val nativeCountDown = extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN)
+        val recognizedTimer = TimerRecognition.matches(sbn.key in timers, chronometer, nativeCountDown,
+            sbn.isOngoing, n.category == Notification.CATEGORY_ALARM || n.category == "stopwatch",
+            sbn.packageName.contains("clock", true),
+            ClockTimeline.parseRemaining(text) != null || ClockTimeline.parseRemaining(title) != null,
+            n.actions.orEmpty().any { a -> listOf("pause", "resume", "cancel", "stop").any { a.title.toString().contains(it, true) } })
+        val mode = when {
+            n.category == Notification.CATEGORY_CALL -> IslandMode.CALL
+            n.category == Notification.CATEGORY_NAVIGATION && sbn.isOngoing -> IslandMode.NAVIGATION
+            recognizedTimer -> IslandMode.TIMER
+            sbn.isOngoing -> return
+            else -> IslandMode.MESSAGE
+        }
 
         if (mode == IslandMode.MESSAGE) {
             if (!isAlerting(sbn)) return
@@ -105,7 +110,6 @@ class IslandNotificationListener : NotificationListenerService() {
             .map { IslandAction(it.title?.toString().orEmpty(), it.actionIntent) }
             .filter { it.label.isNotBlank() }
 
-        val nativeCountDown = Build.VERSION.SDK_INT >= 24 && extras.getBoolean(Notification.EXTRA_CHRONOMETER_COUNT_DOWN)
         val previousTimer = timers[sbn.key]
         val parsedRemaining = if (mode == IslandMode.TIMER && !chronometer) {
             ClockTimeline.parseRemaining(text) ?: ClockTimeline.parseRemaining(title)

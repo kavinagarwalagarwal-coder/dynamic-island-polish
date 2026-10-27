@@ -18,6 +18,8 @@ public struct DynamicIslandView: View {
     public var onOpen: ((IslandActivity) -> Void)?
     public var onExpand: ((IslandActivity) -> Void)?
     public var onCollapse: (() -> Void)?
+    @Namespace private var islandNamespace
+    public var onSwitch: ((IslandActivity) -> Void)?
     @State private var pressed = false
     @State private var dragOffset: CGFloat = 0
     public var concealed: Bool
@@ -40,8 +42,10 @@ public struct DynamicIslandView: View {
         secondaryActivity: IslandActivity? = nil,
         onOpen: ((IslandActivity) -> Void)? = nil,
         onExpand: ((IslandActivity) -> Void)? = nil,
-        onCollapse: (() -> Void)? = nil
+        onCollapse: (() -> Void)? = nil,
+        onSwitch: ((IslandActivity) -> Void)? = nil
     ) {
+        self.onSwitch = onSwitch
         self.secondaryActivity = secondaryActivity
         self.onOpen = onOpen
         self.onExpand = onExpand
@@ -69,7 +73,7 @@ public struct DynamicIslandView: View {
             pillWidth: pillWidth
         )
         guard presentation == .compact, secondaryActivity != nil else { return shape }
-        let width = min(shape.width, max(0, screenWidth - 52))
+        let width = min(IslandMotion.splitWidth * pillWidth, max(0, screenWidth - 52))
         let center = min(max(shape.centerX, 4 + width / 2), max(4 + width / 2, screenWidth - 48 - width / 2))
         return IslandShapeSpec(width: width, height: shape.height, radius: shape.radius, centerX: center, top: shape.top)
     }
@@ -79,6 +83,7 @@ public struct DynamicIslandView: View {
             RoundedRectangle(cornerRadius: spec.radius, style: .continuous)
                 .fill(Color.black)
                 .frame(width: spec.width, height: spec.height)
+                .matchedGeometryEffect(id: activity?.key ?? "camera", in: islandNamespace)
                 .contentShape(RoundedRectangle(cornerRadius: spec.radius, style: .continuous))
                 .onTapGesture { if let activity { onOpen?(activity) } }
                 .onLongPressGesture(minimumDuration: 0.35, maximumDistance: 12, pressing: { pressing in
@@ -92,7 +97,9 @@ public struct DynamicIslandView: View {
                     }
                     .onEnded { value in
                         dragOffset = 0; pressed = false
-                        if abs(value.translation.height) > abs(value.translation.width) {
+                        if abs(value.translation.width) > 28 && abs(value.translation.width) > abs(value.translation.height), let secondaryActivity {
+                            onSwitch?(secondaryActivity)
+                        } else if abs(value.translation.height) > abs(value.translation.width) {
                             if value.translation.height < -26 { onCollapse?() }
                             else if value.translation.height > 26, let activity { onExpand?(activity) }
                         }
@@ -100,17 +107,26 @@ public struct DynamicIslandView: View {
                 .overlay(content)
                 .clipShape(RoundedRectangle(cornerRadius: spec.radius, style: .continuous))
                 .offset(x: spec.centerX - spec.width / 2, y: spec.top)
-                .opacity(concealed ? 0 : 1)
+                .opacity(concealed || presentation == .idle || activity == nil ? 0 : 1)
                 .scaleEffect(concealed ? 0.35 : pressed && !reduceMotion ? 0.96 : 1, anchor: .top)
                 .offset(y: dragOffset)
             if presentation == .compact, let secondaryActivity {
                 Circle().fill(Color.black)
                     .overlay {
-                        Image(systemName: secondarySymbol(secondaryActivity.mode))
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(secondaryActivity.accent)
+                        if secondaryActivity.mode == .timer {
+                            TimelineView(.animation(minimumInterval: 0.1, paused: secondaryActivity.timerPaused)) { _ in
+                                RollingTimerDigits(value: secondaryActivity.timerRemaining == nil ? secondaryActivity.subtitle : TimerIsland.display(secondaryActivity.remainingTime), size: 9, color: secondaryActivity.accent)
+                                    .frame(width: 29).minimumScaleFactor(0.6)
+                                    .opacity(secondaryActivity.timerPaused ? 0.55 : 1)
+                            }
+                        } else {
+                            Image(systemName: secondarySymbol(secondaryActivity.mode))
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundColor(secondaryActivity.accent)
+                        }
                     }
                     .frame(width: 36, height: 36)
+                    .matchedGeometryEffect(id: secondaryActivity.key, in: islandNamespace)
                     .contentShape(Circle())
                     .onTapGesture { onOpen?(secondaryActivity) }
                     .onLongPressGesture(minimumDuration: 0.35) { onExpand?(secondaryActivity) }
@@ -143,7 +159,6 @@ public struct DynamicIslandView: View {
     @ViewBuilder
     private var content: some View {
         ZStack {
-            IdleStatusBar(status: status, opacity: presentation == .idle ? 1 : 0)
             if let activity {
                 if activity.mode == .timer {
                     TimerIsland(activity: activity, expanded: presentation == .expanded,

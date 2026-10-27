@@ -17,7 +17,8 @@ object IslandMotion {
     const val CONTENT_IN_K = 140f
     const val CONTENT_OUT_K = 380f
     const val IDLE_SIDE_MARGIN_DP = 2f
-    const val IDLE_HEIGHT_DP = 34f
+    const val IDLE_HEIGHT_DP = 14f
+    const val SPLIT_WIDTH_DP = 180f
     const val COMPACT_HEIGHT_DP = 36f
     const val COMPACT_WIDTH_DP = 232f
 
