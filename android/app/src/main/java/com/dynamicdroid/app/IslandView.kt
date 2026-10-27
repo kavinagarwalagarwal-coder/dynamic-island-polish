@@ -15,6 +15,7 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import android.os.Build
 import android.os.SystemClock
+import android.os.PowerManager
 import android.text.TextPaint
 import android.text.TextUtils
 import android.view.Choreographer
@@ -136,6 +137,25 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         invalidate()
     }
 
+    private val wallpaperSkin = WallpaperSkinRenderer()
+    private val liquidGlass = WallpaperLiquidGlass()
+    private val powerManager = context.getSystemService(PowerManager::class.java)
+
+    fun applyWallpaper(motion: WallpaperMotion, image: Bitmap?, background: Bitmap? = null, subject: Bitmap? = null) {
+        wallpaperSkin.motion = motion.safe()
+        wallpaperSkin.image = image
+        wallpaperSkin.background = background
+        wallpaperSkin.subject = subject
+        settled = false
+        kick()
+        invalidate()
+    }
+
+    private fun wallpaperAnimating() = wallpaperSkin.enabled && !reduceMotion &&
+        presentation != Presentation.IDLE && !isConcealed && introS.value > 0.01f &&
+        isShown && powerManager?.isInteractive != false &&
+        (activity?.mode != IslandMode.MUSIC || activity?.isPlaying == true)
+
     // Idle status bar data (time, network, battery). Redrawn only when it actually changes.
     private var status = StatusInfo()
     private val statusPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -189,8 +209,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val expandedA = Spring(0f, IslandMotion.CONTENT_IN_K, 1f, 0.004f)
     private val compactA = Spring(0f, IslandMotion.CONTENT_IN_K, 1f, 0.004f)
     // Stiffer press so the squish lands on the finger's first frame.
-    private val pressS = Spring(1f, 760f, 0.62f, 0.0008f)
-    private val stretchS = Spring(0f, 360f, 0.62f, 0.5f)
+    private val pressS = Spring(1f, 760f, 0.76f, 0.0008f)
+    private val stretchS = Spring(0f, 360f, 0.78f, 0.5f)
     private val absorbS = Spring(0f, 120f, 1f, 0.004f)
     // Wake/unlock intro: 0 = hidden dot, 1 = fully present
     private val introS = Spring(1f, 160f, 0.7f, 0.002f)
@@ -513,6 +533,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             if (reduceMotion) s.snap(s.target) else s.step(dt)
             if (!s.isAtRest) rest = false
         }
+        if (wallpaperAnimating()) wallpaperSkin.advance(dt)
         invalidate()
         if (rest && !settled && !tracking) {
             settled = true
@@ -542,7 +563,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun continuousDelay(): Long? {
         val a = activity ?: return null
         if (presentation == Presentation.IDLE) return null
-        if (isConcealed) return null
+        if (isConcealed || introS.value < 0.01f || !isShown || powerManager?.isInteractive == false) return null
+        if (wallpaperAnimating()) return if (powerManager?.isPowerSaveMode == true) 66L else 33L
         val other = secondary
         if (other != null && secondaryA.value > 0.01f &&
             (other.mode == IslandMode.MUSIC && other.isPlaying ||
@@ -648,6 +670,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         clip.addRoundRect(rect, r, r, Path.Direction.CW)
         canvas.save()
         canvas.clipPath(clip)
+        liquidGlass.draw(canvas, rect, r, bodyAlpha, wallpaperSkin)
 
         val ea = expandedA.value.coerceIn(0f, 1f)
         val ca = compactA.value.coerceIn(0f, 1f)
@@ -657,8 +680,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             // Nothing-inspired island stays monochrome; no coloured content glow.
             val alpha = (((ea - 0.45f) / 0.55f).coerceIn(0f, 1f) * 255 * intro).toInt()
             // Content rises and scales in slightly as the shape opens, like iOS.
-            val lift = (1f - ea) * dp(10f)
-            val sc = 0.94f + 0.06f * ea
+            val lift = (1f - ea) * dp(7f)
+            val sc = 0.97f + 0.03f * ea
             canvas.save()
             canvas.translate(0f, -lift)
             canvas.scale(sc, sc, rect.centerX(), rect.top)
@@ -1352,8 +1375,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     a.durationMs > 0L && abs(e.y - barY) < dp(16f) &&
                     e.x >= barLeft - dp(12f) && e.x <= barRight + dp(12f)
                 if (seeking) seekFraction = fractionAt(e.x)
-                if (touchingSecondary) bubblePress.target = if (reduceMotion) 1f else 0.9f
-                else pressS.target = if (reduceMotion) 1f else if (presentation == Presentation.EXPANDED) 0.985f else 0.94f
+                if (touchingSecondary) bubblePress.target = if (reduceMotion) 1f else 0.94f
+                else pressS.target = if (reduceMotion) 1f else if (presentation == Presentation.EXPANDED) 0.985f else 0.96f
                 if (presentation == Presentation.COMPACT) postDelayed(longPress, LONG_PRESS_MS)
                 callbacks?.onInteraction()
                 settled = false

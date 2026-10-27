@@ -79,3 +79,11 @@ Custom Clock notifications may contain a running `Chronometer` only inside their
 Settings includes **Clock notification status** with the last package and recognised format, without saving notification text or images. This helps distinguish missing notification access from an unsupported Clock format on a physical device.
 
 The Android 16 emulator test installs a separate `notification-fixture` app. It posts a real media-session notification and a custom Clock notification with no normal timer fields, then verifies the actual accessibility overlay receives and visibly detaches the timer during running, paused, and resumed states. The fixture is test-only and is not included in the shipped app APK.
+
+### Animated wallpaper pill (1.3)
+
+Under **Animated wallpaper**, choose the same JPG/PNG/image used for your phone wallpaper. Android 13+ restricts direct wallpaper image reads, so this uses the system image picker rather than screen capture or broad storage access. The original is sampled to at most 1024 pixels per side and one private PNG copy is stored in `noBackupFilesDir`; the source URI is not retained. Remove wallpaper deletes that copy. No Internet permission or remote image service is added.
+
+**Vinyl** rotates a user-positioned circular patch of the actual photograph, leaving the rest stationary. Drag the selection circle (or use its position sliders), match its radius to the record, and adjust strength/speed using the live pill preview. **Scene** adds subtle drifting motion to the photo. These are deterministic effects, not automatic object recognition, segmentation, or AI-generated video. The image is clipped to the pill's live spring geometry and dimmed for readable controls; the detached timer keeps its solid background. Idle stays hidden. Motion pauses with paused music, screen off, hidden/fullscreen state, or system animation reduction; wallpaper frames are capped at 30fps (15fps in battery saver).
+
+Morphs use more damped shared springs, quieter press feedback, and a smaller content lift/scale. SwiftUI stays SwiftUI, with corresponding spring/press values updated in `Sources/IslandUI`.
