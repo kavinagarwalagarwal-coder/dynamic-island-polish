@@ -310,4 +310,9 @@ class IslandNotificationListener : NotificationListenerService() {
             contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
         }.getOrNull()
     }
+
+    companion object {
+        @Volatile var instance: IslandNotificationListener? = null
+            private set
+    }
 }
