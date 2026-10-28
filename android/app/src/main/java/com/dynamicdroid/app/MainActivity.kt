@@ -294,6 +294,9 @@ class MainActivity : AppCompatActivity() {
             demo = a; demoPresentation = Presentation.COMPACT
             preview.setSecondary(null); preview.show(a, Presentation.COMPACT, absorb = true)
         }, row(-2).apply { topMargin = dp(8) })
+        column.addView(chip("Preview SwiftUI morph") {
+            startActivity(Intent(this, SwiftIslandMorphPreviewActivity::class.java))
+        }, row(-2).apply { topMargin = dp(8) })
 
         column.addView(label("Previews use sample content. Your real activities appear after Setup.", 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(16) })
         column = page("Rules")

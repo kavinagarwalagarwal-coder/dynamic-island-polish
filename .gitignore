@@ -34,3 +34,4 @@ dist-ssr
 # Native Android generated outputs and downloaded model assets
 android/**/build/
 android/.gradle/
+android/app/libs/

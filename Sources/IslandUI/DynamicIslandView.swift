@@ -1,4 +1,5 @@
 import SwiftUI
+import IslandMorphUI
 
 /// The Dynamic Island. Shape (width, height, radius, center) is driven by one
 /// interpolating spring so idle ↔ compact ↔ expanded morph instead of jumping.
@@ -178,6 +179,7 @@ public struct DynamicIslandView: View {
 public struct IslandPlayground: View {
     @State private var presentation: IslandPresentation = .idle
     @State private var mode: IslandMode = .music
+    @State private var showingAppMorph = false
 
     private var activity: IslandActivity? {
         guard presentation != .idle else { return nil }
@@ -206,32 +208,44 @@ public struct IslandPlayground: View {
     public init() {}
 
     public var body: some View {
-        GeometryReader { geo in
-            ZStack(alignment: .top) {
-                Color.black.ignoresSafeArea()
-                DynamicIslandView(
-                    presentation: presentation,
-                    activity: activity,
-                    screenWidth: geo.size.width,
-                    cameraX: geo.size.width / 2
-                )
-                VStack(spacing: 12) {
-                    Spacer()
-                    Text("Dynamic Droid")
-                        .foregroundColor(.white.opacity(0.6))
-                    HStack {
-                        chip("Idle", .idle)
-                        chip("Compact", .compact)
-                        chip("Expanded", .expanded)
-                    }
-                    HStack {
-                        ForEach([IslandMode.music, .call, .timer, .message], id: \.self) { m in
-                            Button(m.rawValue) { mode = m }
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(mode == m ? 1 : 0.45))
+        Group {
+            if showingAppMorph {
+                AppIslandMorphDemo { showingAppMorph = false }
+            } else {
+                GeometryReader { geo in
+                    ZStack(alignment: .top) {
+                        Color.black.ignoresSafeArea()
+                        DynamicIslandView(
+                            presentation: presentation,
+                            activity: activity,
+                            screenWidth: geo.size.width,
+                            cameraX: geo.size.width / 2
+                        )
+                        VStack(spacing: 12) {
+                            Spacer()
+                            Text("Dynamic Droid")
+                                .foregroundColor(.white.opacity(0.6))
+                            HStack {
+                                chip("Idle", .idle)
+                                chip("Compact", .compact)
+                                chip("Expanded", .expanded)
+                            }
+                            HStack {
+                                ForEach([IslandMode.music, .call, .timer, .message], id: \.self) { m in
+                                    Button(m.rawValue) { mode = m }
+                                        .font(.caption)
+                                        .foregroundColor(.white.opacity(mode == m ? 1 : 0.45))
+                                }
+                            }
+                            Button("App → island morph") {
+                                showingAppMorph = true
+                            }
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(Color(red: 0.48, green: 0.82, blue: 1))
+                            .padding(.top, 2)
+                            .padding(.bottom, 28)
                         }
                     }
-                    .padding(.bottom, 28)
                 }
             }
         }
