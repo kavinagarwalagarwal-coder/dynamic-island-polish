@@ -25,8 +25,8 @@ class ActivityShelf<T>(private val keyOf: (T) -> String, private val priorityOf:
     fun pair(visible: (T) -> Boolean = { true }): Pair<T?, T?> {
         val values = entries.values.filter(visible).reversed()
         val primaryCandidates = if (explicitSelection) values else values.filterNot(prefersBubble).ifEmpty { values }
-        val chosen = primaryCandidates.firstOrNull { keyOf(it) == selected }
-        val primary = chosen ?: primaryCandidates.maxByOrNull(priorityOf)
+        val explicitlyChosen = if (explicitSelection) primaryCandidates.firstOrNull { keyOf(it) == selected } else null
+        val primary = explicitlyChosen ?: primaryCandidates.maxByOrNull(priorityOf)
         val remaining = values.filter { keyOf(it) != primary?.let(keyOf) }
         return primary to (remaining.firstOrNull(prefersBubble) ?: remaining.firstOrNull())
     }

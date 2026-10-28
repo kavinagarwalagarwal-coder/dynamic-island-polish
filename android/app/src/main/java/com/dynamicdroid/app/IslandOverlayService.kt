@@ -42,8 +42,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     private var ongoing: LiveActivity? = null
     private val activities = ActivityShelf<LiveActivity>({ it.key }, {
-        when (it.mode) { IslandMode.CALL -> 3; IslandMode.TIMER -> 2; else -> 1 }
-    }, { it.mode == IslandMode.TIMER })
+        IslandCustomization.priority(this, it.mode)
+    }, { it.mode == IslandMode.TIMER && IslandCustomization.timerAsBubble(this) })
     private var transient: LiveActivity? = null
     private var placementTest: LiveActivity? = null
     private val clearPlacementTest = Runnable { placementTest = null; render() }
@@ -66,6 +66,12 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     private val completions = TimerCompletion()
     private val checkCompletion = Runnable { render() }
+    private val refreshQuietRules = object : Runnable {
+        override fun run() {
+            render()
+            if (IslandCustomization.quietEnabled(this@IslandOverlayService)) handler.postDelayed(this, 60_000L)
+        }
+    }
 
     private val clearTransient = Runnable { transient = null; render() }
     private val autoCollapse = Runnable {
@@ -164,6 +170,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         IslandAccessibilityService.onChanged = { handler.post { reattach() } }
         attachWindow()
         IslandBus.listener = this
+        if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -183,6 +190,12 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 0xFFFFFFFF.toInt(), isPlaying = true)
             handler.removeCallbacks(clearPlacementTest)
             handler.postDelayed(clearPlacementTest, 12_000L)
+            render()
+        }
+        if (intent?.action == ACTION_CUSTOMIZATION) {
+            handler.removeCallbacks(refreshQuietRules)
+            if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)
+            IslandNotificationListener.instance?.refreshAllowedApps()
             render()
         }
         if (intent?.action == ACTION_THEME) {
@@ -263,18 +276,24 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     private fun render(absorb: Boolean = false) {
         val view = island ?: return
-        val t = transient
+        var t = transient
         handler.removeCallbacks(checkCompletion)
         var nextDeadline: Long? = null
         for (candidate in activities.all()) {
             if (candidate.mode != IslandMode.TIMER) continue
             val remaining = candidate.clockMs()
             if (completions.observe(candidate.key, remaining, candidate.pausedTimerMs != null, candidate.chronometerCountDown)) {
-                if (candidate.packageName != foregroundPkg && t == null) {
+                if (IslandCustomization.allowed(this, candidate.packageName) && candidate.packageName != foregroundPkg && t == null) {
                     activities.select(candidate.key)
                     presentation = Presentation.EXPANDED
                     timerPeek = false
                     view.timerDidComplete()
+                    transient = LiveActivity("timer-complete-${candidate.key}", candidate.packageName,
+                        IslandMode.MESSAGE, candidate.title.ifBlank { "Timer" }, "Timer complete",
+                        candidate.appLabel, candidate.appIcon, candidate.artwork, candidate.accent)
+                    handler.removeCallbacks(clearTransient)
+                    handler.postDelayed(clearTransient, 4_000L)
+                    t = transient
                 }
             }
             if (candidate.chronometerCountDown && candidate.pausedTimerMs == null && remaining != null && remaining > 0) {
@@ -283,10 +302,16 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         nextDeadline?.let { handler.postDelayed(checkCompletion, it) }
         // A running timer remains visible beside other activities, including while Clock is open.
-        val (o, secondary) = activities.pair { it.mode == IslandMode.TIMER || it.packageName != foregroundPkg }
+        val quiet = IslandCustomization.quietNow(this)
+        val (o, secondary) = activities.pair {
+            IslandCustomization.allowed(this, it.packageName) &&
+                (it.mode == IslandMode.TIMER || it.packageName != foregroundPkg)
+        }
         ongoing = o
-        view.setSecondary(if (t == null && placementTest == null) secondary else null)
+        view.setSecondary(if (t == null && placementTest == null && !quiet &&
+            !IslandCustomization.isHiddenForForeground(this, foregroundPkg)) secondary?.let { appTint(this, it) } else null)
         val (a, p) = when {
+            quiet || IslandCustomization.isHiddenForForeground(this, foregroundPkg) -> null to Presentation.IDLE
             placementTest != null -> placementTest to presentation
             t != null -> t to Presentation.EXPANDED
             o != null -> o to presentation
@@ -315,7 +340,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             }
         }
         growWindow(view.windowSizeFor(a, p), absorb)
-        view.show(a, p, absorb)
+        view.show(a?.let { appTint(this, it) }, p, absorb)
     }
 
     override fun onActivity(activity: LiveActivity) {
@@ -334,7 +359,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 timerPeek = activity.mode == IslandMode.TIMER
                 presentation = when (activity.mode) {
                     IslandMode.CALL, IslandMode.TIMER -> Presentation.EXPANDED
-                    else -> Presentation.COMPACT
+                    else -> if (IslandCustomization.preferredExpanded(this, activity.packageName) == true)
+                        Presentation.EXPANDED else Presentation.COMPACT
                 }
             }
             watcher?.start()
@@ -370,7 +396,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         val morph = AppReturnPolicy.shouldMorph(source?.packageName, previous, pkg, pkg in homePackages,
             source?.key != island?.activity?.key, unlocked)
         if (morph) { presentation = Presentation.COMPACT; fullscreen = false }
-        render(absorb = morph)
+        if (IslandCustomization.isHiddenForForeground(this, pkg)) island?.cancelAppMorph()
+        render(absorb = morph && !IslandCustomization.isHiddenForForeground(this, pkg))
     }
 
     // ---------------------------------------------------------------- island callbacks
@@ -578,6 +605,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     companion object {
+        const val ACTION_CUSTOMIZATION = "com.dynamicdroid.app.CUSTOMIZATION"
         const val ACTION_TEST = "com.dynamicdroid.app.TEST_PLACEMENT"
         const val ACTION_FIT = "com.dynamicdroid.app.UPDATE_FIT"
         const val ACTION_WALLPAPER = "com.dynamicdroid.app.UPDATE_WALLPAPER"

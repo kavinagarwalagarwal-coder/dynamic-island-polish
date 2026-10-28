@@ -48,6 +48,13 @@ class MainActivity : AppCompatActivity() {
     private val navigation = LinkedHashMap<String, Button>()
     private var placementChoices: android.widget.RadioGroup? = null
     private var placementInfo: TextView? = null
+    private var allowedAppsInfo: TextView? = null
+    private var hiddenAppsInfo: TextView? = null
+    private var quietSwitch: SwitchCompat? = null
+    private var timerBubbleSwitch: SwitchCompat? = null
+    private var quietStartButton: Button? = null
+    private var quietEndButton: Button? = null
+    private var timerLabelInput: android.widget.EditText? = null
     private var theme = IslandTheme()
     private var themeSwitch: SwitchCompat? = null
     private var swatchA: View? = null
@@ -129,7 +136,7 @@ class MainActivity : AppCompatActivity() {
         demo = a
         demoPresentation = p
         preview.contentDescription = "${a.mode.name.lowercase()} preview. Hold to expand; swipe up to collapse."
-        preview.show(a, p)
+        preview.show(appTint(this, a), p)
     }
 
     private val previewCallbacks = object : IslandView.Callbacks {
@@ -187,13 +194,13 @@ class MainActivity : AppCompatActivity() {
         actions = listOf(IslandAction("Decline", selfIntent()), IslandAction("Answer", selfIntent())),
     )
 
-    private fun demoTimer() = LiveActivity(
+    private fun demoTimer(minutes: Int = 9) = LiveActivity(
         key = "demo-timer", packageName = "com.google.android.deskclock", mode = IslandMode.TIMER,
-        title = "Pasta", subtitle = "Timer", appLabel = "Clock",
+        title = if (minutes == 9) "Pasta" else "$minutes min", subtitle = "Timer", appLabel = "Clock",
         appIcon = AppStyle.icon(this, "com.google.android.deskclock"), artwork = null,
         accent = AppStyle.accent(this, "com.google.android.deskclock"),
         actions = listOf(IslandAction("Pause", selfIntent()), IslandAction("Cancel", selfIntent())),
-        chronometerBase = System.currentTimeMillis() + 9 * 60_000L, chronometerCountDown = true,
+        chronometerBase = System.currentTimeMillis() + minutes * 60_000L, chronometerCountDown = true,
     )
 
     private fun selfIntent() = PendingIntent.getActivity(
@@ -228,7 +235,7 @@ class MainActivity : AppCompatActivity() {
         readiness = label("Checking your connections…", 13f, NothingStyle.muted).apply {
             setPadding(0, dp(6), 0, dp(12))
         }.also { shell.addView(it, row(-2)) }
-        val navRows = listOf(listOf("Playground", "Setup"), listOf("Appearance", "Phone fit"))
+        val navRows = listOf(listOf("Playground", "Setup"), listOf("Appearance", "Rules"), listOf("Phone fit"))
         navRows.forEach { names ->
             val strip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             names.forEach { name ->
@@ -272,6 +279,16 @@ class MainActivity : AppCompatActivity() {
         })
         column.addView(musicRow, row(-2).apply { topMargin = dp(14) })
         column.addView(activityRow, row(-2).apply { topMargin = dp(8) })
+        timerLabelInput = android.widget.EditText(this).apply {
+            hint = "Timer name (optional)"; setSingleLine(); textSize = 15f
+            setTextColor(NothingStyle.foreground); setHintTextColor(NothingStyle.muted)
+            background = controlBackground(); setPadding(dp(14), dp(4), dp(14), dp(4))
+        }
+        column.addView(timerLabelInput, row(dp(52)).apply { topMargin = dp(10) })
+        val presets = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        listOf(5, 10, 15, 25).forEach { mins -> presets.addView(chip("${mins}m") { startTimerPreset(mins) }) }
+        column.addView(label("Timer presets", 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
+        column.addView(presets, row(-2))
         column.addView(chip("App → island") {
             val a = demo?.takeIf { it.mode == IslandMode.MUSIC || it.mode == IslandMode.CALL } ?: demoMusic(true)
             demo = a; demoPresentation = Presentation.COMPACT
@@ -279,6 +296,44 @@ class MainActivity : AppCompatActivity() {
         }, row(-2).apply { topMargin = dp(8) })
 
         column.addView(label("Previews use sample content. Your real activities appear after Setup.", 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(16) })
+        column = page("Rules")
+        column.addView(heading("ACTIVITY PRIORITY"), row(-2))
+        column.addView(label("When several activities are live, higher scores stay in the main pill.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
+        timerBubbleSwitch = SwitchCompat(this).apply {
+            text = "Keep timers in the separate bubble"; minHeight = dp(56)
+            setTextColor(NothingStyle.foreground); isChecked = IslandCustomization.timerAsBubble(this@MainActivity)
+            setOnCheckedChangeListener { _, checked ->
+                IslandCustomization.setTimerAsBubble(this@MainActivity, checked); refreshCustomization()
+            }
+        }
+        column.addView(timerBubbleSwitch, row(-2))
+        IslandMode.values().forEach { mode ->
+            val initial = IslandCustomization.priority(this, mode)
+            column.addView(priorityControl(mode, initial), row(-2))
+        }
+        column.addView(heading("APP FILTERS & RULES"), row(-2).apply { topMargin = dp(22) })
+        allowedAppsInfo = label("All supported apps are currently allowed", 14f, NothingStyle.muted)
+        column.addView(allowedAppsInfo, row(-2).apply { topMargin = dp(8) })
+        column.addView(action("allowed-apps", "Choose apps allowed in the island") { chooseApps(allowed = true) }, row(-2).apply { topMargin = dp(8) })
+        hiddenAppsInfo = label("No apps are hidden while open", 14f, NothingStyle.muted)
+        column.addView(hiddenAppsInfo, row(-2).apply { topMargin = dp(8) })
+        column.addView(action("hidden-apps", "Hide island while apps are open") { chooseApps(allowed = false) }, row(-2).apply { topMargin = dp(8) })
+        column.addView(action("quick-actions", "Choose quick actions") { chooseQuickActions() }, row(-2).apply { topMargin = dp(8) })
+        column.addView(action("colors", "Set per-app island styles") { chooseAppStyle() }, row(-2).apply { topMargin = dp(8) })
+        column.addView(heading("QUIET HOURS"), row(-2).apply { topMargin = dp(22) })
+        quietSwitch = SwitchCompat(this).apply {
+            text = "Hide the island on a schedule"; textSize = 16f; minHeight = dp(56)
+            setTextColor(NothingStyle.foreground); isChecked = IslandCustomization.quietEnabled(this@MainActivity)
+            setOnCheckedChangeListener { _, enabled -> saveQuiet(enabled) }
+        }
+        column.addView(quietSwitch, row(-2))
+        val quietTimes = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        quietStartButton = chip("From ${minuteLabel(IslandCustomization.quietStart(this))}") { chooseTime(true) }
+        quietEndButton = chip("Until ${minuteLabel(IslandCustomization.quietEnd(this))}") { chooseTime(false) }
+        quietTimes.addView(quietStartButton); quietTimes.addView(quietEndButton)
+        column.addView(quietTimes, row(-2))
+        column.addView(label("Quiet hours use your phone’s local time. Timer notifications remain available when quiet hours end.", 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(6) })
+
         column = page("Phone fit")
         column.addView(heading("FIT YOUR PHONE"), row(-2))
         column.addView(label("Choose where the island lives. Automatic adapts to the overlay connection, cutout and screen orientation.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(10) })
@@ -309,6 +364,8 @@ class MainActivity : AppCompatActivity() {
                 startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
             } else { selectPage("Setup"); toast("Enable an overlay connection first") }
         }, row(-2).apply { topMargin = dp(10) })
+        column.addView(action("save-profile", "Save this placement profile") { saveProfile() }, row(-2).apply { topMargin = dp(10) })
+        column.addView(action("load-profile", "Load a saved placement profile") { loadProfile() }, row(-2).apply { topMargin = dp(8) })
         column.addView(label("If Samsung or another phone covers the island, select Below status bar, then test again. Adjust the sliders only if needed.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(14) })
         column.addView(fitControl("Size", 70, 130, (fit.scale * 100).toInt(), "%") { fit = fit.copy(scale = it / 100f); updateFit() }, row(-2))
         column.addView(fitControl("Pill width", 70, 150, (fit.pillWidth * 100).toInt(), "%") { fit = fit.copy(pillWidth = it / 100f); updateFit() }, row(-2))
@@ -365,6 +422,7 @@ class MainActivity : AppCompatActivity() {
         column.addView(action("wallpaper", "Use my current wallpaper") {
             applyWallpaperTheme(WallpaperTheme.fromSystem(this))
         }, row(-2).apply { topMargin = dp(8) })
+        column.addView(action("app-colors", "Customize each app’s island style") { chooseAppStyle() }, row(-2).apply { topMargin = dp(10) })
         column.addView(action("pick", "Pick an image instead") {
             pickImage.launch("image/*")
         }, row(-2).apply { topMargin = dp(10) })
@@ -411,7 +469,273 @@ class MainActivity : AppCompatActivity() {
         return shell
     }
 
+    private data class InstalledApp(val packageName: String, val label: String)
+
+    private fun priorityControl(mode: IslandMode, initial: Int): LinearLayout {
+        val title = label("${mode.name.lowercase().replaceFirstChar { it.uppercase() }} · $initial", 16f, NothingStyle.foreground).apply {
+            typeface = NothingStyle.body
+        }
+        val slider = SeekBar(this).apply {
+            max = 100; progress = initial; contentDescription = "${mode.name.lowercase()} priority"
+            progressTintList = ColorStateList.valueOf(NothingStyle.red)
+            thumbTintList = ColorStateList.valueOf(NothingStyle.foreground)
+        }
+        slider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) { title.text = "${mode.name.lowercase().replaceFirstChar { it.uppercase() }} · $value" }
+            override fun onStartTrackingTouch(bar: SeekBar?) = Unit
+            override fun onStopTrackingTouch(bar: SeekBar?) {
+                IslandCustomization.setPriority(this@MainActivity, mode, slider.progress); refreshCustomization()
+            }
+        })
+        return LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(0, dp(12), 0, 0); addView(title, row(-2)); addView(slider, row(dp(48))) }
+    }
+
+    private fun installedApps(): List<InstalledApp> = runCatching {
+        packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER), 0)
+            .map { InstalledApp(it.activityInfo.packageName, it.loadLabel(packageManager).toString()) }
+            .filter { it.packageName != packageName }.distinctBy { it.packageName }
+            .sortedBy { it.label.lowercase() }
+    }.getOrDefault(emptyList())
+
+    private fun chooseApps(allowed: Boolean) {
+        val apps = installedApps(); if (apps.isEmpty()) return
+        val stored = if (allowed) IslandCustomization.allowedApps(this) else IslandCustomization.hiddenWhenOpen(this)
+        val selected = if (allowed && !IslandCustomization.allowedFilterEnabled(this))
+            apps.map { it.packageName }.toMutableSet() else stored.toMutableSet()
+        val search = android.widget.EditText(this).apply {
+            hint = "Search installed apps"; setSingleLine(); textSize = 15f
+            setTextColor(NothingStyle.foreground); setHintTextColor(NothingStyle.muted)
+            background = controlBackground(); setPadding(dp(14), dp(4), dp(14), dp(4))
+        }
+        val list = android.widget.ListView(this).apply { choiceMode = android.widget.ListView.CHOICE_MODE_MULTIPLE }
+        val filtered = apps.toMutableList()
+        val adapter = object : android.widget.BaseAdapter() {
+            override fun getCount() = filtered.size
+            override fun getItem(position: Int) = filtered[position]
+            override fun getItemId(position: Int) = position.toLong()
+            override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+                val row = (convertView as? android.widget.CheckedTextView) ?: android.widget.CheckedTextView(this@MainActivity).apply {
+                    setPadding(dp(16), dp(12), dp(16), dp(12)); textSize = 16f
+                    setTextColor(NothingStyle.foreground)
+                    setCheckMarkDrawable(ContextCompat.getDrawable(this@MainActivity, android.R.drawable.checkbox_on_background))
+                }
+                val app = filtered[position]
+                row.text = app.label
+                row.isChecked = app.packageName in selected
+                return row
+            }
+        }
+        list.adapter = adapter
+        list.setOnItemClickListener { _, _, position, _ ->
+            val app = filtered[position]
+            if (!selected.add(app.packageName)) selected.remove(app.packageName)
+            adapter.notifyDataSetChanged()
+        }
+        search.addTextChangedListener(object : android.text.TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                val query = s?.toString()?.trim().orEmpty()
+                filtered.clear()
+                filtered.addAll(apps.filter { it.label.contains(query, ignoreCase = true) || it.packageName.contains(query, ignoreCase = true) })
+                adapter.notifyDataSetChanged()
+            }
+            override fun afterTextChanged(s: android.text.Editable?) = Unit
+        })
+        val picker = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), 0)
+            addView(search, row(dp(50)))
+            addView(list, LinearLayout.LayoutParams(-1, dp(280)).apply { topMargin = dp(8) })
+        }
+        val dialog = android.app.AlertDialog.Builder(this)
+            .setTitle(if (allowed) "Apps allowed in the island" else "Hide while these apps are open")
+            .setView(picker)
+            .setNegativeButton("Cancel", null)
+            .setNeutralButton(if (allowed) "Allow all" else "Clear rules") { _, _ ->
+                if (allowed) IslandCustomization.setAllowedApps(this, emptySet(), filterEnabled = false)
+                else IslandCustomization.setHiddenWhenOpen(this, emptySet())
+                refreshCustomization()
+            }
+            .setPositiveButton("Save") { _, _ ->
+                if (allowed) IslandCustomization.setAllowedApps(this,
+                    if (selected.size == apps.size) emptySet() else selected,
+                    filterEnabled = selected.size != apps.size)
+                else IslandCustomization.setHiddenWhenOpen(this, selected)
+                refreshCustomization()
+            }.create()
+        dialog.show()
+    }
+
+    private fun chooseQuickActions() {
+        val activity = IslandBus.allOngoing().lastOrNull { it.mode == IslandMode.MUSIC || it.actions.isNotEmpty() }
+            ?: demo?.takeIf { it.mode == IslandMode.MUSIC || it.actions.isNotEmpty() } ?: demoMusic(false)
+        if (activity.mode == IslandMode.MUSIC) {
+            val options = listOf(IslandBus.MEDIA_PREVIOUS to "Previous track", IslandBus.MEDIA_TOGGLE to "Play / pause",
+                IslandBus.MEDIA_NEXT to "Next track", IslandBus.MEDIA_SEEK to "Seek bar")
+            val current = IslandCustomization.mediaSelection(this, activity.packageName) ?: options.map { it.first }.toSet()
+            val selected = current.toMutableSet()
+            android.app.AlertDialog.Builder(this).setTitle("Music controls · ${activity.appLabel}")
+                .setMultiChoiceItems(options.map { it.second }.toTypedArray(), BooleanArray(options.size) { options[it].first in selected }) { _, index, checked ->
+                    if (checked) selected += options[index].first else selected -= options[index].first
+                }.setNeutralButton("Use defaults") { _, _ ->
+                    IslandCustomization.setMediaSelection(this, activity.packageName, null); refreshCustomization()
+                }.setNegativeButton("Cancel", null)
+                .setPositiveButton("Save") { _, _ -> IslandCustomization.setMediaSelection(this, activity.packageName, selected); refreshCustomization() }
+                .show()
+            return
+        }
+        val actions = activity.actions
+        if (actions.isEmpty()) { toast("This app has not provided any quick actions yet"); return }
+        val current = IslandCustomization.actionSelection(this, activity.packageName)
+        val selected = (current ?: actions.take(3).map { it.label }.toSet()).toMutableSet()
+        android.app.AlertDialog.Builder(this).setTitle("Quick actions · ${activity.appLabel}")
+            .setMultiChoiceItems(actions.map { it.label }.toTypedArray(), BooleanArray(actions.size) { actions[it].label in selected }) { _, index, checked ->
+                val label = actions[index].label
+                if (checked && selected.size >= 3) { toast("Choose up to three actions"); return@setMultiChoiceItems }
+                if (checked) selected += label else selected -= label
+            }
+            .setNeutralButton("Use app defaults") { _, _ ->
+                IslandCustomization.setActionSelection(this, activity.packageName, null); refreshCustomization()
+            }
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Save") { _, _ -> IslandCustomization.setActionSelection(this, activity.packageName, selected); refreshCustomization() }
+            .show()
+    }
+
+    private fun chooseAppStyle() {
+        val apps = installedApps(); if (apps.isEmpty()) return
+        android.app.AlertDialog.Builder(this).setTitle("Choose an app to style")
+            .setItems(apps.map { it.label }.toTypedArray()) { _, index -> editAppStyle(apps[index]) }.show()
+    }
+
+    private fun editAppStyle(app: InstalledApp) {
+        val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), dp(4)) }
+        column.addView(label("How it opens", 14f, NothingStyle.muted), row(-2))
+        val layout = android.widget.RadioGroup(this).apply { orientation = android.widget.RadioGroup.VERTICAL }
+        val modes = listOf("Use activity default", "Open compact", "Open expanded")
+        val selectedMode = when (IslandCustomization.preferredExpanded(this, app.packageName)) { true -> 2; false -> 1; null -> 0 }
+        modes.forEachIndexed { index, mode -> layout.addView(android.widget.RadioButton(this).apply {
+            id = View.generateViewId(); text = mode; isChecked = index == selectedMode
+            setTextColor(NothingStyle.foreground)
+        }) }
+        column.addView(layout, row(-2))
+        column.addView(label("Animation speed", 14f, NothingStyle.muted).apply { setPadding(0, dp(8), 0, 0) }, row(-2))
+        val speedLabel = label("${(IslandCustomization.motionSpeed(this, app.packageName) * 100).toInt()}%", 13f, NothingStyle.muted)
+        val speed = SeekBar(this).apply { max = 85; progress = ((IslandCustomization.motionSpeed(this@MainActivity, app.packageName) - .65f) * 100).toInt() }
+        speed.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
+                speedLabel.text = "${value + 65}%"
+            }
+            override fun onStartTrackingTouch(bar: SeekBar?) = Unit
+            override fun onStopTrackingTouch(bar: SeekBar?) = Unit
+        })
+        column.addView(speedLabel, row(-2)); column.addView(speed, row(dp(48)))
+        val accentButton = Button(this).apply {
+            text = "Island color: ${IslandCustomization.accents[IslandCustomization.accentChoice(this@MainActivity, app.packageName)].first}"
+            isAllCaps = false; background = controlBackground(); setTextColor(NothingStyle.foreground)
+            setOnClickListener {
+                android.app.AlertDialog.Builder(this@MainActivity).setTitle("${app.label} island color")
+                    .setSingleChoiceItems(IslandCustomization.accents.map { it.first }.toTypedArray(),
+                        IslandCustomization.accentChoice(this@MainActivity, app.packageName)) { dialog, choice ->
+                        IslandCustomization.setAccentChoice(this@MainActivity, app.packageName, choice)
+                        text = "Island color: ${IslandCustomization.accents[choice].first}"; dialog.dismiss()
+                    }.show()
+            }
+        }
+        column.addView(accentButton, row(-2).apply { topMargin = dp(8) })
+        android.app.AlertDialog.Builder(this).setTitle(app.label).setView(column)
+            .setNeutralButton("Use defaults") { _, _ ->
+                IslandCustomization.setPreferredExpanded(this, app.packageName, null)
+                IslandCustomization.setMotionSpeed(this, app.packageName, 1f)
+                IslandCustomization.setAccentChoice(this, app.packageName, 0)
+                refreshCustomization()
+            }.setNegativeButton("Cancel", null)
+            .setPositiveButton("Save") { _, _ ->
+                val checked = layout.checkedRadioButtonId
+                val mode = (0 until layout.childCount).firstOrNull { layout.getChildAt(it).id == checked } ?: 0
+                IslandCustomization.setPreferredExpanded(this, app.packageName, when (mode) { 1 -> false; 2 -> true; else -> null })
+                IslandCustomization.setMotionSpeed(this, app.packageName, (speed.progress + 65) / 100f)
+                IslandCustomization.saveStyledApps(this, IslandCustomization.savedApps(this) + app.packageName)
+                refreshCustomization(); toast("${app.label} style saved")
+            }.show()
+    }
+
+    private fun startTimerPreset(minutes: Int) {
+        val intent = Intent(android.provider.AlarmClock.ACTION_SET_TIMER).apply {
+            putExtra(android.provider.AlarmClock.EXTRA_LENGTH, minutes * 60)
+            val name = timerLabelInput?.text?.toString()?.trim().orEmpty().ifBlank { "Timer" }
+            putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, name)
+            putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        if (intent.resolveActivity(packageManager) != null) runCatching { startActivity(intent) }
+            .onFailure { toast("Couldn’t start that timer") }
+        else {
+            val label = timerLabelInput?.text?.toString()?.trim().orEmpty().ifBlank { "$minutes min" }
+            preview.setSecondary(null); showDemo(demoTimer(minutes).copy(title = label), Presentation.EXPANDED)
+        }
+    }
+
+    private fun saveQuiet(enabled: Boolean) {
+        IslandCustomization.setQuietHours(this, enabled, IslandCustomization.quietStart(this), IslandCustomization.quietEnd(this))
+        refreshCustomization()
+    }
+    private fun chooseTime(start: Boolean) {
+        val minute = if (start) IslandCustomization.quietStart(this) else IslandCustomization.quietEnd(this)
+        android.app.TimePickerDialog(this, { _, hour, mins ->
+            val from = if (start) hour * 60 + mins else IslandCustomization.quietStart(this)
+            val until = if (start) IslandCustomization.quietEnd(this) else hour * 60 + mins
+            IslandCustomization.setQuietHours(this, IslandCustomization.quietEnabled(this), from, until)
+            refreshCustomization()
+        }, minute / 60, minute % 60, false).show()
+    }
+    private fun minuteLabel(value: Int) = "%02d:%02d".format(value / 60, value % 60)
+
+    private fun saveProfile() {
+        val input = android.widget.EditText(this).apply { hint = "e.g. Samsung"; setSingleLine() }
+        android.app.AlertDialog.Builder(this).setTitle("Save phone placement").setView(input)
+            .setNegativeButton("Cancel", null).setPositiveButton("Save") { _, _ ->
+                val name = input.text.toString().trim().ifBlank { "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}" }
+                IslandProfileStore.save(this, name, fit); refreshCustomization(); toast("Profile saved")
+            }.show()
+    }
+    private fun loadProfile() {
+        val names = IslandProfileStore.names(this).sorted()
+        if (names.isEmpty()) { toast("Save a placement profile first"); return }
+        android.app.AlertDialog.Builder(this).setTitle("Load placement profile").setItems(names.toTypedArray()) { _, index ->
+            IslandProfileStore.load(this, names[index])?.let { next ->
+                fit = next
+                val values = listOf((fit.scale * 100).toInt(), (fit.pillWidth * 100).toInt(), fit.offsetX.toInt(), fit.offsetY.toInt())
+                fitSliders.take(4).forEachIndexed { i, slider -> slider.progress = values[i] - listOf(70, 70, -180, -24)[i] }
+                cameraSwitch?.isChecked = fit.alignCamera
+                placementChoices?.let { group -> (0 until group.childCount).map { group.getChildAt(it) }
+                    .firstOrNull { it.tag == fit.placement }?.let { group.check(it.id) } }
+                updateFit(); toast("${names[index]} profile loaded")
+            }
+        }.setNegativeButton("Cancel", null).setNeutralButton("Manage") { _, _ -> manageProfiles(names) }.show()
+    }
+    private fun manageProfiles(names: List<String>) {
+        if (names.isEmpty()) return
+        android.app.AlertDialog.Builder(this).setTitle("Remove a placement profile").setItems(names.toTypedArray()) { _, index ->
+            IslandProfileStore.remove(this, names[index]); toast("Profile removed")
+        }.setNegativeButton("Done", null).show()
+    }
+    private fun refreshCustomization() {
+        allowedAppsInfo?.text = when {
+            !IslandCustomization.allowedFilterEnabled(this) -> "All supported apps are currently allowed"
+            IslandCustomization.allowedApps(this).isEmpty() -> "No apps are currently allowed"
+            else -> "${IslandCustomization.allowedApps(this).size} selected apps are allowed"
+        }
+        hiddenAppsInfo?.text = IslandCustomization.hiddenWhenOpen(this).let { if (it.isEmpty()) "No apps are hidden while open" else "${it.size} apps hide the island while open" }
+        quietSwitch?.isChecked = IslandCustomization.quietEnabled(this)
+        quietStartButton?.text = "From ${minuteLabel(IslandCustomization.quietStart(this))}"
+        quietEndButton?.text = "Until ${minuteLabel(IslandCustomization.quietEnd(this))}"
+        timerBubbleSwitch?.isChecked = IslandCustomization.timerAsBubble(this)
+        if (Settings.canDrawOverlays(this) || IslandAccessibilityService.isEnabled(this))
+            ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_CUSTOMIZATION))
+    }
+
     private fun selectPage(name: String) {
+        if (name == "Rules") refreshCustomization()
         pages.forEach { (key, view) -> view.visibility = if (key == name) View.VISIBLE else View.GONE }
         navigation.forEach { (key, button) ->
             val selected = key == name

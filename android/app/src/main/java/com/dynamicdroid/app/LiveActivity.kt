@@ -102,4 +102,5 @@ object IslandBus {
     }
 
     fun latestOngoing(): LiveActivity? = ongoing.values.lastOrNull()
+    fun allOngoing(): List<LiveActivity> = ongoing.values.toList()
 }

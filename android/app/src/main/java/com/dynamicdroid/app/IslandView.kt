@@ -73,6 +73,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private set
 
     private var secondary: LiveActivity? = null
+    private var userAccent: Int? = null
+    private var mediaActions = setOf(IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_TOGGLE, IslandBus.MEDIA_NEXT, IslandBus.MEDIA_SEEK)
+    private fun showsMediaAction(action: String) = action in mediaActions
     private var departingSecondary: LiveActivity? = null
     private var departingActivity: LiveActivity? = null
     private val presenceS = Spring(0f, 240f, 0.9f, 0.003f)
@@ -135,7 +138,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var waveColor = NothingStyle.foreground
     private var baseColor = NothingStyle.background
     private var wallpaperAccents = false
-    private val timerColor: Int get() = if (wallpaperAccents) accent else Color.rgb(255, 159, 10)
+    private val timerColor: Int get() = userAccent ?: if (wallpaperAccents) accent else Color.rgb(255, 159, 10)
 
     fun applyTheme(theme: IslandTheme) {
         val t = theme.safe()
@@ -339,6 +342,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (next == null && activity != null) departingActivity = activity
         if (next != null) departingActivity = null
         activity = next
+        userAccent = next?.let { IslandCustomization.customAccent(context, it.packageName) }
+        mediaActions = next?.let { activity -> IslandCustomization.mediaSelection(context, activity.packageName)
+            ?: setOf(IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_TOGGLE, IslandBus.MEDIA_NEXT, IslandBus.MEDIA_SEEK) }
+            ?: setOf(IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_TOGGLE, IslandBus.MEDIA_NEXT, IslandBus.MEDIA_SEEK)
         presenceS.target = if (next != null) 1f else 0f
         presentation = p
         secondaryA.target = if (secondary != null && p == Presentation.COMPACT) 1f else 0f
@@ -350,6 +357,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (!absorb && SystemClock.uptimeMillis() < introHoldUntil) return
         if (introS.value < 0.001f && introS.target == 0f) return
         if (introHoldUntil == 0L && !sheenActive() && !isAbsorbing) restoreShapeSprings()
+        next?.let { activity ->
+            val speed = IslandCustomization.motionSpeed(context, activity.packageName)
+            shapeSprings.forEach { it.stiffness = IslandMotion.SHAPE_K / (speed * speed) }
+        }
         val spec = specFor(p, next)
 
         if (isAbsorbing && (next?.key != old?.key || p != Presentation.COMPACT)) {
@@ -793,7 +804,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 canvas.drawText(digits, center - paint.measureText(digits) / 2,
                     cy - (paint.ascent() + paint.descent()) / 2, paint)
             }
-            IslandMode.MUSIC -> drawWave(canvas, center - dp(9f), cy, dp(18f), dp(14f), waveColor, a.isPlaying, alpha)
+            IslandMode.MUSIC -> drawWave(canvas, center - dp(9f), cy, dp(18f), dp(14f), userAccent ?: waveColor, a.isPlaying, alpha)
             IslandMode.CALL -> drawPhone(canvas, center, cy, dp(18f), alpha, false)
             else -> text(canvas, a.appLabel.take(1), center - dp(4f), cy + dp(5f), dp(15f), bodyPaint, Color.WHITE, alpha)
         }
@@ -963,7 +974,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         when (a.mode) {
             IslandMode.MUSIC -> {
                 // Artwork and waveform flank the camera, matching the SwiftUI compact layout.
-                drawWave(canvas, right - dp(20f), cy, dp(20f), dp(14f), waveColor, a.isPlaying, alpha)
+                drawWave(canvas, right - dp(20f), cy, dp(20f), dp(14f), userAccent ?: waveColor, a.isPlaying, alpha)
             }
             IslandMode.CALL -> {
                 val t = a.chronometerText()
@@ -986,7 +997,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         drawArtwork(canvas, a, l, t, art, dp(14f), alpha)
         val tx = l + art + dp(14f)
         val waveW = dp(24f)
-        drawWave(canvas, rr - waveW, t + dp(20f), waveW, dp(18f), waveColor, a.isPlaying, alpha)
+        drawWave(canvas, rr - waveW, t + dp(20f), waveW, dp(18f), userAccent ?: waveColor, a.isPlaying, alpha)
         text(canvas, a.title, tx, t + dp(25f), rr - waveW - dp(12f) - tx, titlePaint, Color.WHITE, alpha)
         text(canvas, a.subtitle, tx, t + dp(46f), rr - tx, bodyPaint, GREY, alpha)
 
@@ -997,24 +1008,29 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val remaining = "-" + formatDuration((a.durationMs - pos).coerceAtLeast(0L))
         barLeft = l + dp(44f)
         barRight = rr - dp(48f)
-        text(canvas, elapsed, l, barY + dp(4f), dp(40f), smallPaint, GREY, late)
-        text(canvas, remaining, rr, barY + dp(4f), dp(46f), smallPaint, GREY, late, alignRight = true)
-        val thick = if (seeking) dp(8f) else dp(5f)
-        val fraction = if (a.durationMs > 0L) (pos.toFloat() / a.durationMs).coerceIn(0f, 1f) else 0f
-        fillPaint.color = withAlpha(waveColor, late * 50 / 255)
-        canvas.drawRoundRect(barLeft, barY - thick / 2, barRight, barY + thick / 2, thick / 2, thick / 2, fillPaint)
-        fillPaint.color = withAlpha(waveColor, late)
-        if (fraction > 0f) canvas.drawRoundRect(
-            barLeft, barY - thick / 2, barLeft + (barRight - barLeft) * fraction, barY + thick / 2,
-            thick / 2, thick / 2, fillPaint
-        )
+        if (showsMediaAction(IslandBus.MEDIA_SEEK)) {
+            text(canvas, elapsed, l, barY + dp(4f), dp(40f), smallPaint, GREY, late)
+            text(canvas, remaining, rr, barY + dp(4f), dp(46f), smallPaint, GREY, late, alignRight = true)
+            val thick = if (seeking) dp(8f) else dp(5f)
+            val fraction = if (a.durationMs > 0L) (pos.toFloat() / a.durationMs).coerceIn(0f, 1f) else 0f
+            fillPaint.color = withAlpha(userAccent ?: waveColor, late * 50 / 255)
+            canvas.drawRoundRect(barLeft, barY - thick / 2, barRight, barY + thick / 2, thick / 2, thick / 2, fillPaint)
+            fillPaint.color = withAlpha(userAccent ?: waveColor, late)
+            if (fraction > 0f) canvas.drawRoundRect(
+                barLeft, barY - thick / 2, barLeft + (barRight - barLeft) * fraction, barY + thick / 2,
+                thick / 2, thick / 2, fillPaint
+            )
+        }
 
         // Controls
         val cy = rect.top + dp(146f)
         val cx = rect.centerX()
-        drawSkip(canvas, cx - dp(72f), cy, false, late)
-        drawPlayPause(canvas, cx, cy, a.isPlaying, late)
-        drawSkip(canvas, cx + dp(72f), cy, true, late)
+        if (showsMediaAction(IslandBus.MEDIA_PREVIOUS))
+            drawSkip(canvas, cx - dp(72f), cy, false, late)
+        if (showsMediaAction(IslandBus.MEDIA_TOGGLE))
+            drawPlayPause(canvas, cx, cy, a.isPlaying, late)
+        if (showsMediaAction(IslandBus.MEDIA_NEXT))
+            drawSkip(canvas, cx + dp(72f), cy, true, late)
     }
 
     private fun drawMessageExpanded(canvas: Canvas, a: LiveActivity, alpha: Int, late: Int) {
@@ -1447,7 +1463,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun lighten(color: Int) = ColorUtils.blendARGB(color, Color.WHITE, 0.25f)
 
     private fun findAction(a: LiveActivity, vararg words: String) =
-        a.actions.firstOrNull { act -> words.any { act.label.contains(it, ignoreCase = true) } }
+        visibleActions(a).firstOrNull { act -> words.any { act.label.contains(it, ignoreCase = true) } }
 
     // ---------------------------------------------------------------- touch
 
@@ -1478,6 +1494,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 downAt = e.eventTime
                 val a = activity
                 seeking = presentation == Presentation.EXPANDED && a?.mode == IslandMode.MUSIC &&
+                    showsMediaAction(IslandBus.MEDIA_SEEK) &&
                     a.durationMs > 0L && abs(e.y - barY) < dp(16f) &&
                     e.x >= barLeft - dp(12f) && e.x <= barRight + dp(12f)
                 if (seeking) seekFraction = fractionAt(e.x)
@@ -1588,9 +1605,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 if (a.mode == IslandMode.MUSIC && y > barY + dp(16f)) {
                     val cx = rect.centerX()
                     when {
-                        x < cx - dp(36f) -> callbacks?.onMedia(a, IslandBus.MEDIA_PREVIOUS)
-                        x > cx + dp(36f) -> callbacks?.onMedia(a, IslandBus.MEDIA_NEXT)
-                        else -> {
+                        x < cx - dp(36f) && showsMediaAction(IslandBus.MEDIA_PREVIOUS) -> callbacks?.onMedia(a, IslandBus.MEDIA_PREVIOUS)
+                        x > cx + dp(36f) && showsMediaAction(IslandBus.MEDIA_NEXT) -> callbacks?.onMedia(a, IslandBus.MEDIA_NEXT)
+                        x in (cx - dp(36f))..(cx + dp(36f)) && showsMediaAction(IslandBus.MEDIA_TOGGLE) -> {
                             // Flip instantly so the button feels responsive; the real state follows.
                             activity = a.copy(
                                 isPlaying = !a.isPlaying,
@@ -1600,6 +1617,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                             callbacks?.onMedia(a, IslandBus.MEDIA_TOGGLE)
                             kick()
                         }
+                        else -> callbacks?.onOpen(a)
                     }
                 } else {
                     callbacks?.onOpen(a)

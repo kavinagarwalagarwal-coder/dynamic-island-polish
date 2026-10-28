@@ -63,3 +63,13 @@ through the final opening. Reduced motion and interruptible spring behavior are 
 
 CI runs the full instrumentation suite on API 36 and a native navigation/standard-overlay
 compatibility check on API 26 and 30, in addition to JVM and SwiftUI checks.
+
+## Personalization (v1.5)
+
+- **Rules:** set per-activity priority, choose whether a running timer detaches, allow only selected notification apps, hide the island while chosen apps are open, configure up to three source-app quick actions, and set daily quiet hours in local time.
+- **Per-app style:** choose its accent, compact/expanded starting layout and animation speed.
+- **Timer presets:** start five, ten, fifteen or twenty-five minute Clock timers and add a timer label. Presets hand the request to the installed clock app using Android's `ACTION_SET_TIMER` intent and `SET_ALARM` permission; the island still relies on the clock's notification for live timer data.
+- **Phone placement:** save, load and remove named fit profiles. Profiles remain on the device.
+- **Media:** album art, playback progress, seek and transport controls work when a media notification/session supplies them; select which controls appear per player.
+
+Notification allow/hide rules, styles, priorities, quiet hours and profiles are stored locally in app preferences. Notification content itself continues to be processed in memory by the existing listener.
