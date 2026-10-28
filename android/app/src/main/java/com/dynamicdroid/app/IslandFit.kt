@@ -30,11 +30,11 @@ data class IslandFit(
 enum class IslandPlacement { AUTO, CAMERA, BELOW_STATUS_BAR }
 
 object IslandPlacementPolicy {
-    fun belowStatusBar(mode: IslandPlacement, accessibilityHost: Boolean, wideCutout: Boolean,
+    fun belowStatusBar(mode: IslandPlacement, accessibilityHost: Boolean, unsafeCutout: Boolean,
                        landscape: Boolean): Boolean = when (mode) {
         IslandPlacement.BELOW_STATUS_BAR -> true
         IslandPlacement.CAMERA -> !accessibilityHost
-        IslandPlacement.AUTO -> !accessibilityHost || wideCutout || landscape
+        IslandPlacement.AUTO -> !accessibilityHost || unsafeCutout || landscape
     }
 
     fun top(cameraTop: Float, statusBottom: Float, below: Boolean, offset: Float,

@@ -64,7 +64,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     var accessibilityHost = true
     private var statusBarHeight = 0f
     private var windowOriginY = 0f
-    private var wideCutout = false
+    private var unsafeCutout = false
     private val windowLocation = IntArray(2)
 
     var activity: LiveActivity? = null
@@ -197,10 +197,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun updateAnchor() {
         val physicalTop = if (anchorToCutout && fit.alignCamera) cameraTop ?: dp(8f) else dp(8f)
         val below = anchorToCutout && IslandPlacementPolicy.belowStatusBar(fit.placement,
-            accessibilityHost, wideCutout, resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE)
+            accessibilityHost, unsafeCutout, resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE)
         val statusBottom = max(0f, statusBarHeight - windowOriginY)
         baseTop = IslandPlacementPolicy.top(physicalTop, statusBottom, below, dp(fit.offsetY), dp(6f)) / fit.scale
-        if (!isAbsorbing) topS.target = targetTop(presentation)
+        if (!isAbsorbing) {
+            topS.target = targetTop(presentation)
+            centerS.target = specFor(presentation, activity).cx
+        }
     }
 
     // Shape. Same interpolating springs as Sources/IslandUI (Skip / SwiftUI).
@@ -631,13 +634,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             statusBarHeight = if (Build.VERSION.SDK_INT >= 30)
                 max(fallback, insets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top.toFloat())
                 else max(fallback, insets.systemWindowInsetTop.toFloat())
-            cameraX = null; cameraTop = null; cutoutCenterY = null; cutoutDiameter = null; wideCutout = false
+            cameraX = null; cameraTop = null; cutoutCenterY = null; cutoutDiameter = null; unsafeCutout = false
             if (Build.VERSION.SDK_INT >= 28) {
                 // Ignore side and bottom cutouts after rotation. Rects are relative to this window.
-                val cut = insets.displayCutout?.boundingRects?.filter { it.top <= dp(80f) && it.width() > 0 && it.height() > 0 }
+                val cut = insets.displayCutout?.boundingRects?.filter { it.top <= dp(80f) && it.height() <= dp(80f) && it.width() > 0 && it.height() > 0 }
                     ?.minByOrNull { abs(it.exactCenterX() - resources.displayMetrics.widthPixels / 2f) }
                 if (cut != null) {
-                    wideCutout = cut.width() > dp(96f)
+                    unsafeCutout = cut.width() > dp(96f) ||
+                        abs(cut.exactCenterX() - resources.displayMetrics.widthPixels / 2f) > resources.displayMetrics.widthPixels * .20f
                     cutoutCenterY = cut.exactCenterY()
                     cutoutDiameter = min(cut.width(), cut.height()).toFloat().coerceIn(dp(8f), dp(40f))
                     cameraTop = max(dp(4f), cut.exactCenterY() - dp(18f))

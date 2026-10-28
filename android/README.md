@@ -50,7 +50,7 @@ connection status; Playground has interactive sample activities and the app-to-i
 Phone fit includes a temporary 12-second home-screen test, which does not replace real notifications.
 
 Automatic placement follows a camera cutout with an accessibility overlay in portrait. It moves
-below the status bar for ordinary app overlays, wide notches and landscape. Camera mode still
+below the status bar for ordinary app overlays, wide notches, corner cutouts and landscape. Camera mode still
 uses the safe fallback with an ordinary overlay, because Android places that window below the
 status bar. On Samsung or any OEM where system UI still covers the camera-area island, choose
 **Phone fit → Below status bar**. Negative vertical offsets cannot move this fallback into the bar.
