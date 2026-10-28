@@ -29,6 +29,10 @@ class IslandRenderingTest {
 
     private fun capture(name: String) {
         val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: error("No emulator screenshot")
+        saveBitmap(name, bitmap)
+    }
+
+    private fun saveBitmap(name: String, bitmap: Bitmap) {
         // MediaStore output survives the test runner uninstalling its target APK.
         val resolver = instrumentation.targetContext.contentResolver
         val values = android.content.ContentValues().apply {
@@ -44,6 +48,79 @@ class IslandRenderingTest {
         values.put(android.provider.MediaStore.Images.Media.IS_PENDING, 0)
         resolver.update(uri, values, null, null)
         bitmap.recycle()
+    }
+
+    @Test fun dropletConnectsDetachesAndReversesWithoutSnapping() {
+        val music = LiveActivity("drop-music", "music.test", IslandMode.MUSIC, "Music", "Artist", "Music", null, null,
+            0xFFFFFFFF.toInt(), isPlaying = false)
+        val timer = LiveActivity("drop-timer", "clock.test", IslandMode.TIMER, "Tea", "Timer", "Clock", null, null,
+            0xFFFF9F0A.toInt(), chronometerCountDown = true, clockBaseElapsed = SystemClock.elapsedRealtime() + 300_000L)
+        val frames = ArrayList<Bitmap>()
+        try {
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                scenario.onActivity { activity ->
+                    val view = findIsland(activity.window.decorView)!!
+                    view.applyFit(IslandFit(alignCamera = false)); view.setSecondary(null); view.show(music, Presentation.COMPACT)
+                }
+                SystemClock.sleep(1200)
+                val finished = CountDownLatch(1)
+                var connected = false
+                var dropped = false
+                scenario.onActivity { activity ->
+                    val view = findIsland(activity.window.decorView)!!
+                    view.setSecondary(timer); view.show(music, Presentation.COMPACT)
+                    var index = 0
+                    val callback = object : android.view.Choreographer.FrameCallback {
+                        override fun doFrame(time: Long) {
+                            connected = connected || !field<android.graphics.Path>(view, "dropNeck").isEmpty
+                            val g = field<IslandDropGeometry>(view, "dropGeometry")
+                            dropped = dropped || g.centerY > view.resources.displayMetrics.density * 28f
+                            if (index < 40 && index % 2 == 0) {
+                                val bitmap = Bitmap.createBitmap(view.width, (90 * view.resources.displayMetrics.density).toInt(), Bitmap.Config.ARGB_8888)
+                                val canvas = android.graphics.Canvas(bitmap)
+                                canvas.drawColor(android.graphics.Color.rgb(40, 40, 40))
+                                view.draw(canvas); frames.add(bitmap)
+                            }
+                            if (++index < 80) android.view.Choreographer.getInstance().postFrameCallback(this)
+                            else finished.countDown()
+                        }
+                    }
+                    android.view.Choreographer.getInstance().postFrameCallback(callback)
+                }
+                assertTrue("Drop animation did not finish", finished.await(10, TimeUnit.SECONDS))
+                assertTrue("No liquid connection was rendered", connected)
+                assertTrue("Bubble never followed its downward arc", dropped)
+                scenario.onActivity { activity ->
+                    val view = findIsland(activity.window.decorView)!!
+                    assertTrue(field<android.graphics.Path>(view, "dropNeck").isEmpty)
+                    assertFalse(RectF.intersects(field(view, "rect"), field(view, "secondaryRect")))
+                    view.setSecondary(null); view.show(music, Presentation.COMPACT)
+                }
+                SystemClock.sleep(80)
+                scenario.onActivity { activity ->
+                    val view = findIsland(activity.window.decorView)!!
+                    val before = field<Spring>(view, "dropS").value
+                    view.setSecondary(timer); view.show(music, Presentation.COMPACT)
+                    assertEquals("Reversing the merge snapped the droplet", before, field<Spring>(view, "dropS").value, 0f)
+                }
+                SystemClock.sleep(1200)
+                val merged = CountDownLatch(1)
+                scenario.onActivity { activity ->
+                    val view = findIsland(activity.window.decorView)!!
+                    view.callbacks = object : IslandView.Callbacks { override fun onSettled() { merged.countDown() } }
+                    view.setSecondary(null); view.show(music, Presentation.COMPACT)
+                }
+                assertTrue("Merge did not settle", merged.await(10, TimeUnit.SECONDS))
+                instrumentation.waitForIdleSync()
+                scenario.onActivity { activity ->
+                    val view = findIsland(activity.window.decorView)!!
+                    assertTrue(field<RectF>(view, "secondaryRect").isEmpty)
+                    assertTrue(field<android.graphics.Path>(view, "dropNeck").isEmpty)
+                    assertFalse("Drop leaves a continuous animation loop", field<Boolean>(view, "running"))
+                }
+            }
+            frames.forEachIndexed { index, frame -> saveBitmap("drop-frame-${index.toString().padStart(2, '0')}", frame) }
+        } finally { frames.filterNot { it.isRecycled }.forEach(Bitmap::recycle) }
     }
 
     @Test fun splitMergeExpandAndCameraIdleAreRendered() {

@@ -71,6 +71,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var departingActivity: LiveActivity? = null
     private val presenceS = Spring(0f, 240f, 0.9f, 0.003f)
     private val bubbleCenterS = Spring(0f, 220f, 0.82f, 0.5f)
+    private val dropS = Spring(0f, IslandMotion.DROP_K, IslandMotion.DROP_DAMPING_RATIO, 0.003f)
+    private val dropGeometry = IslandDropGeometry()
+    private val dropNeck = Path()
     private val secondaryRect = RectF()
     private var touchingSecondary = false
     private val secondaryHit = RectF()
@@ -85,9 +88,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     fun setSecondary(next: LiveActivity?) {
-        if (next != null && secondary == null && secondaryA.value < 0.01f) bubbleCenterS.snap(cameraCenter())
+        val fresh = next != null && secondary == null && dropS.value < 0.01f
         if (next != null) departingSecondary = next
         secondary = next
+        if (fresh) bubbleCenterS.snap(compactCluster().bubbleCenter)
+        dropS.target = if (next != null && presentation == Presentation.COMPACT) 1f else 0f
         secondaryA.target = if (next != null && presentation == Presentation.COMPACT) 1f else 0f
         refreshContentDescription()
         settled = false
@@ -214,7 +219,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
     private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -321,8 +326,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         presenceS.target = if (next != null) 1f else 0f
         presentation = p
         secondaryA.target = if (secondary != null && p == Presentation.COMPACT) 1f else 0f
+        dropS.target = secondaryA.target
         val cluster = compactCluster()
-        bubbleCenterS.target = if (secondary != null && p == Presentation.COMPACT) cluster.bubbleCenter else cameraCenter()
+        if (secondary != null && p == Presentation.COMPACT) bubbleCenterS.target = cluster.bubbleCenter
         refreshContentDescription()
         // Mid-intro: the widen stage picks up the latest state itself.
         if (!absorb && SystemClock.uptimeMillis() < introHoldUntil) return
@@ -375,6 +381,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         introS.snap(0f)
         presenceS.snap(0f)
         secondaryA.snap(0f)
+        dropS.snap(0f)
         widthS.snap(dp(10f)); heightS.snap(dp(10f)); radiusS.snap(dp(5f))
         centerS.snap(cameraCenter())
         topS.snap(baseTop + dp(12f))
@@ -427,7 +434,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         topS.target = targetTop(presentation)
         setContentTargets(presentation)
         secondaryA.target = if (secondary != null && presentation == Presentation.COMPACT) 1f else 0f
-        bubbleCenterS.target = compactCluster().bubbleCenter
+        dropS.target = secondaryA.target
+        if (secondary != null) bubbleCenterS.target = compactCluster().bubbleCenter
         sheenStart = SystemClock.uptimeMillis() + 300L
         settled = false
         kick()
@@ -707,18 +715,24 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun drawSecondary(canvas: Canvas, intro: Float) {
         secondaryRect.setEmpty()
+        dropNeck.reset()
         val a = secondary ?: departingSecondary ?: return
-        val opacity = secondaryA.value.coerceIn(0f, 1f) * intro
-        if (opacity < 0.01f) { if (secondary == null) departingSecondary = null; return }
+        if (dropS.value < 0.01f && dropS.target == 0f) {
+            if (secondary == null) departingSecondary = null
+            return
+        }
         val diameter = dp(36f)
-        val screen = width / fit.scale
-        val center = bubbleCenterS.value.coerceIn(diameter / 2, max(diameter / 2, screen - dp(4f) - diameter / 2))
-        val cy = baseTop + dp(18f)
-        val size = diameter * (0.65f + 0.35f * opacity) * bubblePress.value
-        secondaryRect.set(center - size / 2, cy - size / 2, center + size / 2, cy + size / 2)
-        fillPaint.color = withAlpha(Color.BLACK, (255 * opacity).toInt())
+        dropGeometry.update(dropS.value, rect.right - diameter * .42f, bubbleCenterS.value,
+            baseTop + dp(18f), diameter, width / fit.scale, dp(4f), bubblePress.value)
+        val center = dropGeometry.centerX
+        val cy = dropGeometry.centerY
+        secondaryRect.set(center - dropGeometry.radiusX, cy - dropGeometry.radiusY,
+            center + dropGeometry.radiusX, cy + dropGeometry.radiusY)
+        val surfaceAlpha = (255 * intro * presenceS.value.coerceIn(0f, 1f)).toInt()
+        fillPaint.color = withAlpha(Color.BLACK, surfaceAlpha)
+        drawDropNeck(canvas, surfaceAlpha)
         canvas.drawOval(secondaryRect, fillPaint)
-        val alpha = (255 * opacity).toInt()
+        val alpha = (surfaceAlpha * dropGeometry.content).toInt()
         when (a.mode) {
             IslandMode.TIMER -> {
                 val timerAlpha = if (a.pausedTimerMs != null) alpha / 2 else alpha
@@ -735,6 +749,26 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             IslandMode.CALL -> drawPhone(canvas, center, cy, dp(18f), alpha, false)
             else -> text(canvas, a.appLabel.take(1), center - dp(4f), cy + dp(5f), dp(15f), bodyPaint, Color.WHITE, alpha)
         }
+    }
+
+    /** Two cubic edges pinch down before the droplet detaches. Draw behind both surfaces. */
+    private fun drawDropNeck(canvas: Canvas, alpha: Int) {
+        dropNeck.reset()
+        val gap = secondaryRect.left - rect.right
+        if (reduceMotion || dropGeometry.neck < .01f || gap < -dp(8f) || gap > dp(36f) || rect.height() > dp(64f)) return
+        val half = min(rect.height() * .32f, dropGeometry.radiusY * .65f) * dropGeometry.neck
+        val x1 = rect.right - dp(5f)
+        val x2 = secondaryRect.left + dropGeometry.radiusX * .18f
+        val y1 = rect.centerY()
+        val y2 = dropGeometry.centerY
+        val middle = (x1 + x2) / 2f
+        dropNeck.moveTo(x1, y1 - half)
+        dropNeck.cubicTo(middle, y1 - half * .12f, middle, y2 - half * .12f, x2, y2 - half)
+        dropNeck.lineTo(x2, y2 + half)
+        dropNeck.cubicTo(middle, y2 + half * .12f, middle, y1 + half * .12f, x1, y1 + half)
+        dropNeck.close()
+        fillPaint.color = withAlpha(Color.BLACK, alpha)
+        canvas.drawPath(dropNeck, fillPaint)
     }
 
     /** Idle island as a status bar: time on the left, network and battery on the right. */
@@ -1351,7 +1385,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 hit.inset(-dp(10f), -dp(10f))
                 secondaryHit.set(secondaryRect)
                 secondaryHit.inset(-dp(4f), -dp(4f))
-                touchingSecondary = secondary != null && presentation == Presentation.COMPACT && secondaryA.value > 0.5f && secondaryHit.contains(e.x, e.y)
+                touchingSecondary = secondary != null && presentation == Presentation.COMPACT && secondaryA.value > 0.5f && dropS.value > .92f && secondaryHit.contains(e.x, e.y)
                 if (isConcealed || (!touchingSecondary && !hit.contains(e.x, e.y))) return false
                 tracking = true
                 dragging = false
