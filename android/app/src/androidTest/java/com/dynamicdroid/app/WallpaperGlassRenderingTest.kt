@@ -88,7 +88,7 @@ class WallpaperGlassRenderingTest {
             scenario.onActivity { find(it.window.decorView)!!.show(music, Presentation.EXPANDED) }
             android.os.SystemClock.sleep(100)
             scenario.onActivity { find(it.window.decorView)!!.show(music, Presentation.COMPACT) }
-            android.os.SystemClock.sleep(1000); capture("wallpaper-glass-split")
+            android.os.SystemClock.sleep(1500); capture("wallpaper-glass-split")
             var effects = 0
             var recordings = 0
             scenario.onActivity { activity ->
