@@ -132,14 +132,15 @@ public struct DynamicIslandView: View {
                     .onLongPressGesture(minimumDuration: 0.35) { onExpand?(secondaryActivity) }
                     .accessibilityLabel("\(secondaryActivity.appLabel): \(secondaryActivity.title)")
                     .offset(x: spec.centerX + spec.width / 2 + 8, y: spec.top)
-                    .transition(reduceMotion ? .opacity : .scale(scale: 0.6).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .islandDrop)
+                    .zIndex(-1)
             }
         }
         .frame(width: screenWidth, height: spec.top + spec.height + 14, alignment: .topLeading)
         .animation(reduceMotion ? .easeOut(duration: 0.15) : IslandMotion.shapeAnimation, value: presentation)
         .animation(reduceMotion ? .easeOut(duration: 0.15) : IslandMotion.shapeAnimation, value: activity?.key)
         .animation(reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.32, dampingFraction: 0.9), value: concealed)
-        .animation(reduceMotion ? .easeOut(duration: 0.15) : IslandMotion.shapeAnimation, value: secondaryActivity?.key)
+        .animation(reduceMotion ? .easeOut(duration: 0.15) : IslandMotion.dropAnimation, value: secondaryActivity?.key)
         .animation(reduceMotion ? nil : .spring(response: IslandMotion.pressResponse, dampingFraction: IslandMotion.pressDampingFraction), value: pressed)
         .animation(reduceMotion ? nil : IslandMotion.contentAnimation, value: dragOffset)
         .allowsHitTesting(!concealed && presentation != .idle)

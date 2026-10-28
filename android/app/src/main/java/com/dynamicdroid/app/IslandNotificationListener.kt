@@ -49,6 +49,7 @@ class IslandNotificationListener : NotificationListenerService() {
 
     override fun onListenerConnected() {
         super.onListenerConnected()
+        instance = this
         IslandBus.mediaControl = ::handleMedia
         runCatching { activeNotifications }.getOrNull()
             ?.sortedBy { it.postTime }
@@ -59,12 +60,13 @@ class IslandNotificationListener : NotificationListenerService() {
     }
 
     override fun onListenerDisconnected() {
+        if (instance === this) instance = null
         IslandBus.mediaControl = null
         super.onListenerDisconnected()
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        if (sbn.packageName == packageName) return
+        if (sbn.packageName == packageName || !IslandCustomization.allowed(this, sbn.packageName)) return
         val n = sbn.notification
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val extras = n.extras
@@ -165,7 +167,14 @@ class IslandNotificationListener : NotificationListenerService() {
         }
     }
 
+    fun refreshAllowedApps() {
+        IslandBus.allOngoing().filterNot { IslandCustomization.allowed(this, it.packageName) }.forEach { IslandBus.remove(it.key) }
+        runCatching { activeNotifications?.filter { IslandCustomization.allowed(this, it.packageName) }
+            ?.sortedBy { it.postTime }?.forEach(::onNotificationPosted) }
+    }
+
     override fun onDestroy() {
+        if (instance === this) instance = null
         setController(null)
         IslandBus.mediaControl = null
         main.removeCallbacksAndMessages(null)
@@ -226,6 +235,7 @@ class IslandNotificationListener : NotificationListenerService() {
 
     private fun publishCurrentMedia() {
         val sbn = mediaNotification ?: return
+        if (!IslandCustomization.allowed(this, sbn.packageName)) { IslandBus.remove(sbn.key); return }
         val n = sbn.notification
         val extras = n.extras
         val metadata = controller?.metadata
@@ -299,5 +309,10 @@ class IslandNotificationListener : NotificationListenerService() {
             val options = BitmapFactory.Options().apply { inSampleSize = sample }
             contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, options) }
         }.getOrNull()
+    }
+
+    companion object {
+        @Volatile var instance: IslandNotificationListener? = null
+            private set
     }
 }

@@ -6,6 +6,12 @@ import SwiftUI
 /// The Kotlin `Spring` stepper uses the equivalent stiffness + dampingRatio
 /// (`dampingRatio = damping / (2 * sqrt(stiffness))`).
 public enum IslandMotion {
+    public static let dropStiffness: Double = 170
+    public static let dropDamping: Double = 16.69
+    public static var dropAnimation: Animation {
+        .interpolatingSpring(stiffness: dropStiffness, damping: dropDamping)
+    }
+
     public static let shapeStiffness: Double = 205
     public static let widthDamping: Double = 23.77
     public static let heightDamping: Double = 25.2

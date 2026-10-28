@@ -9,6 +9,8 @@ import kotlin.math.sqrt
  * dampingRatio = damping / (2 * sqrt(stiffness)).
  */
 object IslandMotion {
+    const val DROP_K = 170f
+    const val DROP_DAMPING_RATIO = 0.64f
     const val SHAPE_K = 205f
     const val WIDTH_DAMPING_RATIO = 0.83f
     const val HEIGHT_DAMPING_RATIO = 0.88f

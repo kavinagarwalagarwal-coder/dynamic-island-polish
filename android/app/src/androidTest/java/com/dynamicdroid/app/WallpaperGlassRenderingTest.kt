@@ -18,6 +18,8 @@ class WallpaperGlassRenderingTest {
         if (view is ViewGroup) for (i in 0 until view.childCount) find(view.getChildAt(i))?.let { return it }
         return null
     }
+    private fun glass(view: IslandView): WallpaperLiquidGlass =
+        IslandView::class.java.getDeclaredField("liquidGlass").apply { isAccessible = true }.get(view) as WallpaperLiquidGlass
     private fun capture(name: String) {
         val bitmap = instrumentation.uiAutomation.takeScreenshot() ?: error("No screenshot")
         val resolver = instrumentation.targetContext.contentResolver
@@ -44,13 +46,22 @@ class WallpaperGlassRenderingTest {
         p.color = Color.BLACK; c.drawCircle(256f, 256f, 150f, p)
         p.color = Color.rgb(230, 100, 60); c.drawCircle(256f, 256f, 55f, p)
         p.color = Color.WHITE; c.drawRect(235f, 115f, 270f, 225f, p)
-        val music = LiveActivity("wallpaper-test", "test.music", IslandMode.MUSIC, "Wallpaper motion", "Local preview", "Music", null, null, Color.WHITE, isPlaying = true)
+        val music = LiveActivity("wallpaper-test", "test.music", IslandMode.MUSIC, "Wallpaper glass", "Still backdrop", "Music", null, null, Color.WHITE, isPlaying = true)
         val timer = LiveActivity("timer", "test.clock", IslandMode.TIMER, "Tea", "", "Clock", null, null, Color.YELLOW,
             chronometerCountDown = true, clockBaseElapsed = android.os.SystemClock.elapsedRealtime() + 300000)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
+                fun open(view: View): Boolean {
+                    if (view is android.widget.Button && view.text.toString() == "Playground") { view.performClick(); return true }
+                    if (view is ViewGroup) for (i in 0 until view.childCount) if (open(view.getChildAt(i))) return true
+                    return false
+                }
+                assertTrue(open(activity.window.decorView))
+            }
+            instrumentation.waitForIdleSync()
+            scenario.onActivity { activity ->
                 val view = find(activity.window.decorView)!!
-                view.applyWallpaper(WallpaperMotion(enabled = true, automatic = false, strength = .65f), image)
+                view.applyWallpaper(WallpaperStyle(enabled = true, strength = .65f), image)
                 view.setSecondary(timer); view.show(music, Presentation.COMPACT)
             }
             android.os.SystemClock.sleep(1000)
@@ -86,7 +97,36 @@ class WallpaperGlassRenderingTest {
             scenario.onActivity { find(it.window.decorView)!!.show(music, Presentation.EXPANDED) }
             android.os.SystemClock.sleep(100)
             scenario.onActivity { find(it.window.decorView)!!.show(music, Presentation.COMPACT) }
-            android.os.SystemClock.sleep(1000); capture("wallpaper-glass-split")
+            android.os.SystemClock.sleep(1500); capture("wallpaper-glass-split")
+            var effects = 0
+            var recordings = 0
+            scenario.onActivity { activity ->
+                val glass = glass(find(activity.window.decorView)!!)
+                effects = glass.effectBuilds; recordings = glass.recordings
+            }
+            // Playing music continues drawing, but the still backdrop must reuse native resources.
+            android.os.SystemClock.sleep(12_000)
+            scenario.onActivity { activity ->
+                val glass = glass(find(activity.window.decorView)!!)
+                assertEquals("Rebuilt a settled native effect", effects, glass.effectBuilds)
+                assertEquals("Re-recorded a still wallpaper", recordings, glass.recordings)
+            }
+            repeat(25) { step ->
+                scenario.onActivity { find(it.window.decorView)!!.show(music, if (step % 2 == 0) Presentation.EXPANDED else Presentation.COMPACT) }
+                android.os.SystemClock.sleep(1000)
+            }
+            scenario.onActivity { activity ->
+                val view = find(activity.window.decorView)!!
+                view.setSecondary(null)
+                view.show(music.copy(isPlaying = false), Presentation.COMPACT)
+            }
+            android.os.SystemClock.sleep(1500)
+            scenario.onActivity { activity ->
+                val view = find(activity.window.decorView)!!
+                val running = IslandView::class.java.getDeclaredField("running").apply { isAccessible = true }.getBoolean(view)
+                assertFalse("A still wallpaper must not keep a frame loop running", running)
+                assertTrue(glass(view).wasHardwareRendered)
+            }
         }
         image.recycle()
     }

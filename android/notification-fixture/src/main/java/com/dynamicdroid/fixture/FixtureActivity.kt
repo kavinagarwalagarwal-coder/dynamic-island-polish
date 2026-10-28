@@ -31,6 +31,15 @@ class FixtureActivity : Activity() {
             nm.notify(101, Notification.Builder(this, "fixture").setSmallIcon(android.R.drawable.ic_media_play)
                 .setContentTitle("Fixture music").setOngoing(true)
                 .setStyle(Notification.MediaStyle().setMediaSession(session!!.sessionToken)).build())
+            if (kind == "player") {
+                nm.cancel(202)
+                setContentView(android.widget.TextView(this).apply {
+                    text = "Fixture music player"; textSize = 28f
+                    setTextColor(android.graphics.Color.WHITE); setBackgroundColor(android.graphics.Color.DKGRAY)
+                    gravity = android.view.Gravity.CENTER
+                })
+                return
+            }
             val paused = kind == "paused"
             val remote = RemoteViews(packageName, R.layout.timer_notification).apply {
                 setChronometer(R.id.clock, SystemClock.elapsedRealtime() + 300_000, null, !paused)

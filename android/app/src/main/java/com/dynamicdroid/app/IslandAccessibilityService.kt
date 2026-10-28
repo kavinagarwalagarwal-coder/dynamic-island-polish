@@ -25,7 +25,15 @@ class IslandAccessibilityService : AccessibilityService() {
         runCatching { ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java)) }
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) = Unit
+    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        // Package metadata only. Never access event text or retrieve window content.
+        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
+            val pkg = event.packageName?.toString() ?: return
+            // Ignore events from our non-focusable overlay; allow our actual settings activity.
+            if (pkg == packageName && event.className?.toString() != MainActivity::class.java.name) return
+            onForegroundPackage?.invoke(pkg)
+        }
+    }
     override fun onInterrupt() = Unit
 
     override fun onUnbind(intent: Intent?): Boolean {
@@ -51,6 +59,7 @@ class IslandAccessibilityService : AccessibilityService() {
 
         /** Set by the overlay service so it can move its window when this connects/disconnects. */
         var onChanged: (() -> Unit)? = null
+        var onForegroundPackage: ((String) -> Unit)? = null
 
         fun isEnabled(context: Context): Boolean {
             val enabled = Settings.Secure.getString(

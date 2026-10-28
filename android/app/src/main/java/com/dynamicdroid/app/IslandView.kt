@@ -15,7 +15,6 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import android.os.Build
 import android.os.SystemClock
-import android.os.PowerManager
 import android.text.TextPaint
 import android.text.TextUtils
 import android.view.Choreographer
@@ -55,12 +54,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fun onDismiss(activity: LiveActivity) {}
         fun onInteraction() {}
         fun onSettled() {}
+        fun onAnchorChanged() {}
         /** Another app went fullscreen (video, photos, games) or came back out of it. */
         fun onFullscreenChanged(fullscreen: Boolean) {}
     }
 
     var callbacks: Callbacks? = null
     var anchorToCutout = true
+    var accessibilityHost = true
+    private var statusBarHeight = 0f
+    private var windowOriginY = 0f
+    private var unsafeCutout = false
+    private val windowLocation = IntArray(2)
 
     var activity: LiveActivity? = null
         private set
@@ -68,10 +73,16 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private set
 
     private var secondary: LiveActivity? = null
+    private var userAccent: Int? = null
+    private var mediaActions = setOf(IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_TOGGLE, IslandBus.MEDIA_NEXT, IslandBus.MEDIA_SEEK)
+    private fun showsMediaAction(action: String) = action in mediaActions
     private var departingSecondary: LiveActivity? = null
     private var departingActivity: LiveActivity? = null
     private val presenceS = Spring(0f, 240f, 0.9f, 0.003f)
     private val bubbleCenterS = Spring(0f, 220f, 0.82f, 0.5f)
+    private val dropS = Spring(0f, IslandMotion.DROP_K, IslandMotion.DROP_DAMPING_RATIO, 0.003f)
+    private val dropGeometry = IslandDropGeometry()
+    private val dropNeck = Path()
     private val secondaryRect = RectF()
     private var touchingSecondary = false
     private val secondaryHit = RectF()
@@ -86,9 +97,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     fun setSecondary(next: LiveActivity?) {
-        if (next != null && secondary == null && secondaryA.value < 0.01f) bubbleCenterS.snap(cameraCenter())
+        val fresh = next != null && secondary == null && dropS.value < 0.01f
         if (next != null) departingSecondary = next
         secondary = next
+        if (fresh) bubbleCenterS.snap(compactCluster().bubbleCenter)
+        dropS.target = if (next != null && presentation == Presentation.COMPACT) 1f else 0f
         secondaryA.target = if (next != null && presentation == Presentation.COMPACT) 1f else 0f
         refreshContentDescription()
         settled = false
@@ -125,7 +138,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var waveColor = NothingStyle.foreground
     private var baseColor = NothingStyle.background
     private var wallpaperAccents = false
-    private val timerColor: Int get() = if (wallpaperAccents) accent else Color.rgb(255, 159, 10)
+    private val timerColor: Int get() = userAccent ?: if (wallpaperAccents) accent else Color.rgb(255, 159, 10)
 
     fun applyTheme(theme: IslandTheme) {
         val t = theme.safe()
@@ -138,25 +151,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     private val wallpaperSkin = WallpaperSkinRenderer()
-    private var wallpaperFrameAt = 0L
-    private val wallpaperVisibleRect = android.graphics.Rect()
-    private val liquidGlass = WallpaperLiquidGlass()
-    private val powerManager = context.getSystemService(PowerManager::class.java)
+    private val liquidGlass = WallpaperLiquidGlass(context)
 
-    fun applyWallpaper(motion: WallpaperMotion, image: Bitmap?, background: Bitmap? = null, subject: Bitmap? = null) {
-        wallpaperSkin.motion = motion.safe()
+    fun applyWallpaper(style: WallpaperStyle, image: Bitmap?) {
+        wallpaperSkin.style = style
         wallpaperSkin.image = image
-        wallpaperSkin.background = background
-        wallpaperSkin.subject = subject
-        settled = false
-        kick()
+        liquidGlass.resetFailure()
         invalidate()
     }
-
-    private fun wallpaperAnimating() = wallpaperSkin.enabled && !reduceMotion &&
-        presentation != Presentation.IDLE && !isConcealed && introS.value > 0.01f &&
-        isShown && getLocalVisibleRect(wallpaperVisibleRect) && powerManager?.isInteractive != false &&
-        (activity?.mode != IslandMode.MUSIC || activity?.isPlaying == true)
 
     // Idle status bar data (time, network, battery). Redrawn only when it actually changes.
     private var status = StatusInfo()
@@ -197,8 +199,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun updateAnchor() {
         val physicalTop = if (anchorToCutout && fit.alignCamera) cameraTop ?: dp(8f) else dp(8f)
-        baseTop = max(0f, physicalTop + dp(fit.offsetY)) / fit.scale
-        if (!isAbsorbing) topS.target = targetTop(presentation)
+        val below = anchorToCutout && IslandPlacementPolicy.belowStatusBar(fit.placement,
+            accessibilityHost, unsafeCutout, resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE)
+        val statusBottom = max(0f, statusBarHeight - windowOriginY)
+        baseTop = IslandPlacementPolicy.top(physicalTop, statusBottom, below, dp(fit.offsetY), dp(6f)) / fit.scale
+        if (!isAbsorbing) {
+            topS.target = targetTop(presentation)
+            centerS.target = specFor(presentation, activity).cx
+        }
     }
 
     // Shape. Same interpolating springs as Sources/IslandUI (Skip / SwiftUI).
@@ -213,7 +221,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // Stiffer press so the squish lands on the finger's first frame.
     private val pressS = Spring(1f, 760f, 0.76f, 0.0008f)
     private val stretchS = Spring(0f, 360f, 0.78f, 0.5f)
-    private val absorbS = Spring(0f, 120f, 1f, 0.004f)
+    private val absorbS = Spring(0f, 78f, 0.94f, 0.003f)
+    private val appMorph = AppMorphGeometry()
+    private var morphCard: Bitmap? = null
+    private var softMorphCard: Bitmap? = null
+    private val morphPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     // Wake/unlock intro: 0 = hidden dot, 1 = fully present
     private val introS = Spring(1f, 160f, 0.7f, 0.002f)
     // Status-bar content of the idle pill
@@ -226,7 +238,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
     private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -330,29 +342,38 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (next == null && activity != null) departingActivity = activity
         if (next != null) departingActivity = null
         activity = next
+        userAccent = next?.let { IslandCustomization.customAccent(context, it.packageName) }
+        mediaActions = next?.let { activity -> IslandCustomization.mediaSelection(context, activity.packageName)
+            ?: setOf(IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_TOGGLE, IslandBus.MEDIA_NEXT, IslandBus.MEDIA_SEEK) }
+            ?: setOf(IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_TOGGLE, IslandBus.MEDIA_NEXT, IslandBus.MEDIA_SEEK)
         presenceS.target = if (next != null) 1f else 0f
         presentation = p
         secondaryA.target = if (secondary != null && p == Presentation.COMPACT) 1f else 0f
+        dropS.target = secondaryA.target
         val cluster = compactCluster()
-        bubbleCenterS.target = if (secondary != null && p == Presentation.COMPACT) cluster.bubbleCenter else cameraCenter()
+        if (secondary != null && p == Presentation.COMPACT) bubbleCenterS.target = cluster.bubbleCenter
         refreshContentDescription()
         // Mid-intro: the widen stage picks up the latest state itself.
         if (!absorb && SystemClock.uptimeMillis() < introHoldUntil) return
         if (introS.value < 0.001f && introS.target == 0f) return
         if (introHoldUntil == 0L && !sheenActive() && !isAbsorbing) restoreShapeSprings()
+        next?.let { activity ->
+            val speed = IslandCustomization.motionSpeed(context, activity.packageName)
+            shapeSprings.forEach { it.stiffness = IslandMotion.SHAPE_K / (speed * speed) }
+        }
         val spec = specFor(p, next)
 
-        if (absorb && next != null) {
+        if (isAbsorbing && (next?.key != old?.key || p != Presentation.COMPACT)) {
+            absorbS.snap(0f); morphCard = null; softMorphCard = null
+        }
+        if (absorb && next != null && !reduceMotion) {
             removeCallbacks(introWiden); introHoldUntil = 0L; introS.snap(1f)
-            val dm = resources.displayMetrics
-            widthS.snap(dm.widthPixels * 0.84f)
-            heightS.snap(dm.heightPixels * 0.58f)
-            radiusS.snap(dp(46f))
-            topS.snap(dm.heightPixels * 0.2f)
-            absorbS.snap(1f)
-            compactA.snap(0f)
-            expandedA.snap(0f)
-            shapeSprings.forEach { it.stiffness = 120f; it.dampingRatio = 0.82f }
+            concealS.snap(1f) // Home is visible; avoid a full-screen alpha layer left over from fullscreen media.
+            widthS.snap(spec.w); heightS.snap(spec.h); radiusS.snap(spec.r)
+            centerS.snap(spec.cx); topS.snap(targetTop(p)); presenceS.snap(1f)
+            morphCard = makeMorphCard(next)
+            softMorphCard = morphCard?.let { runCatching { Bitmap.createScaledBitmap(it, 32, 56, true) }.getOrNull() }
+            absorbS.snap(1f); compactA.snap(0f); expandedA.snap(0f)
         }
         widthS.target = spec.w
         heightS.target = spec.h
@@ -363,6 +384,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         setContentTargets(p)
         settled = false
         kick()
+    }
+
+    fun cancelAppMorph() {
+        if (!isAbsorbing) return
+        absorbS.snap(0f); morphCard = null; softMorphCard = null
+        settled = false; kick(); invalidate()
     }
 
     /** Content fades in slowly once the shape has room, and fades out fast so it never squashes. */
@@ -382,11 +409,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         tracking = false; seeking = false
         removeCallbacks(longPress)
         pressS.snap(1f); stretchS.snap(0f); absorbS.snap(0f)
+        morphCard = null; softMorphCard = null
         removeCallbacks(introWiden)
         introHoldUntil = 0L
         introS.snap(0f)
         presenceS.snap(0f)
         secondaryA.snap(0f)
+        dropS.snap(0f)
         widthS.snap(dp(10f)); heightS.snap(dp(10f)); radiusS.snap(dp(5f))
         centerS.snap(cameraCenter())
         topS.snap(baseTop + dp(12f))
@@ -439,7 +468,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         topS.target = targetTop(presentation)
         setContentTargets(presentation)
         secondaryA.target = if (secondary != null && presentation == Presentation.COMPACT) 1f else 0f
-        bubbleCenterS.target = compactCluster().bubbleCenter
+        dropS.target = secondaryA.target
+        if (secondary != null) bubbleCenterS.target = compactCluster().bubbleCenter
         sheenStart = SystemClock.uptimeMillis() + 300L
         settled = false
         kick()
@@ -535,15 +565,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             if (reduceMotion) s.snap(s.target) else s.step(dt)
             if (!s.isAtRest) rest = false
         }
-        val wallpaperNow = frameTimeNanos / 1_000_000L
-        if (wallpaperAnimating()) {
-            if (wallpaperFrameAt != 0L) wallpaperSkin.advance((wallpaperNow - wallpaperFrameAt).coerceIn(0L, 100L) / 1000f)
-            wallpaperFrameAt = wallpaperNow
-        } else wallpaperFrameAt = 0L
         invalidate()
         if (rest && !settled && !tracking) {
             settled = true
             if (activity == null) departingActivity = null
+            if (!isAbsorbing) { morphCard = null; softMorphCard = null }
             restoreShapeSprings()
             callbacks?.onSettled()
         }
@@ -569,8 +595,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun continuousDelay(): Long? {
         val a = activity ?: return null
         if (presentation == Presentation.IDLE) return null
-        if (isConcealed || introS.value < 0.01f || !isShown || powerManager?.isInteractive == false) return null
-        if (wallpaperAnimating()) return if (powerManager?.isPowerSaveMode == true) 66L else 33L
+        if (isConcealed || introS.value < 0.01f || !isShown) return null
         val other = secondary
         if (other != null && secondaryA.value > 0.01f &&
             (other.mode == IslandMode.MUSIC && other.isPlaying ||
@@ -606,22 +631,40 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         removeCallbacks(introWiden); introHoldUntil = 0L
         Choreographer.getInstance().removeFrameCallback(this)
         running = false
+        liquidGlass.release()
+        morphCard = null; softMorphCard = null
         super.onDetachedFromWindow()
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
-        if (anchorToCutout && Build.VERSION.SDK_INT >= 28) {
-            val dm = resources.displayMetrics
-            val cut = insets.displayCutout?.boundingRects
-                ?.minByOrNull { abs(it.exactCenterX() - dm.widthPixels / 2f) }
-            if (cut != null && cut.top < dp(80f)) {
-                cutoutCenterY = cut.exactCenterY()
-                cutoutDiameter = min(cut.width(), cut.height()).toFloat().coerceIn(dp(8f), dp(40f))
-                cameraTop = max(dp(4f), cut.exactCenterY() - dp(18f))
-                cameraX = cut.exactCenterX()
-                updateAnchor()
-                kick()
+        if (anchorToCutout) {
+            getLocationOnScreen(windowLocation)
+            windowOriginY = windowLocation[1].toFloat()
+            val fallbackId = resources.getIdentifier("status_bar_height", "dimen", "android")
+            val fallback = if (fallbackId != 0) resources.getDimensionPixelSize(fallbackId).toFloat() else dp(24f)
+            statusBarHeight = if (Build.VERSION.SDK_INT >= 30)
+                max(fallback, insets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top.toFloat())
+                else max(fallback, insets.systemWindowInsetTop.toFloat())
+            cameraX = null; cameraTop = null; cutoutCenterY = null; cutoutDiameter = null; unsafeCutout = false
+            if (Build.VERSION.SDK_INT >= 28) {
+                // Ignore side and bottom cutouts after rotation. Rects are relative to this window.
+                val cut = insets.displayCutout?.boundingRects?.filter { it.top <= dp(80f) && it.height() <= dp(80f) && it.width() > 0 && it.height() > 0 }
+                    ?.minByOrNull { abs(it.exactCenterX() - resources.displayMetrics.widthPixels / 2f) }
+                if (cut != null) {
+                    unsafeCutout = cut.width() > dp(96f) ||
+                        abs(cut.exactCenterX() - resources.displayMetrics.widthPixels / 2f) > resources.displayMetrics.widthPixels * .20f
+                    cutoutCenterY = cut.exactCenterY()
+                    cutoutDiameter = min(cut.width(), cut.height()).toFloat().coerceIn(dp(8f), dp(40f))
+                    cameraTop = max(dp(4f), cut.exactCenterY() - dp(18f))
+                    cameraX = cut.exactCenterX()
+                    statusBarHeight = max(statusBarHeight, cut.bottom + windowOriginY)
+                }
             }
+            val previousTop = baseTop
+            updateAnchor()
+            // Reserve space before moving downward; otherwise a short idle window clips on OEMs.
+            if (abs(previousTop - baseTop) > .5f) callbacks?.onAnchorChanged()
+            settled = false; kick()
         }
         // Videos, photos and games hide the system status bar; overlays see that in their insets.
         if (anchorToCutout && Build.VERSION.SDK_INT >= 30) {
@@ -638,7 +681,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // ---------------------------------------------------------------- drawing
 
     override fun onDraw(canvas: Canvas) {
-        if (wallpaperAnimating() && !running) kick()
         // Fully hidden (fullscreen video/photos): draw nothing at all.
         val conceal = concealS.value.coerceIn(0f, 1f)
         if (conceal < 0.01f) return
@@ -663,11 +705,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val h = max(dp(1f), heightS.value + stretchS.value) * press * (0.6f + 0.4f * conceal)
         val top = topS.value
         rect.set(cx - w / 2f, top, cx + w / 2f, top + h)
-        val r = min(radiusS.value * press, h / 2f)
+        var r = min(radiusS.value * press, h / 2f)
         val absorb = absorbS.value.coerceIn(0f, 1f)
+        if (isAbsorbing) {
+            val sceneHeight = (if (anchorToCutout) resources.displayMetrics.heightPixels else height).toFloat() / fit.scale
+            appMorph.update(1f - absorb, width / fit.scale, sceneHeight, cx, top, w, h, density)
+            rect.set(appMorph.left, appMorph.top, appMorph.left + appMorph.width, appMorph.top + appMorph.height)
+            r = appMorph.radius
+        }
+        val reveal = if (isAbsorbing) appMorph.reveal else 1f
 
-        val bodyAlpha = (255 * presenceS.value.coerceIn(0f, 1f) * (1f - absorb * 0.3f) * min(1f, intro * 2.5f)).toInt()
-        drawSecondary(canvas, intro)
+        val bodyAlpha = (255 * presenceS.value.coerceIn(0f, 1f) * min(1f, intro * 2.5f)).toInt()
+        drawSecondary(canvas, intro * reveal)
         shapePaint.color = Color.BLACK
         shapePaint.alpha = bodyAlpha
         canvas.drawRoundRect(rect, r, r, shapePaint)
@@ -677,10 +726,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         clip.addRoundRect(rect, r, r, Path.Direction.CW)
         canvas.save()
         canvas.clipPath(clip)
-        liquidGlass.draw(canvas, rect, r, bodyAlpha, wallpaperSkin)
+        if (absorb < .06f) liquidGlass.draw(canvas, rect, r, bodyAlpha, wallpaperSkin)
 
-        val ea = expandedA.value.coerceIn(0f, 1f)
-        val ca = compactA.value.coerceIn(0f, 1f)
+        val ea = expandedA.value.coerceIn(0f, 1f) * reveal
+        val ca = compactA.value.coerceIn(0f, 1f) * reveal
         val liveTimer = isLiveTimer(a)
         actionHits.clear()
         if (ea > 0.01f) {
@@ -717,7 +766,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
         // The timer's ring and digits are shared between compact and expanded and morph between them.
         if (liveTimer) drawTimerMorph(canvas, a, ea, ca, intro)
-        if (absorb > 0.01f) drawAbsorb(canvas, a, absorb)
+        if (absorb > 0.01f) drawAbsorb(canvas, absorb)
         canvas.restore()
         canvas.restore()
         if (layered) canvas.restore()
@@ -725,18 +774,24 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun drawSecondary(canvas: Canvas, intro: Float) {
         secondaryRect.setEmpty()
+        dropNeck.reset()
         val a = secondary ?: departingSecondary ?: return
-        val opacity = secondaryA.value.coerceIn(0f, 1f) * intro
-        if (opacity < 0.01f) { if (secondary == null) departingSecondary = null; return }
+        if (dropS.value < 0.01f && dropS.target == 0f) {
+            if (secondary == null) departingSecondary = null
+            return
+        }
         val diameter = dp(36f)
-        val screen = width / fit.scale
-        val center = bubbleCenterS.value.coerceIn(diameter / 2, max(diameter / 2, screen - dp(4f) - diameter / 2))
-        val cy = baseTop + dp(18f)
-        val size = diameter * (0.65f + 0.35f * opacity) * bubblePress.value
-        secondaryRect.set(center - size / 2, cy - size / 2, center + size / 2, cy + size / 2)
-        fillPaint.color = withAlpha(Color.BLACK, (255 * opacity).toInt())
+        dropGeometry.update(dropS.value, rect.right - diameter * .42f, bubbleCenterS.value,
+            baseTop + dp(18f), diameter, width / fit.scale, dp(4f), bubblePress.value)
+        val center = dropGeometry.centerX
+        val cy = dropGeometry.centerY
+        secondaryRect.set(center - dropGeometry.radiusX, cy - dropGeometry.radiusY,
+            center + dropGeometry.radiusX, cy + dropGeometry.radiusY)
+        val surfaceAlpha = (255 * intro * presenceS.value.coerceIn(0f, 1f)).toInt()
+        fillPaint.color = withAlpha(Color.BLACK, surfaceAlpha)
+        drawDropNeck(canvas, surfaceAlpha)
         canvas.drawOval(secondaryRect, fillPaint)
-        val alpha = (255 * opacity).toInt()
+        val alpha = (surfaceAlpha * dropGeometry.content).toInt()
         when (a.mode) {
             IslandMode.TIMER -> {
                 val timerAlpha = if (a.pausedTimerMs != null) alpha / 2 else alpha
@@ -749,10 +804,30 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 canvas.drawText(digits, center - paint.measureText(digits) / 2,
                     cy - (paint.ascent() + paint.descent()) / 2, paint)
             }
-            IslandMode.MUSIC -> drawWave(canvas, center - dp(9f), cy, dp(18f), dp(14f), waveColor, a.isPlaying, alpha)
+            IslandMode.MUSIC -> drawWave(canvas, center - dp(9f), cy, dp(18f), dp(14f), userAccent ?: waveColor, a.isPlaying, alpha)
             IslandMode.CALL -> drawPhone(canvas, center, cy, dp(18f), alpha, false)
             else -> text(canvas, a.appLabel.take(1), center - dp(4f), cy + dp(5f), dp(15f), bodyPaint, Color.WHITE, alpha)
         }
+    }
+
+    /** Two cubic edges pinch down before the droplet detaches. Draw behind both surfaces. */
+    private fun drawDropNeck(canvas: Canvas, alpha: Int) {
+        dropNeck.reset()
+        val gap = secondaryRect.left - rect.right
+        if (reduceMotion || dropGeometry.neck < .01f || gap < -dp(8f) || gap > dp(36f) || rect.height() > dp(64f)) return
+        val half = min(rect.height() * .32f, dropGeometry.radiusY * .65f) * dropGeometry.neck
+        val x1 = rect.right - dp(5f)
+        val x2 = secondaryRect.left + dropGeometry.radiusX * .18f
+        val y1 = rect.centerY()
+        val y2 = dropGeometry.centerY
+        val middle = (x1 + x2) / 2f
+        dropNeck.moveTo(x1, y1 - half)
+        dropNeck.cubicTo(middle, y1 - half * .12f, middle, y2 - half * .12f, x2, y2 - half)
+        dropNeck.lineTo(x2, y2 + half)
+        dropNeck.cubicTo(middle, y2 + half * .12f, middle, y1 + half * .12f, x1, y1 + half)
+        dropNeck.close()
+        fillPaint.color = withAlpha(Color.BLACK, alpha)
+        canvas.drawPath(dropNeck, fillPaint)
     }
 
     /** Idle island as a status bar: time on the left, network and battery on the right. */
@@ -899,7 +974,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         when (a.mode) {
             IslandMode.MUSIC -> {
                 // Artwork and waveform flank the camera, matching the SwiftUI compact layout.
-                drawWave(canvas, right - dp(20f), cy, dp(20f), dp(14f), waveColor, a.isPlaying, alpha)
+                drawWave(canvas, right - dp(20f), cy, dp(20f), dp(14f), userAccent ?: waveColor, a.isPlaying, alpha)
             }
             IslandMode.CALL -> {
                 val t = a.chronometerText()
@@ -922,7 +997,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         drawArtwork(canvas, a, l, t, art, dp(14f), alpha)
         val tx = l + art + dp(14f)
         val waveW = dp(24f)
-        drawWave(canvas, rr - waveW, t + dp(20f), waveW, dp(18f), waveColor, a.isPlaying, alpha)
+        drawWave(canvas, rr - waveW, t + dp(20f), waveW, dp(18f), userAccent ?: waveColor, a.isPlaying, alpha)
         text(canvas, a.title, tx, t + dp(25f), rr - waveW - dp(12f) - tx, titlePaint, Color.WHITE, alpha)
         text(canvas, a.subtitle, tx, t + dp(46f), rr - tx, bodyPaint, GREY, alpha)
 
@@ -933,24 +1008,29 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val remaining = "-" + formatDuration((a.durationMs - pos).coerceAtLeast(0L))
         barLeft = l + dp(44f)
         barRight = rr - dp(48f)
-        text(canvas, elapsed, l, barY + dp(4f), dp(40f), smallPaint, GREY, late)
-        text(canvas, remaining, rr, barY + dp(4f), dp(46f), smallPaint, GREY, late, alignRight = true)
-        val thick = if (seeking) dp(8f) else dp(5f)
-        val fraction = if (a.durationMs > 0L) (pos.toFloat() / a.durationMs).coerceIn(0f, 1f) else 0f
-        fillPaint.color = withAlpha(waveColor, late * 50 / 255)
-        canvas.drawRoundRect(barLeft, barY - thick / 2, barRight, barY + thick / 2, thick / 2, thick / 2, fillPaint)
-        fillPaint.color = withAlpha(waveColor, late)
-        if (fraction > 0f) canvas.drawRoundRect(
-            barLeft, barY - thick / 2, barLeft + (barRight - barLeft) * fraction, barY + thick / 2,
-            thick / 2, thick / 2, fillPaint
-        )
+        if (showsMediaAction(IslandBus.MEDIA_SEEK)) {
+            text(canvas, elapsed, l, barY + dp(4f), dp(40f), smallPaint, GREY, late)
+            text(canvas, remaining, rr, barY + dp(4f), dp(46f), smallPaint, GREY, late, alignRight = true)
+            val thick = if (seeking) dp(8f) else dp(5f)
+            val fraction = if (a.durationMs > 0L) (pos.toFloat() / a.durationMs).coerceIn(0f, 1f) else 0f
+            fillPaint.color = withAlpha(userAccent ?: waveColor, late * 50 / 255)
+            canvas.drawRoundRect(barLeft, barY - thick / 2, barRight, barY + thick / 2, thick / 2, thick / 2, fillPaint)
+            fillPaint.color = withAlpha(userAccent ?: waveColor, late)
+            if (fraction > 0f) canvas.drawRoundRect(
+                barLeft, barY - thick / 2, barLeft + (barRight - barLeft) * fraction, barY + thick / 2,
+                thick / 2, thick / 2, fillPaint
+            )
+        }
 
         // Controls
         val cy = rect.top + dp(146f)
         val cx = rect.centerX()
-        drawSkip(canvas, cx - dp(72f), cy, false, late)
-        drawPlayPause(canvas, cx, cy, a.isPlaying, late)
-        drawSkip(canvas, cx + dp(72f), cy, true, late)
+        if (showsMediaAction(IslandBus.MEDIA_PREVIOUS))
+            drawSkip(canvas, cx - dp(72f), cy, false, late)
+        if (showsMediaAction(IslandBus.MEDIA_TOGGLE))
+            drawPlayPause(canvas, cx, cy, a.isPlaying, late)
+        if (showsMediaAction(IslandBus.MEDIA_NEXT))
+            drawSkip(canvas, cx + dp(72f), cy, true, late)
     }
 
     private fun drawMessageExpanded(canvas: Canvas, a: LiveActivity, alpha: Int, late: Int) {
@@ -1174,15 +1254,50 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
 
 
-    /** While swiping away from an app, its art shrinks with the shape into the island. */
-    private fun drawAbsorb(canvas: Canvas, a: LiveActivity, absorb: Float) {
-        val img = a.artwork ?: a.appIcon
-        val size = min(min(rect.width(), rect.height()) * 0.42f, dp(120f))
-        val l = rect.centerX() - size / 2
-        val t = rect.centerY() - size / 2
-        val alpha = (absorb.coerceIn(0f, 1f) * 255).toInt()
-        if (img != null) drawImage(canvas, img, l, t, size, size * 0.24f, alpha)
-        else drawLetterTile(canvas, a, l, t, size, size * 0.24f, alpha)
+    /** Small notification-derived replica, not a screenshot of the third-party app. */
+    private fun makeMorphCard(a: LiveActivity): Bitmap? = try {
+        val bitmap = Bitmap.createBitmap(320, 560, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bitmap)
+        c.drawColor(Color.rgb(20, 20, 22))
+        val title = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = NothingStyle.body; color = Color.WHITE; textSize = 22f; textAlign = Paint.Align.CENTER
+        }
+        val small = TextPaint(title).apply { textSize = 14f; color = Color.LTGRAY }
+        fun label(value: String, y: Float, paint: TextPaint) {
+            c.drawText(TextUtils.ellipsize(value, paint, 280f, TextUtils.TruncateAt.END).toString(), 160f, y, paint)
+        }
+        label(a.appLabel, 42f, small)
+        val image = a.artwork ?: a.appIcon
+        if (image != null) drawImage(c, image, 48f, 100f, 224f, if (a.mode == IslandMode.CALL) 112f else 16f, 255)
+        else {
+            val tile = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.DKGRAY }
+            c.drawRoundRect(48f, 100f, 272f, 324f, 24f, 24f, tile)
+            label(a.appLabel.take(1), 222f, title)
+        }
+        label(a.title, 374f, title)
+        label(a.subtitle.ifBlank { a.appLabel }, 404f, small)
+        c.save(); c.scale(1f / density, 1f / density)
+        if (a.mode == IslandMode.MUSIC) {
+            drawSkip(c, 84f * density, 493f * density, false, 255)
+            drawPlayPause(c, 160f * density, 493f * density, a.isPlaying, 255)
+            drawSkip(c, 236f * density, 493f * density, true, 255)
+        } else drawPhone(c, 160f * density, 493f * density, dp(28f), 255, false)
+        c.restore()
+        bitmap
+    } catch (_: OutOfMemoryError) { null } catch (_: RuntimeException) { null }
+
+    private fun drawAbsorb(canvas: Canvas, absorb: Float) {
+        val image = morphCard ?: return
+        val fade = ((1f - absorb - .28f) / .44f).coerceIn(0f, 1f)
+        val cardVisibility = 1f - fade * fade * (3f - 2f * fade)
+        val alpha = ((1f - appMorph.reveal) * cardVisibility * 255).toInt().coerceIn(0, 255)
+        val blur = (sin((1f - absorb) * Math.PI).toFloat() * .85f).coerceIn(0f, 1f)
+        morphPaint.alpha = alpha
+        canvas.drawBitmap(image, null, rect, morphPaint)
+        softMorphCard?.let {
+            morphPaint.alpha = (alpha * blur).toInt()
+            canvas.drawBitmap(it, null, rect, morphPaint)
+        }
     }
 
     private fun drawActions(canvas: Canvas, a: LiveActivity, l: Float, t: Float, r: Float, alpha: Int) {
@@ -1348,7 +1463,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun lighten(color: Int) = ColorUtils.blendARGB(color, Color.WHITE, 0.25f)
 
     private fun findAction(a: LiveActivity, vararg words: String) =
-        a.actions.firstOrNull { act -> words.any { act.label.contains(it, ignoreCase = true) } }
+        visibleActions(a).firstOrNull { act -> words.any { act.label.contains(it, ignoreCase = true) } }
 
     // ---------------------------------------------------------------- touch
 
@@ -1369,7 +1484,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 hit.inset(-dp(10f), -dp(10f))
                 secondaryHit.set(secondaryRect)
                 secondaryHit.inset(-dp(4f), -dp(4f))
-                touchingSecondary = secondary != null && presentation == Presentation.COMPACT && secondaryA.value > 0.5f && secondaryHit.contains(e.x, e.y)
+                touchingSecondary = secondary != null && presentation == Presentation.COMPACT && secondaryA.value > 0.5f && dropS.value > .92f && secondaryHit.contains(e.x, e.y)
                 if (isConcealed || (!touchingSecondary && !hit.contains(e.x, e.y))) return false
                 tracking = true
                 dragging = false
@@ -1379,6 +1494,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 downAt = e.eventTime
                 val a = activity
                 seeking = presentation == Presentation.EXPANDED && a?.mode == IslandMode.MUSIC &&
+                    showsMediaAction(IslandBus.MEDIA_SEEK) &&
                     a.durationMs > 0L && abs(e.y - barY) < dp(16f) &&
                     e.x >= barLeft - dp(12f) && e.x <= barRight + dp(12f)
                 if (seeking) seekFraction = fractionAt(e.x)
@@ -1489,9 +1605,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 if (a.mode == IslandMode.MUSIC && y > barY + dp(16f)) {
                     val cx = rect.centerX()
                     when {
-                        x < cx - dp(36f) -> callbacks?.onMedia(a, IslandBus.MEDIA_PREVIOUS)
-                        x > cx + dp(36f) -> callbacks?.onMedia(a, IslandBus.MEDIA_NEXT)
-                        else -> {
+                        x < cx - dp(36f) && showsMediaAction(IslandBus.MEDIA_PREVIOUS) -> callbacks?.onMedia(a, IslandBus.MEDIA_PREVIOUS)
+                        x > cx + dp(36f) && showsMediaAction(IslandBus.MEDIA_NEXT) -> callbacks?.onMedia(a, IslandBus.MEDIA_NEXT)
+                        x in (cx - dp(36f))..(cx + dp(36f)) && showsMediaAction(IslandBus.MEDIA_TOGGLE) -> {
                             // Flip instantly so the button feels responsive; the real state follows.
                             activity = a.copy(
                                 isPlaying = !a.isPlaying,
@@ -1501,6 +1617,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                             callbacks?.onMedia(a, IslandBus.MEDIA_TOGGLE)
                             kick()
                         }
+                        else -> callbacks?.onOpen(a)
                     }
                 } else {
                     callbacks?.onOpen(a)

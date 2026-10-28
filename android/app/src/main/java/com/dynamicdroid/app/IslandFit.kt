@@ -9,6 +9,7 @@ data class IslandFit(
     val offsetX: Float = 0f,
     val offsetY: Float = 0f,
     val alignCamera: Boolean = true,
+    val placement: IslandPlacement = IslandPlacement.AUTO,
 ) {
     fun safe() = copy(
         scale = scale.coerceIn(0.7f, 1.3f),
@@ -23,4 +24,20 @@ data class IslandFit(
             return desired.coerceIn(half.coerceAtMost(screenWidth / 2f), max(screenWidth / 2f, screenWidth - half))
         }
     }
+}
+
+/** Explicit fallback for OEM status bars, wide notches and ordinary overlay windows. */
+enum class IslandPlacement { AUTO, CAMERA, BELOW_STATUS_BAR }
+
+object IslandPlacementPolicy {
+    fun belowStatusBar(mode: IslandPlacement, accessibilityHost: Boolean, unsafeCutout: Boolean,
+                       landscape: Boolean): Boolean = when (mode) {
+        IslandPlacement.BELOW_STATUS_BAR -> true
+        IslandPlacement.CAMERA -> !accessibilityHost
+        IslandPlacement.AUTO -> !accessibilityHost || unsafeCutout || landscape
+    }
+
+    fun top(cameraTop: Float, statusBottom: Float, below: Boolean, offset: Float,
+            gap: Float): Float = if (below) kotlin.math.max(statusBottom + gap, statusBottom + gap + offset)
+        else kotlin.math.max(0f, cameraTop + offset)
 }
