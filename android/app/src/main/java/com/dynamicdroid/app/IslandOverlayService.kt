@@ -151,7 +151,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         )
         watcher = ForegroundWatcher(this, ::onForegroundChanged)
         IslandAccessibilityService.onForegroundPackage = { pkg ->
-            if (pkg in homePackages || activities.all().any { it.packageName == pkg }) watcher?.hint(pkg)
+            val interruptsHandoff = island?.isAbsorbing == true && packageManager.getLaunchIntentForPackage(pkg) != null
+            if (pkg in homePackages || activities.all().any { it.packageName == pkg } || interruptsHandoff) watcher?.hint(pkg)
         }
         status = StatusMonitor(this) { info -> island?.applyStatus(info) }.also { it.start() }
         IslandAccessibilityService.onChanged = { handler.post { reattach() } }
