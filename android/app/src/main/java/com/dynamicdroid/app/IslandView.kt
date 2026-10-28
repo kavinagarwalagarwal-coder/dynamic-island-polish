@@ -15,7 +15,6 @@ import android.graphics.Shader
 import android.graphics.Typeface
 import android.os.Build
 import android.os.SystemClock
-import android.os.PowerManager
 import android.text.TextPaint
 import android.text.TextUtils
 import android.view.Choreographer
@@ -138,25 +137,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     private val wallpaperSkin = WallpaperSkinRenderer()
-    private var wallpaperFrameAt = 0L
-    private val wallpaperVisibleRect = android.graphics.Rect()
-    private val liquidGlass = WallpaperLiquidGlass()
-    private val powerManager = context.getSystemService(PowerManager::class.java)
+    private val liquidGlass = WallpaperLiquidGlass(context)
 
-    fun applyWallpaper(motion: WallpaperMotion, image: Bitmap?, background: Bitmap? = null, subject: Bitmap? = null) {
-        wallpaperSkin.motion = motion.safe()
+    fun applyWallpaper(style: WallpaperStyle, image: Bitmap?) {
+        wallpaperSkin.style = style
         wallpaperSkin.image = image
-        wallpaperSkin.background = background
-        wallpaperSkin.subject = subject
-        settled = false
-        kick()
+        liquidGlass.resetFailure()
         invalidate()
     }
-
-    private fun wallpaperAnimating() = wallpaperSkin.enabled && !reduceMotion &&
-        presentation != Presentation.IDLE && !isConcealed && introS.value > 0.01f &&
-        isShown && getLocalVisibleRect(wallpaperVisibleRect) && powerManager?.isInteractive != false &&
-        (activity?.mode != IslandMode.MUSIC || activity?.isPlaying == true)
 
     // Idle status bar data (time, network, battery). Redrawn only when it actually changes.
     private var status = StatusInfo()
@@ -535,11 +523,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             if (reduceMotion) s.snap(s.target) else s.step(dt)
             if (!s.isAtRest) rest = false
         }
-        val wallpaperNow = frameTimeNanos / 1_000_000L
-        if (wallpaperAnimating()) {
-            if (wallpaperFrameAt != 0L) wallpaperSkin.advance((wallpaperNow - wallpaperFrameAt).coerceIn(0L, 100L) / 1000f)
-            wallpaperFrameAt = wallpaperNow
-        } else wallpaperFrameAt = 0L
         invalidate()
         if (rest && !settled && !tracking) {
             settled = true
@@ -569,8 +552,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun continuousDelay(): Long? {
         val a = activity ?: return null
         if (presentation == Presentation.IDLE) return null
-        if (isConcealed || introS.value < 0.01f || !isShown || powerManager?.isInteractive == false) return null
-        if (wallpaperAnimating()) return if (powerManager?.isPowerSaveMode == true) 66L else 33L
+        if (isConcealed || introS.value < 0.01f || !isShown) return null
         val other = secondary
         if (other != null && secondaryA.value > 0.01f &&
             (other.mode == IslandMode.MUSIC && other.isPlaying ||
@@ -606,6 +588,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         removeCallbacks(introWiden); introHoldUntil = 0L
         Choreographer.getInstance().removeFrameCallback(this)
         running = false
+        liquidGlass.release()
         super.onDetachedFromWindow()
     }
 
@@ -638,7 +621,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // ---------------------------------------------------------------- drawing
 
     override fun onDraw(canvas: Canvas) {
-        if (wallpaperAnimating() && !running) kick()
         // Fully hidden (fullscreen video/photos): draw nothing at all.
         val conceal = concealS.value.coerceIn(0f, 1f)
         if (conceal < 0.01f) return

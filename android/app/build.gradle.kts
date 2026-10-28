@@ -12,14 +12,11 @@ android {
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 5
-        versionName = "1.3.0"
+        versionCode = 6
+        versionName = "1.3.1"
     }
 
     buildFeatures { viewBinding = false }
-    sourceSets.getByName("main").assets.srcDir(layout.buildDirectory.dir("generated/wallpaperAssets"))
-    sourceSets.getByName("androidTest").assets.srcDir(layout.buildDirectory.dir("generated/wallpaperTestAssets"))
-    androidResources { noCompress += "tflite" }
     sourceSets.getByName("test").java.srcDir("../tests")
 
     compileOptions {
@@ -32,23 +29,7 @@ android {
     lint { abortOnError = false }
 }
 
-val prepareWallpaperModels by tasks.registering(Exec::class) {
-    commandLine("python3", rootProject.file("tools/prepare_wallpaper_models.py").absolutePath)
-    inputs.file(rootProject.file("tools/prepare_wallpaper_models.py"))
-    outputs.dir(layout.buildDirectory.dir("generated/wallpaperAssets"))
-}
-tasks.named("preBuild").configure { dependsOn(prepareWallpaperModels) }
-val prepareWallpaperTestAssets by tasks.registering(Exec::class) {
-    dependsOn(prepareWallpaperModels)
-    commandLine("python3", rootProject.file("tools/prepare_wallpaper_models.py").absolutePath, "--test")
-    inputs.file(rootProject.file("tools/prepare_wallpaper_models.py"))
-    outputs.dir(layout.buildDirectory.dir("generated/wallpaperTestAssets"))
-}
-tasks.matching { it.name == "preDebugAndroidTestBuild" }.configureEach { dependsOn(prepareWallpaperTestAssets) }
-
 dependencies {
-    implementation("com.google.ai.edge.litert:litert:1.4.2")
-    implementation("com.google.ai.edge.litert:litert-api:1.4.2")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:core:1.6.1")

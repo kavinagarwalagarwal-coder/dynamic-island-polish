@@ -16,6 +16,7 @@
         tools:ignore="QueryAllPackagesPermission" />
 
     <application
+        android:name=".DynamicDroidApplication"
         android:allowBackup="true"
         android:hardwareAccelerated="true"
         android:label="Dynamic Droid"

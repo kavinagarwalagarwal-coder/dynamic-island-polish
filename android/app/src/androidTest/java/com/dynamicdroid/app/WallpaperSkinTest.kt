@@ -11,63 +11,51 @@ import java.io.File
 
 @RunWith(AndroidJUnit4::class)
 class WallpaperSkinTest {
-    @Test fun realBundledModelsRecogniseAndSeparateCatOffline() {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val context = instrumentation.targetContext
-        assertEquals(android.content.pm.PackageManager.PERMISSION_DENIED,
-            context.packageManager.checkPermission("android.permission.INTERNET", context.packageName))
-        val photo = instrumentation.context.assets.open("cat.jpg").use { BitmapFactory.decodeStream(it) }
+    @Test fun fractionalMorphBoundsRenderWithoutTheOldCropCrash() {
+        val source = Bitmap.createBitmap(512, 256, Bitmap.Config.ARGB_8888)
+        source.eraseColor(Color.BLUE)
+        val output = Bitmap.createBitmap(400, 300, Bitmap.Config.ARGB_8888)
+        val renderer = WallpaperSkinRenderer().apply { image = source; style = WallpaperStyle(enabled = true) }
+        renderer.draw(Canvas(output), RectF(114.45830535888672f, 0f, 245.54168701171875f, 40.4f), 255)
+        assertTrue(Color.blue(output.getPixel(150, 20)) > 0)
+        source.recycle(); output.recycle()
+    }
+    @Test fun previousWallpaperMigratesAndOldLayersAreDeleted() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = context.getSharedPreferences("wallpaper_motion", 0)
+        prefs.edit().putBoolean("enabled", true).putBoolean("glass", true).putFloat("strength", .55f)
+            .putBoolean("automatic", true).putString("autoLabel", "cat").commit()
+        val original = File(context.noBackupFilesDir, "island-wallpaper.png")
+        val background = File(context.noBackupFilesDir, "island-wallpaper-background.png")
+        val subject = File(context.noBackupFilesDir, "island-wallpaper-subject.png")
+        original.writeText("fixture"); background.writeText("fixture"); subject.writeText("fixture")
         try {
-            val result = LocalWallpaperAnalyzer.analyze(context, photo)
-            assertTrue("Wrong subject: ${result.label}", result.label.contains("cat", true))
-            assertEquals("breathe", result.effect)
-            assertNotNull("Foreground mask missing", result.subject)
-            assertNotNull("Separated background missing", result.background)
-            assertTrue(result.confidence > .1f)
-            result.subject?.recycle(); result.background?.recycle()
-        } finally { photo.recycle() }
+            WallpaperSkinStore.migrate(context)
+            assertTrue(original.exists()); assertFalse(background.exists()); assertFalse(subject.exists())
+            assertFalse(prefs.contains("autoLabel")); assertFalse(prefs.contains("automatic"))
+            assertTrue(WallpaperSkinStore.read(context).enabled)
+            assertEquals(.55f, WallpaperSkinStore.read(context).strength, 0f)
+        } finally { WallpaperSkinStore.remove(context) }
     }
-
-    @Test fun circleSearchFindsTheRecordWithoutUserCoordinates() {
-        val image = Bitmap.createBitmap(240, 240, Bitmap.Config.ARGB_8888)
-        val c = Canvas(image); c.drawColor(Color.WHITE)
-        c.drawCircle(120f, 120f, 70f, Paint().apply { color = Color.BLACK })
-        val disc = DiscLocator.locate(image)
-        assertNotNull("Circular record was not located", disc)
-        assertEquals(.5f, disc!![0], .06f)
-        assertEquals(.5f, disc[1], .06f)
-        assertEquals(70f / 240, disc[2], .06f)
-        image.recycle()
-    }
-
-    @Test fun selectedDiscMovesWhileTheRestOfThePhotoStaysStill() {
-        val image = Bitmap.createBitmap(240, 160, Bitmap.Config.ARGB_8888)
-        val c = Canvas(image)
-        c.drawColor(Color.BLUE)
-        val paint = Paint().apply { color = Color.RED }
-        c.drawRect(80f, 40f, 120f, 120f, paint)
-        paint.color = Color.GREEN
-        c.drawRect(120f, 40f, 160f, 120f, paint)
-        val renderer = WallpaperSkinRenderer().apply {
-            this.image = image
-            motion = WallpaperMotion(enabled = true, automatic = false, radius = .25f, strength = .65f)
+    @Test fun rapidRestartFallsBackToPlainWallpaper() {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        val prefs = context.getSharedPreferences("wallpaper_recovery", 0)
+        val oldStyle = WallpaperSkinStore.read(context)
+        try {
+            WallpaperSkinStore.save(context, WallpaperStyle(enabled = true, glass = true))
+            prefs.edit().putLong("processStart", 100_000L).putBoolean("glassActive", true).commit()
+            assertTrue(WallpaperRecovery.onProcessStart(context, 105_000L))
+            assertTrue(WallpaperSkinStore.read(context).enabled)
+            assertFalse(WallpaperSkinStore.read(context).glass)
+            assertFalse(WallpaperRecovery.onProcessStart(context, 110_000L))
+        } finally {
+            prefs.edit().clear().commit(); WallpaperSkinStore.save(context, oldStyle)
         }
-        fun frame(): Bitmap = Bitmap.createBitmap(240, 160, Bitmap.Config.ARGB_8888).also {
-            Canvas(it).apply { drawColor(Color.BLACK); renderer.draw(this, RectF(0f, 0f, 240f, 160f), 255) }
-        }
-        val before = frame()
-        renderer.advance(4f)
-        val after = frame()
-        assertNotEquals("Selected record did not rotate", before.getPixel(100, 90), after.getPixel(100, 90))
-        assertEquals("Outside the record moved", before.getPixel(20, 80), after.getPixel(20, 80))
-        renderer.motion = renderer.motion.copy(enabled = false)
-        val disabled = frame()
-        assertEquals(Color.BLACK, disabled.getPixel(100, 90))
-        listOf(image, before, after, disabled).forEach(Bitmap::recycle)
     }
-
     @Test fun importedImageIsSampledAndKeptOutsideAndroidBackup() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
+        assertEquals(android.content.pm.PackageManager.PERMISSION_DENIED,
+            context.packageManager.checkPermission("android.permission.INTERNET", context.packageName))
         val input = File(context.cacheDir, "test-wallpaper.png")
         val image = Bitmap.createBitmap(2048, 1024, Bitmap.Config.ARGB_8888)
         input.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }

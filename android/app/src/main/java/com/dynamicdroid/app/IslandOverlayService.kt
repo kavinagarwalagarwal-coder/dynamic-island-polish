@@ -166,7 +166,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             island?.applyTheme(IslandPreferences.readTheme(this))
         }
         if (intent?.action == ACTION_WALLPAPER) {
-            island?.applyWallpaper(WallpaperSkinStore.read(this), WallpaperSkinStore.image(this), WallpaperSkinStore.background(this), WallpaperSkinStore.subject(this))
+            island?.applyWallpaper(WallpaperSkinStore.read(this), WallpaperSkinStore.image(this))
         }
         if (ongoing != null) watcher?.start()
         return START_STICKY
@@ -186,7 +186,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             it.callbacks = this
             it.applyFit(IslandPreferences.read(this))
             it.applyTheme(IslandPreferences.readTheme(this))
-            it.applyWallpaper(WallpaperSkinStore.read(this), WallpaperSkinStore.image(this), WallpaperSkinStore.background(this), WallpaperSkinStore.subject(this))
+            it.applyWallpaper(WallpaperSkinStore.read(this), WallpaperSkinStore.image(this))
             status?.let { m -> it.applyStatus(m.current) }
         }
         island = view

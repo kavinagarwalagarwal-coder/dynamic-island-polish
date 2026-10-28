@@ -47,51 +47,36 @@ class MainActivity : AppCompatActivity() {
     private var themeSwitch: SwitchCompat? = null
     private var swatchA: View? = null
     private var swatchB: View? = null
-    private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        val bmp = uri?.let {
-            runCatching { contentResolver.openInputStream(it)?.use(BitmapFactory::decodeStream) }.getOrNull()
-        }
-        if (bmp == null) toast("Couldn't read that image") else applyWallpaperTheme(WallpaperTheme.fromBitmap(bmp))
-    }
-
-    private var wallpaperMotion = WallpaperMotion()
-    private var recognitionStatus: TextView? = null
+    private var wallpaperStyle = WallpaperStyle()
     private var wallpaperPreview: IslandView? = null
-    private var wallpaperEditor: WallpaperFocusView? = null
     private var wallpaperSwitch: SwitchCompat? = null
-    private var focusX: SeekBar? = null
-    private var focusY: SeekBar? = null
     private val wallpaperWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri != null) wallpaperWorker.execute {
+            val theme = runCatching { WallpaperSkinStore.decodeImage(applicationContext, uri).let { bitmap ->
+                try { WallpaperTheme.fromBitmap(bitmap) } finally { bitmap.recycle() }
+            } }.getOrNull()
+            runOnUiThread { if (!isDestroyed) applyWallpaperTheme(theme) }
+        }
+    }
     private val pickWallpaper = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) {
-            buttons["motion-pick"]?.isEnabled = false
-            buttons["motion-remove"]?.isEnabled = false
-            toast("Preparing wallpaper…")
+            buttons["wallpaper-pick"]?.isEnabled = false
+            buttons["wallpaper-remove"]?.isEnabled = false
             wallpaperWorker.execute {
                 val result = runCatching {
-                    val bitmap = WallpaperSkinStore.importImage(applicationContext, uri)
-                    val analysis = runCatching { LocalWallpaperAnalyzer.analyze(applicationContext, bitmap) }
-                        .getOrElse { LocalWallpaperAnalyzer.Analysis("Recognition unavailable · gentle drift", 0f, "drift") }
-                    WallpaperSkinStore.saveAnalysis(applicationContext, analysis)
-                    WallpaperSkinStore.save(applicationContext, WallpaperSkinStore.read(applicationContext).copy(
-                        enabled = true, autoEffect = analysis.effect, autoLabel = analysis.label,
-                        autoConfidence = analysis.confidence, x = analysis.x, y = analysis.y, radius = analysis.radius))
-                    bitmap to analysis
+                    WallpaperSkinStore.importImage(applicationContext, uri)
+                    WallpaperSkinStore.save(applicationContext, WallpaperSkinStore.read(applicationContext).copy(enabled = true))
                 }
                 runOnUiThread {
                     if (!isDestroyed) {
-                        buttons["motion-pick"]?.isEnabled = true
-                        buttons["motion-remove"]?.isEnabled = true
+                        buttons["wallpaper-pick"]?.isEnabled = true
+                        buttons["wallpaper-remove"]?.isEnabled = true
                         if (result.isSuccess) {
-                            val (bitmap, analysis) = result.getOrThrow()
-                            wallpaperMotion = wallpaperMotion.copy(enabled = true, autoEffect = analysis.effect,
-                                autoLabel = analysis.label, autoConfidence = analysis.confidence,
-                                x = analysis.x, y = analysis.y, radius = analysis.radius)
-                            wallpaperEditor?.image = bitmap
-                            focusX?.progress = (analysis.x * 100).toInt(); focusY?.progress = (analysis.y * 100).toInt()
+                            wallpaperStyle = WallpaperSkinStore.read(this)
                             wallpaperSwitch?.isChecked = true
                             applyWallpaperUpdate()
-                            toast("Wallpaper ready · ${analysis.effect}")
+                            toast("Wallpaper ready")
                         } else toast("Couldn't read that image. Try a JPG or PNG.")
                     }
                 }
@@ -108,7 +93,7 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         fit = IslandPreferences.read(this)
         theme = IslandPreferences.readTheme(this)
-        wallpaperMotion = WallpaperSkinStore.read(this)
+        wallpaperStyle = WallpaperSkinStore.read(this)
         window.statusBarColor = BG
         setContentView(buildScreen())
         if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -231,7 +216,7 @@ class MainActivity : AppCompatActivity() {
             callbacks = previewCallbacks
             applyFit(fit.copy(offsetY = 0f))
             applyTheme(theme)
-            applyWallpaper(wallpaperMotion, WallpaperSkinStore.image(this@MainActivity), WallpaperSkinStore.background(this@MainActivity), WallpaperSkinStore.subject(this@MainActivity))
+            applyWallpaper(wallpaperStyle, WallpaperSkinStore.image(this@MainActivity))
         }
         column.addView(FrameLayout(this).apply { addView(preview, FrameLayout.LayoutParams(-1, -1)) }, row(dp(270)))
         val musicRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
@@ -302,7 +287,7 @@ class MainActivity : AppCompatActivity() {
             pickImage.launch("image/*")
         }, row(-2).apply { topMargin = dp(10) })
 
-        addWallpaperMotionControls(column)
+        addWallpaperControls(column)
 
         column.addView(heading("( 05 )  CONNECTIONS"), row(-2).apply { topMargin = dp(28) })
         column.addView(heading("CLOCK NOTIFICATION STATUS"), row(-2).apply { topMargin = dp(16) })
@@ -332,120 +317,74 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun addWallpaperMotionControls(column: LinearLayout) {
-        column.addView(heading("( 04 )  ANIMATED WALLPAPER"), row(-2).apply { topMargin = dp(28) })
-        column.addView(label("Choose the same image as your phone wallpaper. Everything is animated on this phone.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
-        column.addView(action("motion-pick", "Choose wallpaper image") { pickWallpaper.launch("image/*") }, row(-2).apply { topMargin = dp(12) })
+    private fun addWallpaperControls(column: LinearLayout) {
+        column.addView(heading("( 04 )  WALLPAPER GLASS"), row(-2).apply { topMargin = dp(28) })
+        column.addView(label("Choose your wallpaper image. It stays still beneath the refracted glass.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
+        column.addView(action("wallpaper-pick", "Choose wallpaper image") { pickWallpaper.launch("image/*") }, row(-2).apply { topMargin = dp(12) })
         wallpaperSwitch = SwitchCompat(this).apply {
-            text = "Wallpaper inside pill"
-            textSize = 16f; minHeight = dp(56)
+            text = "Wallpaper inside pill"; textSize = 16f; minHeight = dp(56)
             setTextColor(NothingStyle.foreground)
-            isChecked = wallpaperMotion.enabled && WallpaperSkinStore.image(this@MainActivity) != null
+            isChecked = wallpaperStyle.enabled && WallpaperSkinStore.image(this@MainActivity) != null
             setOnCheckedChangeListener { _, checked ->
                 if (checked && WallpaperSkinStore.image(this@MainActivity) == null) {
-                    isChecked = false
-                    pickWallpaper.launch("image/*")
-                } else {
-                    wallpaperMotion = wallpaperMotion.copy(enabled = checked)
-                    applyWallpaperUpdate()
-                }
+                    isChecked = false; pickWallpaper.launch("image/*")
+                } else { wallpaperStyle = wallpaperStyle.copy(enabled = checked); applyWallpaperUpdate() }
             }
         }
         column.addView(wallpaperSwitch, row(-2))
-        recognitionStatus = label(wallpaperMotion.autoLabel, 14f, NothingStyle.foreground)
-        column.addView(recognitionStatus, row(-2).apply { topMargin = dp(8) })
+        val status = label(WallpaperRecovery.status(this), 14f, NothingStyle.muted)
         column.addView(SwitchCompat(this).apply {
-            text = "Liquid Glass · refract animated wallpaper"; minHeight = dp(56)
-            setTextColor(NothingStyle.foreground); isChecked = wallpaperMotion.glass
+            text = "Liquid Glass refraction"; minHeight = dp(56)
+            setTextColor(NothingStyle.foreground); isChecked = wallpaperStyle.glass
             isEnabled = Build.VERSION.SDK_INT >= 33
-            setOnCheckedChangeListener { _, checked -> wallpaperMotion = wallpaperMotion.copy(glass = checked); applyWallpaperUpdate() }
+            setOnCheckedChangeListener { _, checked ->
+                wallpaperStyle = wallpaperStyle.copy(glass = checked)
+                if (checked) WallpaperRecovery.clearStatus(this@MainActivity)
+                status.text = WallpaperRecovery.status(this@MainActivity)
+                applyWallpaperUpdate()
+            }
         }, row(-2))
-        val modes = android.widget.RadioGroup(this).apply {
-            val automatic = android.widget.RadioButton(this@MainActivity).apply {
-                id = View.generateViewId(); text = "Auto · recognise subject and choose motion"; minHeight = dp(48)
-                setTextColor(NothingStyle.foreground)
-            }
-            orientation = LinearLayout.VERTICAL
-            val spin = android.widget.RadioButton(this@MainActivity).apply {
-                id = View.generateViewId(); text = "Vinyl · spin selected circle"; minHeight = dp(48)
-                setTextColor(NothingStyle.foreground)
-            }
-            val drift = android.widget.RadioButton(this@MainActivity).apply {
-                id = View.generateViewId(); text = "Scene · gentle drift"; minHeight = dp(48)
-                setTextColor(NothingStyle.foreground)
-            }
-            addView(automatic); addView(spin); addView(drift)
-            check(if (wallpaperMotion.automatic) automatic.id else if (wallpaperMotion.spin) spin.id else drift.id)
-            setOnCheckedChangeListener { _, id ->
-                wallpaperMotion = wallpaperMotion.copy(automatic = id == automatic.id, spin = id == spin.id)
-                applyWallpaperUpdate()
-            }
-        }
-        column.addView(modes, row(-2))
-        column.addView(label("Auto recognises supported objects locally. Motion is a subtle effect, not generated video. Manual vinyl mode lets you correct the circle if recognition misses it.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(10) })
-        wallpaperEditor = WallpaperFocusView(this).apply {
-            image = WallpaperSkinStore.image(this@MainActivity)
-            motion = wallpaperMotion
-            onFocus = { x, y ->
-                wallpaperMotion = wallpaperMotion.copy(x = x, y = y)
-                focusX?.progress = (x * 100).toInt(); focusY?.progress = (y * 100).toInt()
-                applyWallpaperUpdate()
-            }
-        }
-        column.addView(wallpaperEditor, row(dp(210)).apply { topMargin = dp(12) })
+        column.addView(status, row(-2))
         wallpaperPreview = IslandView(this).apply {
             anchorToCutout = false
-            applyFit(IslandFit(scale = .85f, alignCamera = false))
-            applyTheme(theme)
-            applyWallpaper(wallpaperMotion, WallpaperSkinStore.image(this@MainActivity), WallpaperSkinStore.background(this@MainActivity), WallpaperSkinStore.subject(this@MainActivity))
+            applyFit(IslandFit(scale = .85f, alignCamera = false)); applyTheme(theme)
+            applyWallpaper(wallpaperStyle, WallpaperSkinStore.image(this@MainActivity))
             callbacks = object : IslandView.Callbacks {
                 override fun onExpandRequest() { show(activity, Presentation.EXPANDED) }
                 override fun onCollapseRequest() { show(activity, Presentation.COMPACT) }
                 override fun onOpen(activity: LiveActivity) { show(activity, if (presentation == Presentation.COMPACT) Presentation.EXPANDED else Presentation.COMPACT) }
             }
-            show(demoMusic(true), Presentation.COMPACT)
+            // A paused preview needs no continuous frames; tap/hold still demonstrates morphs.
+            show(demoMusic(false), Presentation.COMPACT)
         }
         column.addView(wallpaperPreview, row(dp(180)))
-        fun control(name: String, low: Int, high: Int, value: Int, unit: String, update: (Int) -> Unit): SeekBar {
-            val container = fitControl(name, low, high, value, unit, update)
-            val slider = fitSliders.removeAt(fitSliders.lastIndex)
+        fun control(name: String, value: Int, low: Int = 0, high: Int = 100, update: (Int) -> Unit) {
+            val container = fitControl(name, low, high, value, "%", update)
+            fitSliders.removeAt(fitSliders.lastIndex)
             column.addView(container, row(-2))
-            return slider
         }
-        focusX = control("Object horizontal position", 0, 100, (wallpaperMotion.x * 100).toInt(), "%") {
-            wallpaperMotion = wallpaperMotion.copy(x = it / 100f); applyWallpaperUpdate()
+        control("Wallpaper horizontal position", (wallpaperStyle.x * 100).toInt()) {
+            wallpaperStyle = wallpaperStyle.copy(x = it / 100f); applyWallpaperUpdate()
         }
-        focusY = control("Object vertical position", 0, 100, (wallpaperMotion.y * 100).toInt(), "%") {
-            wallpaperMotion = wallpaperMotion.copy(y = it / 100f); applyWallpaperUpdate()
+        control("Wallpaper vertical position", (wallpaperStyle.y * 100).toInt()) {
+            wallpaperStyle = wallpaperStyle.copy(y = it / 100f); applyWallpaperUpdate()
         }
-        control("Circle radius", 5, 50, (wallpaperMotion.radius * 100).toInt(), "%") {
-            wallpaperMotion = wallpaperMotion.copy(radius = it / 100f); applyWallpaperUpdate()
+        control("Wallpaper strength", (wallpaperStyle.strength * 100).toInt(), 15, 65) {
+            wallpaperStyle = wallpaperStyle.copy(strength = it / 100f); applyWallpaperUpdate()
         }
-        control("Wallpaper strength", 15, 65, (wallpaperMotion.strength * 100).toInt(), "%") {
-            wallpaperMotion = wallpaperMotion.copy(strength = it / 100f); applyWallpaperUpdate()
-        }
-        control("Seconds per cycle", 8, 30, wallpaperMotion.periodSeconds.toInt(), "s") {
-            wallpaperMotion = wallpaperMotion.copy(periodSeconds = it.toFloat()); applyWallpaperUpdate()
-        }
-        column.addView(action("motion-remove", "Remove wallpaper image") {
+        column.addView(action("wallpaper-remove", "Remove wallpaper image") {
             WallpaperSkinStore.remove(this)
-            wallpaperMotion = WallpaperSkinStore.read(this)
-            wallpaperSwitch?.isChecked = false
-            wallpaperEditor?.image = null
+            wallpaperStyle = WallpaperSkinStore.read(this); wallpaperSwitch?.isChecked = false
             applyWallpaperUpdate()
         }, row(-2).apply { topMargin = dp(12) })
     }
 
     private fun applyWallpaperUpdate() {
-        wallpaperMotion = wallpaperMotion.safe()
-        WallpaperSkinStore.save(this, wallpaperMotion)
+        wallpaperStyle = wallpaperStyle.safe()
+        WallpaperSkinStore.save(this, wallpaperStyle)
         val bitmap = WallpaperSkinStore.image(this)
-        wallpaperEditor?.motion = wallpaperMotion
-        val background = WallpaperSkinStore.background(this)
-        val subject = WallpaperSkinStore.subject(this)
-        preview.applyWallpaper(wallpaperMotion, bitmap, background, subject)
-        wallpaperPreview?.applyWallpaper(wallpaperMotion, bitmap, background, subject)
-        recognitionStatus?.text = "${wallpaperMotion.autoLabel} · ${(wallpaperMotion.autoConfidence * 100).toInt()}% classifier confidence · ${wallpaperMotion.effect}"
+        preview.applyWallpaper(wallpaperStyle, bitmap)
+        wallpaperPreview?.applyWallpaper(wallpaperStyle, bitmap)
         if (Settings.canDrawOverlays(this) || IslandAccessibilityService.isEnabled(this)) {
             ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_WALLPAPER))
         }
