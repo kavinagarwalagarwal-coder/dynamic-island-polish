@@ -47,6 +47,10 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private var transient: LiveActivity? = null
     private var presentation = Presentation.COMPACT
     private var foregroundPkg: String? = null
+    private val homePackages by lazy {
+        packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+            .map { it.activityInfo.packageName }.toSet()
+    }
     private var watcher: ForegroundWatcher? = null
     /** A newly started timer opens briefly, then morphs up into the pill. */
     private var timerPeek = false
@@ -146,6 +150,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             ContextCompat.RECEIVER_EXPORTED
         )
         watcher = ForegroundWatcher(this, ::onForegroundChanged)
+        IslandAccessibilityService.onForegroundPackage = { pkg ->
+            if (pkg in homePackages || activities.all().any { it.packageName == pkg }) watcher?.hint(pkg)
+        }
         status = StatusMonitor(this) { info -> island?.applyStatus(info) }.also { it.start() }
         IslandAccessibilityService.onChanged = { handler.post { reattach() } }
         attachWindow()
@@ -267,7 +274,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
         params?.let { lp ->
-            val touchable = a != null && !concealed
+            val touchable = a != null && !concealed && !absorb && !view.isAbsorbing
             val isOff = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0
             if (touchable == isOff) {
                 lp.flags = if (touchable) lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
@@ -319,6 +326,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         activities.remove(key)
         completions.remove(key)
+        if (activities.all().isEmpty()) watcher?.stop()
         if (ongoing?.key == key) {
             ongoing = activities.pair { it.mode == IslandMode.TIMER || it.packageName != foregroundPkg }.first
             presentation = Presentation.COMPACT
@@ -329,12 +337,17 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     private fun onForegroundChanged(pkg: String) {
         val previous = foregroundPkg
+        if (pkg == previous) return
+        // Use the unfiltered shelf: the owner was deliberately hidden while its app was open.
+        val source = activities.pair().first?.takeIf { it.mode == IslandMode.MUSIC || it.mode == IslandMode.CALL }
         foregroundPkg = pkg
-        val leaving = ongoing?.packageName == previous && previous != pkg
-        if (leaving) presentation = Presentation.COMPACT
-        render(absorb = leaving && island?.activity == null &&
-            getSystemService(PowerManager::class.java)?.isInteractive == true &&
-            getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false)
+        if (pkg !in homePackages) island?.cancelAppMorph()
+        val unlocked = getSystemService(PowerManager::class.java)?.isInteractive == true &&
+            getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false
+        val morph = AppReturnPolicy.shouldMorph(source?.packageName, previous, pkg, pkg in homePackages,
+            source?.key != island?.activity?.key, unlocked)
+        if (morph) { presentation = Presentation.COMPACT; fullscreen = false }
+        render(absorb = morph)
     }
 
     // ---------------------------------------------------------------- island callbacks
@@ -505,6 +518,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     override fun onDestroy() {
         if (IslandBus.listener === this) IslandBus.listener = null
         IslandAccessibilityService.onChanged = null
+        IslandAccessibilityService.onForegroundPackage = null
         watcher?.stop()
         status?.stop()
         handler.removeCallbacksAndMessages(null)

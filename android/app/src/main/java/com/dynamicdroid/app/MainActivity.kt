@@ -232,6 +232,11 @@ class MainActivity : AppCompatActivity() {
         })
         column.addView(musicRow, row(-2).apply { topMargin = dp(14) })
         column.addView(activityRow, row(-2).apply { topMargin = dp(8) })
+        column.addView(chip("App → island") {
+            val a = demo?.takeIf { it.mode == IslandMode.MUSIC || it.mode == IslandMode.CALL } ?: demoMusic(true)
+            demo = a; demoPresentation = Presentation.COMPACT
+            preview.setSecondary(null); preview.show(a, Presentation.COMPACT, absorb = true)
+        }, row(-2).apply { topMargin = dp(8) })
 
         column.addView(heading("( 02 )  PHONE FIT"), row(-2).apply { topMargin = dp(24) })
         column.addView(fitControl("Size", 70, 130, (fit.scale * 100).toInt(), "%") { fit = fit.copy(scale = it / 100f); updateFit() }, row(-2))

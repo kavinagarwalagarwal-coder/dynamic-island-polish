@@ -206,7 +206,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // Stiffer press so the squish lands on the finger's first frame.
     private val pressS = Spring(1f, 760f, 0.76f, 0.0008f)
     private val stretchS = Spring(0f, 360f, 0.78f, 0.5f)
-    private val absorbS = Spring(0f, 120f, 1f, 0.004f)
+    private val absorbS = Spring(0f, 65f, 0.90f, 0.003f)
+    private val appMorph = AppMorphGeometry()
+    private var morphCard: Bitmap? = null
+    private var softMorphCard: Bitmap? = null
+    private val morphPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     // Wake/unlock intro: 0 = hidden dot, 1 = fully present
     private val introS = Spring(1f, 160f, 0.7f, 0.002f)
     // Status-bar content of the idle pill
@@ -336,17 +340,16 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (introHoldUntil == 0L && !sheenActive() && !isAbsorbing) restoreShapeSprings()
         val spec = specFor(p, next)
 
-        if (absorb && next != null) {
+        if (isAbsorbing && (next?.key != old?.key || p != Presentation.COMPACT)) {
+            absorbS.snap(0f); morphCard = null; softMorphCard = null
+        }
+        if (absorb && next != null && !reduceMotion) {
             removeCallbacks(introWiden); introHoldUntil = 0L; introS.snap(1f)
-            val dm = resources.displayMetrics
-            widthS.snap(dm.widthPixels * 0.84f)
-            heightS.snap(dm.heightPixels * 0.58f)
-            radiusS.snap(dp(46f))
-            topS.snap(dm.heightPixels * 0.2f)
-            absorbS.snap(1f)
-            compactA.snap(0f)
-            expandedA.snap(0f)
-            shapeSprings.forEach { it.stiffness = 120f; it.dampingRatio = 0.82f }
+            widthS.snap(spec.w); heightS.snap(spec.h); radiusS.snap(spec.r)
+            centerS.snap(spec.cx); topS.snap(targetTop(p)); presenceS.snap(1f)
+            morphCard = makeMorphCard(next)
+            softMorphCard = morphCard?.let { runCatching { Bitmap.createScaledBitmap(it, 32, 56, true) }.getOrNull() }
+            absorbS.snap(1f); compactA.snap(0f); expandedA.snap(0f)
         }
         widthS.target = spec.w
         heightS.target = spec.h
@@ -357,6 +360,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         setContentTargets(p)
         settled = false
         kick()
+    }
+
+    fun cancelAppMorph() {
+        if (!isAbsorbing) return
+        absorbS.snap(0f); morphCard = null; softMorphCard = null
+        settled = false; kick(); invalidate()
     }
 
     /** Content fades in slowly once the shape has room, and fades out fast so it never squashes. */
@@ -376,6 +385,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         tracking = false; seeking = false
         removeCallbacks(longPress)
         pressS.snap(1f); stretchS.snap(0f); absorbS.snap(0f)
+        morphCard = null; softMorphCard = null
         removeCallbacks(introWiden)
         introHoldUntil = 0L
         introS.snap(0f)
@@ -535,6 +545,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (rest && !settled && !tracking) {
             settled = true
             if (activity == null) departingActivity = null
+            if (!isAbsorbing) { morphCard = null; softMorphCard = null }
             restoreShapeSprings()
             callbacks?.onSettled()
         }
@@ -597,6 +608,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         Choreographer.getInstance().removeFrameCallback(this)
         running = false
         liquidGlass.release()
+        morphCard = null; softMorphCard = null
         super.onDetachedFromWindow()
     }
 
@@ -653,11 +665,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val h = max(dp(1f), heightS.value + stretchS.value) * press * (0.6f + 0.4f * conceal)
         val top = topS.value
         rect.set(cx - w / 2f, top, cx + w / 2f, top + h)
-        val r = min(radiusS.value * press, h / 2f)
+        var r = min(radiusS.value * press, h / 2f)
         val absorb = absorbS.value.coerceIn(0f, 1f)
+        if (isAbsorbing) {
+            val sceneHeight = (if (anchorToCutout) resources.displayMetrics.heightPixels else height).toFloat() / fit.scale
+            appMorph.update(1f - absorb, width / fit.scale, sceneHeight, cx, top, w, h, density)
+            rect.set(appMorph.left, appMorph.top, appMorph.left + appMorph.width, appMorph.top + appMorph.height)
+            r = appMorph.radius
+        }
+        val reveal = if (isAbsorbing) appMorph.reveal else 1f
 
-        val bodyAlpha = (255 * presenceS.value.coerceIn(0f, 1f) * (1f - absorb * 0.3f) * min(1f, intro * 2.5f)).toInt()
-        drawSecondary(canvas, intro)
+        val bodyAlpha = (255 * presenceS.value.coerceIn(0f, 1f) * min(1f, intro * 2.5f)).toInt()
+        drawSecondary(canvas, intro * reveal)
         shapePaint.color = Color.BLACK
         shapePaint.alpha = bodyAlpha
         canvas.drawRoundRect(rect, r, r, shapePaint)
@@ -667,10 +686,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         clip.addRoundRect(rect, r, r, Path.Direction.CW)
         canvas.save()
         canvas.clipPath(clip)
-        liquidGlass.draw(canvas, rect, r, bodyAlpha, wallpaperSkin)
+        if (absorb < .06f) liquidGlass.draw(canvas, rect, r, bodyAlpha, wallpaperSkin)
 
-        val ea = expandedA.value.coerceIn(0f, 1f)
-        val ca = compactA.value.coerceIn(0f, 1f)
+        val ea = expandedA.value.coerceIn(0f, 1f) * reveal
+        val ca = compactA.value.coerceIn(0f, 1f) * reveal
         val liveTimer = isLiveTimer(a)
         actionHits.clear()
         if (ea > 0.01f) {
@@ -707,7 +726,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
         // The timer's ring and digits are shared between compact and expanded and morph between them.
         if (liveTimer) drawTimerMorph(canvas, a, ea, ca, intro)
-        if (absorb > 0.01f) drawAbsorb(canvas, a, absorb)
+        if (absorb > 0.01f) drawAbsorb(canvas, absorb)
         canvas.restore()
         canvas.restore()
         if (layered) canvas.restore()
@@ -1190,15 +1209,48 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
 
 
-    /** While swiping away from an app, its art shrinks with the shape into the island. */
-    private fun drawAbsorb(canvas: Canvas, a: LiveActivity, absorb: Float) {
-        val img = a.artwork ?: a.appIcon
-        val size = min(min(rect.width(), rect.height()) * 0.42f, dp(120f))
-        val l = rect.centerX() - size / 2
-        val t = rect.centerY() - size / 2
-        val alpha = (absorb.coerceIn(0f, 1f) * 255).toInt()
-        if (img != null) drawImage(canvas, img, l, t, size, size * 0.24f, alpha)
-        else drawLetterTile(canvas, a, l, t, size, size * 0.24f, alpha)
+    /** Small notification-derived replica, not a screenshot of the third-party app. */
+    private fun makeMorphCard(a: LiveActivity): Bitmap? = try {
+        val bitmap = Bitmap.createBitmap(320, 560, Bitmap.Config.ARGB_8888)
+        val c = Canvas(bitmap)
+        c.drawColor(Color.rgb(20, 20, 22))
+        val title = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
+            typeface = NothingStyle.body; color = Color.WHITE; textSize = 22f; textAlign = Paint.Align.CENTER
+        }
+        val small = TextPaint(title).apply { textSize = 14f; color = Color.LTGRAY }
+        fun label(value: String, y: Float, paint: TextPaint) {
+            c.drawText(TextUtils.ellipsize(value, paint, 280f, TextUtils.TruncateAt.END).toString(), 160f, y, paint)
+        }
+        label(a.appLabel, 42f, small)
+        val image = a.artwork ?: a.appIcon
+        if (image != null) drawImage(c, image, 48f, 100f, 224f, if (a.mode == IslandMode.CALL) 112f else 16f, 255)
+        else {
+            val tile = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.DKGRAY }
+            c.drawRoundRect(48f, 100f, 272f, 324f, 24f, 24f, tile)
+            label(a.appLabel.take(1), 222f, title)
+        }
+        label(a.title, 374f, title)
+        label(a.subtitle.ifBlank { a.appLabel }, 404f, small)
+        c.save(); c.scale(1f / density, 1f / density)
+        if (a.mode == IslandMode.MUSIC) {
+            drawSkip(c, 84f * density, 493f * density, false, 255)
+            drawPlayPause(c, 160f * density, 493f * density, a.isPlaying, 255)
+            drawSkip(c, 236f * density, 493f * density, true, 255)
+        } else drawPhone(c, 160f * density, 493f * density, dp(28f), 255, false)
+        c.restore()
+        bitmap
+    } catch (_: OutOfMemoryError) { null } catch (_: RuntimeException) { null }
+
+    private fun drawAbsorb(canvas: Canvas, absorb: Float) {
+        val image = morphCard ?: return
+        val alpha = ((1f - appMorph.reveal) * 255).toInt().coerceIn(0, 255)
+        val blur = (sin((1f - absorb) * Math.PI).toFloat() * .85f).coerceIn(0f, 1f)
+        morphPaint.alpha = alpha
+        canvas.drawBitmap(image, null, rect, morphPaint)
+        softMorphCard?.let {
+            morphPaint.alpha = (alpha * blur).toInt()
+            canvas.drawBitmap(it, null, rect, morphPaint)
+        }
     }
 
     private fun drawActions(canvas: Canvas, a: LiveActivity, l: Float, t: Float, r: Float, alpha: Int) {

@@ -76,6 +76,33 @@ class LiveOverlayTest {
                     visible(false) && TimerDiagnostics.read(instrumentation.targetContext).contains("notification timer text")
                 }
                 capture("live-overlay-timer-chip")
+                shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind player")
+                await("Music island did not hide inside its owner app") {
+                    val service = IslandBus.listener as? IslandOverlayService ?: return@await false
+                    field<String?>(service, "foregroundPkg") == "com.dynamicdroid.fixture" &&
+                        field<IslandView?>(service, "island")?.activity == null
+                }
+                shell("input keyevent KEYCODE_HOME")
+                await("Leaving the real player for Home did not trigger the handoff") {
+                    val service = IslandBus.listener as? IslandOverlayService ?: return@await false
+                    field<IslandView?>(service, "island")?.isAbsorbing == true
+                }
+                instrumentation.runOnMainSync {
+                    val service = IslandBus.listener as IslandOverlayService
+                    val view = field<IslandView>(service, "island")
+                    val window = field<android.view.WindowManager.LayoutParams>(service, "params")
+                    assertNotNull("No notification-derived card", field<Bitmap?>(view, "morphCard"))
+                    assertTrue("Flying card blocks Home touches", window.flags and android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0)
+                }
+                capture("live-app-to-island")
+                await("Handoff did not settle into a touchable compact island") {
+                    val service = IslandBus.listener as? IslandOverlayService ?: return@await false
+                    val view = field<IslandView>(service, "island")
+                    val window = field<android.view.WindowManager.LayoutParams>(service, "params")
+                    !view.isAbsorbing && view.activity?.mode == IslandMode.MUSIC &&
+                        window.height < view.resources.displayMetrics.heightPixels / 2 &&
+                        window.flags and android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0
+                }
             } finally {
                 shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind clear")
                 shell("cmd notification disallow_listener com.dynamicdroid.app/com.dynamicdroid.app.IslandNotificationListener")

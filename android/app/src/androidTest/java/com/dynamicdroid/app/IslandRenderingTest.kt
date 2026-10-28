@@ -50,6 +50,56 @@ class IslandRenderingTest {
         bitmap.recycle()
     }
 
+    @Test fun appCardPinchesTravelsAndOpensIntoIsland() {
+        val music = LiveActivity("handoff", "music.test", IslandMode.MUSIC, "Reference motion", "Local notification card", "Player", null, null,
+            0xFFFFFFFF.toInt(), isPlaying = false)
+        val frames = ArrayList<Bitmap>()
+        try {
+            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+                scenario.onActivity { activity ->
+                    val view = findIsland(activity.window.decorView)!!
+                    view.applyFit(IslandFit(alignCamera = false)); view.setSecondary(null); view.show(music, Presentation.COMPACT)
+                }
+                SystemClock.sleep(1000)
+                val done = CountDownLatch(1)
+                var narrow = false; var rose = false
+                scenario.onActivity { activity ->
+                    val view = findIsland(activity.window.decorView)!!
+                    view.show(music, Presentation.COMPACT, absorb = true)
+                    assertNotNull(field<Bitmap?>(view, "morphCard"))
+                    var index = 0; var previousTop = 0f
+                    val callback = object : android.view.Choreographer.FrameCallback {
+                        override fun doFrame(time: Long) {
+                            val g = field<AppMorphGeometry>(view, "appMorph")
+                            narrow = narrow || g.width < view.width * .20f && g.height > g.width
+                            rose = rose || g.top < previousTop && g.width < view.width * .20f
+                            previousTop = g.top
+                            if (index < 60 && index % 3 == 0) {
+                                val b = Bitmap.createBitmap(view.width / 2, view.height / 2, Bitmap.Config.ARGB_8888)
+                                val c = android.graphics.Canvas(b); c.drawColor(android.graphics.Color.DKGRAY); c.scale(.5f, .5f)
+                                view.draw(c); frames.add(b)
+                            }
+                            if (++index < 100) android.view.Choreographer.getInstance().postFrameCallback(this) else done.countDown()
+                        }
+                    }
+                    android.view.Choreographer.getInstance().postFrameCallback(callback)
+                }
+                assertTrue(done.await(15, TimeUnit.SECONDS)); assertTrue("Card never pinched", narrow); assertTrue("Card never travelled upward", rose)
+                scenario.onActivity { activity ->
+                    val view = findIsland(activity.window.decorView)!!
+                    assertFalse(view.isAbsorbing)
+                    assertNull("Temporary card was retained", field<Bitmap?>(view, "morphCard"))
+                    assertEquals(Presentation.COMPACT, view.presentation)
+                    assertEquals(232f * view.resources.displayMetrics.density, field<RectF>(view, "rect").width(), 1f)
+                    view.show(music, Presentation.COMPACT, absorb = true)
+                    view.cancelAppMorph()
+                    assertFalse(view.isAbsorbing); assertNull(field<Bitmap?>(view, "morphCard"))
+                }
+            }
+            frames.forEachIndexed { index, frame -> saveBitmap("app-morph-frame-${index.toString().padStart(2, '0')}", frame) }
+        } finally { frames.filterNot { it.isRecycled }.forEach(Bitmap::recycle) }
+    }
+
     @Test fun dropletConnectsDetachesAndReversesWithoutSnapping() {
         val music = LiveActivity("drop-music", "music.test", IslandMode.MUSIC, "Music", "Artist", "Music", null, null,
             0xFFFFFFFF.toInt(), isPlaying = false)
