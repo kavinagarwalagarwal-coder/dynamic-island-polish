@@ -345,6 +345,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
         if (absorb && next != null && !reduceMotion) {
             removeCallbacks(introWiden); introHoldUntil = 0L; introS.snap(1f)
+            concealS.snap(1f) // Home is visible; avoid a full-screen alpha layer left over from fullscreen media.
             widthS.snap(spec.w); heightS.snap(spec.h); radiusS.snap(spec.r)
             centerS.snap(spec.cx); topS.snap(targetTop(p)); presenceS.snap(1f)
             morphCard = makeMorphCard(next)
