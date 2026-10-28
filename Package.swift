@@ -4,8 +4,8 @@ import PackageDescription
 let package = Package(
     name: "IslandUI",
     platforms: [
-        .iOS(.v15),
-        .macOS(.v12),
+        .iOS(.v16),
+        .macOS(.v13),
     ],
     products: [
         .library(name: "IslandUI", targets: ["IslandUI"]),
