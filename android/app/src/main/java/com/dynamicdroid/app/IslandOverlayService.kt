@@ -47,6 +47,10 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private var transient: LiveActivity? = null
     private var presentation = Presentation.COMPACT
     private var foregroundPkg: String? = null
+    private val keyboardPackages by lazy {
+        runCatching { getSystemService(android.view.inputmethod.InputMethodManager::class.java)
+            .enabledInputMethodList.map { it.packageName }.toSet() }.getOrDefault(emptySet())
+    }
     private val homePackages by lazy {
         packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
             .map { it.activityInfo.packageName }.toSet()
@@ -151,8 +155,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         )
         watcher = ForegroundWatcher(this, ::onForegroundChanged)
         IslandAccessibilityService.onForegroundPackage = { pkg ->
-            val interruptsHandoff = island?.isAbsorbing == true && packageManager.getLaunchIntentForPackage(pkg) != null
-            if (pkg in homePackages || activities.all().any { it.packageName == pkg } || interruptsHandoff) watcher?.hint(pkg)
+            if (pkg !in keyboardPackages && (pkg in homePackages || activities.all().any { it.packageName == pkg } ||
+                    packageManager.getLaunchIntentForPackage(pkg) != null)) watcher?.hint(pkg)
         }
         status = StatusMonitor(this) { info -> island?.applyStatus(info) }.also { it.start() }
         IslandAccessibilityService.onChanged = { handler.post { reattach() } }

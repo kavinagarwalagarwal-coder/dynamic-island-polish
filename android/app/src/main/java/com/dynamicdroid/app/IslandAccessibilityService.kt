@@ -28,7 +28,10 @@ class IslandAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         // Package metadata only. Never access event text or retrieve window content.
         if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            event.packageName?.toString()?.let { onForegroundPackage?.invoke(it) }
+            val pkg = event.packageName?.toString() ?: return
+            // Ignore events from our non-focusable overlay; allow our actual settings activity.
+            if (pkg == packageName && event.className?.toString() != MainActivity::class.java.name) return
+            onForegroundPackage?.invoke(pkg)
         }
     }
     override fun onInterrupt() = Unit
