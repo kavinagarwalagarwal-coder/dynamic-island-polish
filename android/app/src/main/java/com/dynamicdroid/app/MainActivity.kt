@@ -117,7 +117,7 @@ class MainActivity : AppCompatActivity() {
         val notifications = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
         buttons["notifications"]?.text = if (notifications) "✓ Notification access enabled" else "Connect notifications"
         val ready = notifications && (overlay || a11y)
-        readiness?.text = if (ready) "Ready • Your island is connected" else "Setup needed • Open Setup to connect your island"
+        readiness?.text = if (ready) "Ready • Your island is connected" else "Setup needed • Connect notifications and an overlay"
         readiness?.setTextColor(if (ready) 0xFF9BE4BE.toInt() else NothingStyle.foreground)
         placementInfo?.text = placementExplanation()
         if (overlay || a11y) startIsland()
@@ -255,7 +255,7 @@ class MainActivity : AppCompatActivity() {
             applyWallpaper(wallpaperStyle, WallpaperSkinStore.image(this@MainActivity))
         }
         column.addView(FrameLayout(this).apply {
-            background = NothingStyle.panel()
+            background = GradientDrawable().apply { cornerRadius = dp(24).toFloat(); setColor(NothingStyle.surface) }
             setPadding(dp(6), dp(16), dp(6), dp(8))
             addView(preview, FrameLayout.LayoutParams(-1, -1))
         }, row(dp(280)).apply { topMargin = dp(16) })
@@ -417,9 +417,7 @@ class MainActivity : AppCompatActivity() {
             val selected = key == name
             button.isSelected = selected
             button.setTextColor(if (selected) Color.BLACK else NothingStyle.foreground)
-            button.background = if (selected) GradientDrawable().apply {
-                cornerRadius = dp(18).toFloat(); setColor(NothingStyle.foreground)
-            } else NothingStyle.panel()
+            button.background = controlBackground(if (selected) NothingStyle.foreground else NothingStyle.surface)
             ViewCompat.setStateDescription(button, if (selected) "Selected" else "")
         }
         pages[name]?.parent?.let { (it as? View)?.parent as? ScrollView }?.scrollTo(0, 0)
@@ -513,7 +511,7 @@ class MainActivity : AppCompatActivity() {
         contentDescription = "$text preview"
         setTextColor(NothingStyle.foreground)
         typeface = NothingStyle.body
-        background = NothingStyle.panel()
+        background = controlBackground()
         setOnClickListener { click() }
         layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
             marginStart = dp(3); marginEnd = dp(3)
@@ -529,7 +527,7 @@ class MainActivity : AppCompatActivity() {
         setPadding(dp(16), dp(16), dp(16), dp(16))
         setTextColor(NothingStyle.foreground)
         typeface = NothingStyle.body
-        background = NothingStyle.panel()
+        background = controlBackground()
         setOnClickListener { click() }
         buttons[key] = this
     }
@@ -538,11 +536,21 @@ class MainActivity : AppCompatActivity() {
         this.text = text
         textSize = size
         setTextColor(color)
-        typeface = NothingStyle.mono
+        typeface = NothingStyle.body
     }
 
     private fun heading(text: String) = label(text, 14f, NothingStyle.foreground).apply {
+        typeface = NothingStyle.mono
         ViewCompat.setAccessibilityHeading(this, true)
+    }
+
+    private fun controlBackground(color: Int = NothingStyle.surface): android.graphics.drawable.Drawable {
+        val shape = GradientDrawable().apply {
+            cornerRadius = dp(18).toFloat(); setColor(color)
+            setStroke(dp(1), NothingStyle.line)
+        }
+        return android.graphics.drawable.RippleDrawable(
+            ColorStateList.valueOf(if (color == NothingStyle.foreground) 0x22000000 else 0x33FFFFFF), shape, null)
     }
 
     private fun fitControl(name: String, min: Int, max: Int, value: Int, unit: String, change: (Int) -> Unit): LinearLayout {

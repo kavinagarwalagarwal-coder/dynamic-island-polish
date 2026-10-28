@@ -50,6 +50,8 @@ class IslandRenderingTest {
                     assertTrue(button.isShown); assertTrue(button.performClick()); assertTrue(button.isSelected)
                 }
                 instrumentation.waitForIdleSync()
+                // IdleSync drains the UI queue before SurfaceFlinger presents the new page.
+                SystemClock.sleep(450)
                 capture("design-${name.replace(" ", "-").lowercase()}")
             }
         }
