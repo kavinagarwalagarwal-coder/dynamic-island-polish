@@ -23,6 +23,38 @@ class IslandRenderingTest {
         if (view is ViewGroup) for (i in 0 until view.childCount) findIsland(view.getChildAt(i))?.let { return it }
         return null
     }
+    private fun launchPlayground(): ActivityScenario<MainActivity> {
+        val scenario = ActivityScenario.launch(MainActivity::class.java)
+        scenario.onActivity { activity ->
+            fun click(view: View): Boolean {
+                if (view is android.widget.Button && view.text.toString() == "Playground") { view.performClick(); return true }
+                if (view is ViewGroup) for (i in 0 until view.childCount) if (click(view.getChildAt(i))) return true
+                return false
+            }
+            assertTrue(click(activity.window.decorView))
+        }
+        instrumentation.waitForIdleSync()
+        return scenario
+    }
+
+    @Test fun navigationExposesSetupAppearanceAndPlacementWithoutLongSettingsScroll() {
+        launchPlayground().use { scenario ->
+            for (name in listOf("Setup", "Phone fit", "Appearance", "Playground")) {
+                scenario.onActivity { activity ->
+                    fun find(view: View): android.widget.Button? {
+                        if (view is android.widget.Button && view.text.toString() == name) return view
+                        if (view is ViewGroup) for (i in 0 until view.childCount) find(view.getChildAt(i))?.let { return it }
+                        return null
+                    }
+                    val button = find(activity.window.decorView) ?: error("Missing $name navigation")
+                    assertTrue(button.isShown); assertTrue(button.performClick()); assertTrue(button.isSelected)
+                }
+                instrumentation.waitForIdleSync()
+                capture("design-${name.replace(" ", "-").lowercase()}")
+            }
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun <T> field(view: IslandView, name: String): T =
         IslandView::class.java.getDeclaredField(name).apply { isAccessible = true }.get(view) as T
@@ -55,7 +87,7 @@ class IslandRenderingTest {
             0xFFFFFFFF.toInt(), isPlaying = false)
         val frames = ArrayList<Bitmap>()
         try {
-            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            launchPlayground().use { scenario ->
                 scenario.onActivity { activity ->
                     val view = findIsland(activity.window.decorView)!!
                     view.applyFit(IslandFit(alignCamera = false)); view.setSecondary(null); view.show(music, Presentation.COMPACT)
@@ -107,7 +139,7 @@ class IslandRenderingTest {
             0xFFFF9F0A.toInt(), chronometerCountDown = true, clockBaseElapsed = SystemClock.elapsedRealtime() + 300_000L)
         val frames = ArrayList<Bitmap>()
         try {
-            ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+            launchPlayground().use { scenario ->
                 scenario.onActivity { activity ->
                     val view = findIsland(activity.window.decorView)!!
                     view.applyFit(IslandFit(alignCamera = false)); view.setSecondary(null); view.show(music, Presentation.COMPACT)
@@ -182,7 +214,7 @@ class IslandRenderingTest {
         instrumentation.uiAutomation.executeShellCommand(
             "pm grant com.dynamicdroid.app android.permission.POST_NOTIFICATIONS"
         ).let { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).use { input -> input.readBytes() } }
-        ActivityScenario.launch(MainActivity::class.java).use { scenario ->
+        launchPlayground().use { scenario ->
             fun present(primary: LiveActivity?, secondary: LiveActivity?, p: Presentation, scale: Float = 1f) {
                 val settled = CountDownLatch(1)
                 scenario.onActivity { activity ->

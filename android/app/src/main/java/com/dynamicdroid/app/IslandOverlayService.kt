@@ -45,6 +45,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         when (it.mode) { IslandMode.CALL -> 3; IslandMode.TIMER -> 2; else -> 1 }
     }, { it.mode == IslandMode.TIMER })
     private var transient: LiveActivity? = null
+    private var placementTest: LiveActivity? = null
+    private val clearPlacementTest = Runnable { placementTest = null; render() }
     private var presentation = Presentation.COMPACT
     private var foregroundPkg: String? = null
     private val keyboardPackages by lazy {
@@ -174,6 +176,15 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 render()
             }
         }
+        if (intent?.action == ACTION_TEST) {
+            presentation = Presentation.COMPACT
+            placementTest = LiveActivity("placement-test", packageName, IslandMode.MUSIC,
+                "Placement test", "Hold to expand · swipe up to collapse", "Dynamic Droid", null, null,
+                0xFFFFFFFF.toInt(), isPlaying = true)
+            handler.removeCallbacks(clearPlacementTest)
+            handler.postDelayed(clearPlacementTest, 12_000L)
+            render()
+        }
         if (intent?.action == ACTION_THEME) {
             island?.applyTheme(IslandPreferences.readTheme(this))
         }
@@ -196,6 +207,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         windowManager = wm
         val view = IslandView(host).also {
             it.callbacks = this
+            it.accessibilityHost = a11y != null
             it.applyFit(IslandPreferences.read(this))
             it.applyTheme(IslandPreferences.readTheme(this))
             it.applyWallpaper(WallpaperSkinStore.read(this), WallpaperSkinStore.image(this))
@@ -217,8 +229,13 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             y = 0
+            if (Build.VERSION.SDK_INT >= 30) {
+                setFitInsetsTypes(0)
+                setFitInsetsSides(0)
+            }
             if (Build.VERSION.SDK_INT >= 28) {
-                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+                layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= 30) WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                    else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
         }
         params = lp
@@ -268,8 +285,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // A running timer remains visible beside other activities, including while Clock is open.
         val (o, secondary) = activities.pair { it.mode == IslandMode.TIMER || it.packageName != foregroundPkg }
         ongoing = o
-        view.setSecondary(if (t == null) secondary else null)
+        view.setSecondary(if (t == null && placementTest == null) secondary else null)
         val (a, p) = when {
+            placementTest != null -> placementTest to presentation
             t != null -> t to Presentation.EXPANDED
             o != null -> o to presentation
             else -> null to Presentation.IDLE
@@ -378,6 +396,12 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     override fun onMedia(activity: LiveActivity, command: String, positionMs: Long?) {
+        if (activity.key == placementTest?.key) {
+            if (command == IslandBus.MEDIA_TOGGLE) {
+                placementTest = placementTest?.copy(isPlaying = !activity.isPlaying); render()
+            }
+            return
+        }
         if (IslandBus.mediaControl?.invoke(command, positionMs) == true) return
         // No media session: fall back to the notification's own buttons.
         val words = when (command) {
@@ -406,7 +430,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     override fun onExpandRequest() {
-        if (transient != null || ongoing == null) return
+        if (placementTest == null && (transient != null || ongoing == null)) return
         timerPeek = false
         presentation = Presentation.EXPANDED
         render()
@@ -441,6 +465,16 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             handler.removeCallbacks(autoCollapse)
             if (ongoing?.mode != IslandMode.CALL) handler.postDelayed(autoCollapse, EXPANDED_TIMEOUT_MS)
         }
+    }
+
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        reattach()
+    }
+
+    override fun onAnchorChanged() {
+        val view = island ?: return
+        view.post { if (island === view) growWindow(view.windowSizeFor(view.activity, view.presentation), false) }
     }
 
     override fun onSettled() {
@@ -544,6 +578,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     companion object {
+        const val ACTION_TEST = "com.dynamicdroid.app.TEST_PLACEMENT"
         const val ACTION_FIT = "com.dynamicdroid.app.UPDATE_FIT"
         const val ACTION_WALLPAPER = "com.dynamicdroid.app.UPDATE_WALLPAPER"
         const val ACTION_THEME = "com.dynamicdroid.app.UPDATE_THEME"

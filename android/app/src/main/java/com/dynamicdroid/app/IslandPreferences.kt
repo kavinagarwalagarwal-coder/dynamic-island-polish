@@ -9,13 +9,15 @@ object IslandPreferences {
     fun read(context: Context): IslandFit {
         val p = prefs(context)
         return IslandFit(p.getFloat("scale", 1f), p.getFloat("width", 1f),
-            p.getFloat("x", 0f), p.getFloat("y", 0f), p.getBoolean("camera", true)).safe()
+            p.getFloat("x", 0f), p.getFloat("y", 0f), p.getBoolean("camera", true),
+            runCatching { IslandPlacement.valueOf(p.getString("placement", "AUTO") ?: "AUTO") }
+                .getOrDefault(IslandPlacement.AUTO)).safe()
     }
 
     fun save(context: Context, fit: IslandFit) {
         val f = fit.safe()
         prefs(context).edit().putFloat("scale", f.scale).putFloat("width", f.pillWidth)
-            .putFloat("x", f.offsetX).putFloat("y", f.offsetY).putBoolean("camera", f.alignCamera).apply()
+            .putFloat("x", f.offsetX).putFloat("y", f.offsetY).putBoolean("camera", f.alignCamera).putString("placement", f.placement.name).apply()
     }
 
     fun readTheme(context: Context): IslandTheme {

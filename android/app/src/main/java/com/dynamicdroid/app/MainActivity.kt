@@ -43,6 +43,11 @@ class MainActivity : AppCompatActivity() {
     private val fitSliders = ArrayList<SeekBar>()
     private var cameraSwitch: SwitchCompat? = null
     private var clockDiagnostic: TextView? = null
+    private var readiness: TextView? = null
+    private val pages = LinkedHashMap<String, LinearLayout>()
+    private val navigation = LinkedHashMap<String, Button>()
+    private var placementChoices: android.widget.RadioGroup? = null
+    private var placementInfo: TextView? = null
     private var theme = IslandTheme()
     private var themeSwitch: SwitchCompat? = null
     private var swatchA: View? = null
@@ -108,7 +113,13 @@ class MainActivity : AppCompatActivity() {
         buttons["overlay"]?.text = if (overlay) "Display over other apps: allowed" else "Allow display over other apps"
         buttons["usage"]?.text = if (ForegroundWatcher.hasPermission(this)) "Usage access: allowed" else "Allow usage access (optional)"
         val a11y = IslandAccessibilityService.isEnabled(this)
-        buttons["a11y"]?.text = if (a11y) "Top-edge tapping: enabled" else "Allow tapping over the status bar"
+        buttons["a11y"]?.text = if (a11y) "✓ Camera-area overlay enabled" else "Enable camera-area overlay"
+        val notifications = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
+        buttons["notifications"]?.text = if (notifications) "✓ Notification access enabled" else "Connect notifications"
+        val ready = notifications && (overlay || a11y)
+        readiness?.text = if (ready) "Ready • Your island is connected" else "Setup needed • Open Setup to connect your island"
+        readiness?.setTextColor(if (ready) 0xFF9BE4BE.toInt() else NothingStyle.foreground)
+        placementInfo?.text = placementExplanation()
         if (overlay || a11y) startIsland()
     }
 
@@ -117,6 +128,7 @@ class MainActivity : AppCompatActivity() {
     private fun showDemo(a: LiveActivity, p: Presentation) {
         demo = a
         demoPresentation = p
+        preview.contentDescription = "${a.mode.name.lowercase()} preview. Hold to expand; swipe up to collapse."
         preview.show(a, p)
     }
 
@@ -202,15 +214,39 @@ class MainActivity : AppCompatActivity() {
 
     // ---------------------------------------------------------------- screen
 
-    private fun buildScreen(): ScrollView {
+    private fun buildScreen(): View {
         val pad = dp(20)
-        val column = LinearLayout(this).apply {
+        val shell = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(pad, dp(20), pad, pad)
+            setBackgroundColor(BG)
+            setPadding(pad, dp(12), pad, 0)
         }
-        column.addView(heading("( 01 )  DROID / NOTHING INSPIRED"), row(-2))
-        column.addView(DotHeading(this), row(dp(64)))
+        shell.addView(label("Dynamic Droid", 28f, NothingStyle.foreground).apply {
+            typeface = android.graphics.Typeface.DEFAULT_BOLD
+            ViewCompat.setAccessibilityHeading(this, true)
+        }, row(-2))
+        readiness = label("Checking your connections…", 13f, NothingStyle.muted).apply {
+            setPadding(0, dp(6), 0, dp(12))
+        }.also { shell.addView(it, row(-2)) }
+        val navRows = listOf(listOf("Playground", "Setup"), listOf("Appearance", "Phone fit"))
+        navRows.forEach { names ->
+            val strip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+            names.forEach { name ->
+                val button = chip(name) { selectPage(name) }
+                button.contentDescription = name
+                navigation[name] = button; strip.addView(button)
+            }
+            shell.addView(strip, row(-2).apply { bottomMargin = dp(6) })
+        }
+        val content = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        fun page(name: String) = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(18), 0, dp(28))
+            pages[name] = this; content.addView(this, row(-2))
+        }
+        var column = page("Playground")
+        column.addView(heading("TRY YOUR ISLAND"), row(-2))
+        column.addView(label("Tap a scene. Hold the island to expand it, or swipe up to collapse.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
         preview = IslandView(this).apply {
             anchorToCutout = false
             callbacks = previewCallbacks
@@ -218,7 +254,11 @@ class MainActivity : AppCompatActivity() {
             applyTheme(theme)
             applyWallpaper(wallpaperStyle, WallpaperSkinStore.image(this@MainActivity))
         }
-        column.addView(FrameLayout(this).apply { addView(preview, FrameLayout.LayoutParams(-1, -1)) }, row(dp(270)))
+        column.addView(FrameLayout(this).apply {
+            background = NothingStyle.panel()
+            setPadding(dp(6), dp(16), dp(6), dp(8))
+            addView(preview, FrameLayout.LayoutParams(-1, -1))
+        }, row(dp(280)).apply { topMargin = dp(16) })
         val musicRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
         musicRow.addView(chip("Music") { showDemo(demoMusic(true), Presentation.EXPANDED) })
         musicRow.addView(chip("Idle") { demo = null; preview.setSecondary(null); preview.show(null, Presentation.IDLE) })
@@ -238,7 +278,38 @@ class MainActivity : AppCompatActivity() {
             preview.setSecondary(null); preview.show(a, Presentation.COMPACT, absorb = true)
         }, row(-2).apply { topMargin = dp(8) })
 
-        column.addView(heading("( 02 )  PHONE FIT"), row(-2).apply { topMargin = dp(24) })
+        column.addView(label("Previews use sample content. Your real activities appear after Setup.", 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(16) })
+        column = page("Phone fit")
+        column.addView(heading("FIT YOUR PHONE"), row(-2))
+        column.addView(label("Choose where the island lives. Automatic adapts to the overlay connection, cutout and screen orientation.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(10) })
+        placementInfo = label(placementExplanation(), 13f, NothingStyle.muted)
+        column.addView(placementInfo, row(-2).apply { topMargin = dp(12) })
+        placementChoices = android.widget.RadioGroup(this).apply {
+            orientation = android.widget.RadioGroup.VERTICAL
+            listOf(IslandPlacement.AUTO to "Automatic (recommended)",
+                IslandPlacement.CAMERA to "Around camera cutout",
+                IslandPlacement.BELOW_STATUS_BAR to "Below status bar").forEach { (mode, title) ->
+                addView(android.widget.RadioButton(this@MainActivity).apply {
+                    id = View.generateViewId(); tag = mode
+                    text = title; textSize = 16f; minHeight = dp(52)
+                    setTextColor(NothingStyle.foreground)
+                    buttonTintList = ColorStateList.valueOf(NothingStyle.foreground)
+                    isChecked = fit.placement == mode
+                }, row(-2))
+            }
+            setOnCheckedChangeListener { group, id ->
+                val selected = group.findViewById<android.widget.RadioButton>(id)?.tag as? IslandPlacement
+                if (selected != null) { fit = fit.copy(placement = selected); updateFit() }
+            }
+        }
+        column.addView(placementChoices, row(-2))
+        column.addView(action("test-fit", "Test on my home screen · 12 seconds") {
+            if (Settings.canDrawOverlays(this) || IslandAccessibilityService.isEnabled(this)) {
+                ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_TEST))
+                startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
+            } else { selectPage("Setup"); toast("Enable an overlay connection first") }
+        }, row(-2).apply { topMargin = dp(10) })
+        column.addView(label("If Samsung or another phone covers the island, select Below status bar, then test again. Adjust the sliders only if needed.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(14) })
         column.addView(fitControl("Size", 70, 130, (fit.scale * 100).toInt(), "%") { fit = fit.copy(scale = it / 100f); updateFit() }, row(-2))
         column.addView(fitControl("Pill width", 70, 150, (fit.pillWidth * 100).toInt(), "%") { fit = fit.copy(pillWidth = it / 100f); updateFit() }, row(-2))
         column.addView(fitControl("Left / right", -180, 180, fit.offsetX.toInt(), "dp") { fit = fit.copy(offsetX = it.toFloat()); updateFit() }, row(-2))
@@ -260,10 +331,16 @@ class MainActivity : AppCompatActivity() {
             val defaults = listOf(30, 30, 180, 24)
             fitSliders.forEachIndexed { index, slider -> slider.progress = defaults[index] }
             cameraSwitch?.isChecked = true
+            placementChoices?.let { group ->
+                (0 until group.childCount).map { group.getChildAt(it) }.firstOrNull { it.tag == IslandPlacement.AUTO }
+                    ?.let { group.check(it.id) }
+            }
             updateFit()
         }, row(-2))
 
-        column.addView(heading("( 03 )  WALLPAPER THEME"), row(-2).apply { topMargin = dp(28) })
+        column = page("Appearance")
+        column.addView(heading("MAKE IT YOURS"), row(-2))
+        column.addView(label("Choose wallpaper accents or a refracted wallpaper background. Changes apply immediately.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(10) })
         themeSwitch = SwitchCompat(this).apply {
             text = "Match island to wallpaper"
             textSize = 16f
@@ -294,7 +371,10 @@ class MainActivity : AppCompatActivity() {
 
         addWallpaperControls(column)
 
-        column.addView(heading("( 05 )  CONNECTIONS"), row(-2).apply { topMargin = dp(28) })
+        column = page("Setup")
+        column.addView(heading("CONNECT YOUR ISLAND"), row(-2))
+        column.addView(label("1. Connect notifications for music, timers and calls.\n2. Enable the camera-area overlay for top-edge placement and taps.\n3. Add usage access for more reliable app-to-island transitions.", 15f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
+        column.addView(label("Display over other apps is a fallback when the camera-area overlay is unavailable. It uses a position below the status bar.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
         column.addView(heading("CLOCK NOTIFICATION STATUS"), row(-2).apply { topMargin = dp(16) })
         clockDiagnostic = label(TimerDiagnostics.read(this), 13f, NothingStyle.muted)
         column.addView(clockDiagnostic, row(-2).apply { topMargin = dp(8) })
@@ -316,14 +396,43 @@ class MainActivity : AppCompatActivity() {
             startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
         }, row(-2).apply { topMargin = dp(10) })
 
-        return ScrollView(this).apply {
-            setBackgroundColor(BG)
-            addView(column)
+        shell.addView(ScrollView(this).apply {
+            isFillViewport = true
+            addView(content)
+        }, LinearLayout.LayoutParams(-1, 0, 1f))
+        ViewCompat.setOnApplyWindowInsetsListener(shell) { view, insets ->
+            val bars = insets.getInsets(androidx.core.view.WindowInsetsCompat.Type.systemBars() or androidx.core.view.WindowInsetsCompat.Type.displayCutout())
+            view.setPadding(pad + bars.left, dp(12) + bars.top, pad + bars.right, bars.bottom)
+            insets
         }
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
+        val connected = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
+        selectPage(if (connected) "Playground" else "Setup")
+        return shell
+    }
+
+    private fun selectPage(name: String) {
+        pages.forEach { (key, view) -> view.visibility = if (key == name) View.VISIBLE else View.GONE }
+        navigation.forEach { (key, button) ->
+            val selected = key == name
+            button.isSelected = selected
+            button.setTextColor(if (selected) Color.BLACK else NothingStyle.foreground)
+            button.background = if (selected) GradientDrawable().apply {
+                cornerRadius = dp(18).toFloat(); setColor(NothingStyle.foreground)
+            } else NothingStyle.panel()
+            ViewCompat.setStateDescription(button, if (selected) "Selected" else "")
+        }
+        pages[name]?.parent?.let { (it as? View)?.parent as? ScrollView }?.scrollTo(0, 0)
+    }
+
+    private fun placementExplanation(): String = when {
+        fit.placement == IslandPlacement.BELOW_STATUS_BAR -> "Below status bar • avoids system clock and icon overlap"
+        IslandAccessibilityService.instance != null -> "Camera-area overlay connected • Automatic follows the camera in portrait"
+        else -> "Standard overlay • Automatic keeps the island below the status bar"
     }
 
     private fun addWallpaperControls(column: LinearLayout) {
-        column.addView(heading("( 04 )  WALLPAPER GLASS"), row(-2).apply { topMargin = dp(28) })
+        column.addView(heading("WALLPAPER GLASS"), row(-2).apply { topMargin = dp(28) })
         column.addView(label("Choose your wallpaper image. It stays still beneath the refracted glass.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
         column.addView(action("wallpaper-pick", "Choose wallpaper image") { pickWallpaper.launch("image/*") }, row(-2).apply { topMargin = dp(12) })
         wallpaperSwitch = SwitchCompat(this).apply {
@@ -471,6 +580,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun updateFit() {
         IslandPreferences.save(this, fit)
+        placementInfo?.text = placementExplanation()
         preview.applyFit(fit.copy(offsetY = 0f))
         if (Settings.canDrawOverlays(this) || IslandAccessibilityService.isEnabled(this)) {
             ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_FIT))

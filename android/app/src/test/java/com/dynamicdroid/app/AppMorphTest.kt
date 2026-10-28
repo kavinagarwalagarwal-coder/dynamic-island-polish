@@ -23,6 +23,20 @@ class AppMorphTest {
             assertTrue(g.top >= 0f); assertTrue(g.top + g.height <= 800f)
         }
     }
+    @Test fun flightArrivesWithoutTheOldVerticalVelocityDiscontinuity() {
+        val g = AppMorphGeometry()
+        fun center(p: Float): Float {
+            g.update(p, 360f, 800f, 180f, 8f, 232f, 36f, 1f)
+            return g.top + g.height / 2f
+        }
+        val before = center(.849f)
+        val landing = center(.85f)
+        val after = center(.851f)
+        assertEquals(26f, landing, .01f)
+        assertTrue(kotlin.math.abs(landing - before) < .1f)
+        assertTrue(kotlin.math.abs(after - landing) < .1f)
+    }
+
     @Test fun leavingAHiddenOwnerForHomeCanAnimateButOtherSwitchesCannot() {
         val shelf = ActivityShelf<String>({ it }, { 1 })
         shelf.put("music.app")

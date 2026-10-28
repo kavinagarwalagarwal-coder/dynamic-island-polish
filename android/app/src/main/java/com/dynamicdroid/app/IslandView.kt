@@ -54,12 +54,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fun onDismiss(activity: LiveActivity) {}
         fun onInteraction() {}
         fun onSettled() {}
+        fun onAnchorChanged() {}
         /** Another app went fullscreen (video, photos, games) or came back out of it. */
         fun onFullscreenChanged(fullscreen: Boolean) {}
     }
 
     var callbacks: Callbacks? = null
     var anchorToCutout = true
+    var accessibilityHost = true
+    private var statusBarHeight = 0f
+    private var windowOriginY = 0f
+    private var wideCutout = false
+    private val windowLocation = IntArray(2)
 
     var activity: LiveActivity? = null
         private set
@@ -190,7 +196,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun updateAnchor() {
         val physicalTop = if (anchorToCutout && fit.alignCamera) cameraTop ?: dp(8f) else dp(8f)
-        baseTop = max(0f, physicalTop + dp(fit.offsetY)) / fit.scale
+        val below = anchorToCutout && IslandPlacementPolicy.belowStatusBar(fit.placement,
+            accessibilityHost, wideCutout, resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE)
+        val statusBottom = max(0f, statusBarHeight - windowOriginY)
+        baseTop = IslandPlacementPolicy.top(physicalTop, statusBottom, below, dp(fit.offsetY), dp(6f)) / fit.scale
         if (!isAbsorbing) topS.target = targetTop(presentation)
     }
 
@@ -206,7 +215,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // Stiffer press so the squish lands on the finger's first frame.
     private val pressS = Spring(1f, 760f, 0.76f, 0.0008f)
     private val stretchS = Spring(0f, 360f, 0.78f, 0.5f)
-    private val absorbS = Spring(0f, 65f, 0.90f, 0.003f)
+    private val absorbS = Spring(0f, 78f, 0.94f, 0.003f)
     private val appMorph = AppMorphGeometry()
     private var morphCard: Bitmap? = null
     private var softMorphCard: Bitmap? = null
@@ -614,18 +623,33 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
-        if (anchorToCutout && Build.VERSION.SDK_INT >= 28) {
-            val dm = resources.displayMetrics
-            val cut = insets.displayCutout?.boundingRects
-                ?.minByOrNull { abs(it.exactCenterX() - dm.widthPixels / 2f) }
-            if (cut != null && cut.top < dp(80f)) {
-                cutoutCenterY = cut.exactCenterY()
-                cutoutDiameter = min(cut.width(), cut.height()).toFloat().coerceIn(dp(8f), dp(40f))
-                cameraTop = max(dp(4f), cut.exactCenterY() - dp(18f))
-                cameraX = cut.exactCenterX()
-                updateAnchor()
-                kick()
+        if (anchorToCutout) {
+            getLocationOnScreen(windowLocation)
+            windowOriginY = windowLocation[1].toFloat()
+            val fallbackId = resources.getIdentifier("status_bar_height", "dimen", "android")
+            val fallback = if (fallbackId != 0) resources.getDimensionPixelSize(fallbackId).toFloat() else dp(24f)
+            statusBarHeight = if (Build.VERSION.SDK_INT >= 30)
+                max(fallback, insets.getInsetsIgnoringVisibility(WindowInsets.Type.statusBars()).top.toFloat())
+                else max(fallback, insets.systemWindowInsetTop.toFloat())
+            cameraX = null; cameraTop = null; cutoutCenterY = null; cutoutDiameter = null; wideCutout = false
+            if (Build.VERSION.SDK_INT >= 28) {
+                // Ignore side and bottom cutouts after rotation. Rects are relative to this window.
+                val cut = insets.displayCutout?.boundingRects?.filter { it.top <= dp(80f) && it.width() > 0 && it.height() > 0 }
+                    ?.minByOrNull { abs(it.exactCenterX() - resources.displayMetrics.widthPixels / 2f) }
+                if (cut != null) {
+                    wideCutout = cut.width() > dp(96f)
+                    cutoutCenterY = cut.exactCenterY()
+                    cutoutDiameter = min(cut.width(), cut.height()).toFloat().coerceIn(dp(8f), dp(40f))
+                    cameraTop = max(dp(4f), cut.exactCenterY() - dp(18f))
+                    cameraX = cut.exactCenterX()
+                    statusBarHeight = max(statusBarHeight, cut.bottom + windowOriginY)
+                }
             }
+            val previousTop = baseTop
+            updateAnchor()
+            // Reserve space before moving downward; otherwise a short idle window clips on OEMs.
+            if (abs(previousTop - baseTop) > .5f) callbacks?.onAnchorChanged()
+            settled = false; kick()
         }
         // Videos, photos and games hide the system status bar; overlays see that in their insets.
         if (anchorToCutout && Build.VERSION.SDK_INT >= 30) {
@@ -1244,7 +1268,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun drawAbsorb(canvas: Canvas, absorb: Float) {
         val image = morphCard ?: return
-        val alpha = ((1f - appMorph.reveal) * 255).toInt().coerceIn(0, 255)
+        val fade = ((1f - absorb - .28f) / .44f).coerceIn(0f, 1f)
+        val cardVisibility = 1f - fade * fade * (3f - 2f * fade)
+        val alpha = ((1f - appMorph.reveal) * cardVisibility * 255).toInt().coerceIn(0, 255)
         val blur = (sin((1f - absorb) * Math.PI).toFloat() * .85f).coerceIn(0f, 1f)
         morphPaint.alpha = alpha
         canvas.drawBitmap(image, null, rect, morphPaint)

@@ -18,30 +18,33 @@ class AppMorphGeometry {
         val needleWidth = min(14f * density, targetHeight * .5f)
         val needleHeight = targetHeight * .65f
         var cx = screenWidth / 2f
-        var cy: Float
+        val flight = smooth((p / .85f).coerceIn(0f, 1f))
+        val startY = screenHeight * .47f
+        val endY = targetTop + targetHeight / 2f
+        val u = 1f - flight
+        val cy = u*u*u*startY + 3f*u*u*flight*(screenHeight * .64f) +
+            3f*u*flight*flight*(endY + screenHeight * .10f) + flight*flight*flight*endY
         when {
             p < .45f -> {
                 val t = smooth(p / .45f)
                 width = mix(screenWidth * .88f, screenWidth * .14f, t)
                 height = mix(screenHeight * .84f, screenHeight * .28f, t)
-                cy = mix(screenHeight * .47f, screenHeight * .60f, t)
                 radius = mix(36f * density, 12f * density, t)
             }
             p < .85f -> {
                 val t = (p - .45f) / .40f
-                val travel = t * t
                 width = mix(screenWidth * .14f, needleWidth, smooth(t))
                 height = mix(screenHeight * .28f, needleHeight, smooth(t))
                 cx = mix(cx, targetX, smooth(t))
-                cy = mix(screenHeight * .60f, targetTop + targetHeight / 2f, travel)
                 radius = mix(12f * density, needleWidth / 2f, smooth(t))
             }
             else -> {
                 val t = (p - .85f) / .15f
-                val open = 1f - (1f - t) * (1f - t) * (1f - t)
-                width = mix(needleWidth, targetWidth, open)
+                val open = smooth(t)
+                val settle = kotlin.math.sin(t * Math.PI).toFloat() * t * (1f - t) * .10f
+                width = mix(needleWidth, targetWidth, open) + targetWidth * settle
                 height = mix(needleHeight, targetHeight, open)
-                cx = targetX; cy = targetTop + targetHeight / 2f
+                cx = targetX
                 radius = mix(needleWidth / 2f, targetHeight / 2f, open)
             }
         }
@@ -52,7 +55,7 @@ class AppMorphGeometry {
         reveal = smooth(((p - .90f) / .10f).coerceIn(0f, 1f))
     }
     private fun mix(a: Float, b: Float, t: Float) = a + (b - a) * t
-    private fun smooth(t: Float) = t.coerceIn(0f, 1f).let { it * it * (3f - 2f * it) }
+    private fun smooth(t: Float) = t.coerceIn(0f, 1f).let { it * it * it * (it * (it * 6f - 15f) + 10f) }
 }
 
 object AppReturnPolicy {
