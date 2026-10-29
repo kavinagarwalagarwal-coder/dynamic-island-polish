@@ -175,7 +175,10 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                     packageManager.getLaunchIntentForPackage(pkg) != null)) watcher?.hint(pkg)
         }
         status = StatusMonitor(this) { info -> island?.applyStatus(info) }.also { it.start() }
-        IslandAccessibilityService.onChanged = { handler.post { reattach() } }
+        IslandAccessibilityService.onChanged = { handler.post {
+            reattach()
+            if (activities.all().isNotEmpty()) watcher?.start()
+        } }
         attachWindow()
         IslandBus.listener = this
         if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)

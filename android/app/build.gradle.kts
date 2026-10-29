@@ -41,7 +41,7 @@ android {
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
-            // Preserve update compatibility with the previously installed debug APK.
+            // Installable test build; uses the same key as this CI run's debug variant.
             signingConfig = signingConfigs.getByName("debug")
             matchingFallbacks += listOf("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
