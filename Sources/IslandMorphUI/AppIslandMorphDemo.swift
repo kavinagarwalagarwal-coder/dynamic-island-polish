@@ -82,7 +82,6 @@ public struct AppIslandMorphDemo: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 24)
             }
-            .contentShape(Rectangle())
             .onAppear {
                 // Opening the demo mimics leaving a media app: its full-screen
                 // surface contracts into the island. Tapping the pill reverses it.
@@ -206,7 +205,6 @@ public struct AppIslandMorphDemo: View {
             .frame(width: width, height: height)
             .background(Color.black)
             .clipShape(Capsule())
-            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Open the activity dashboard")
