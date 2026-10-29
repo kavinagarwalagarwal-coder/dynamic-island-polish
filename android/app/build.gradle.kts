@@ -58,7 +58,7 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp")
     implementation("org.commonmark:commonmark:0.28.0")
     implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.28.0")
-    implementation("org.jetbrains.kotlin:kotlin-reflect:2.1.0")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:2.3.10")
     implementation("io.coil-kt.coil3:coil-compose:3.4.0")
     debugImplementation(fileTree(mapOf("dir" to "libs/debug", "include" to listOf("*.aar", "*.jar"))))
     releaseImplementation(fileTree(mapOf("dir" to "libs/release", "include" to listOf("*.aar", "*.jar"))))
