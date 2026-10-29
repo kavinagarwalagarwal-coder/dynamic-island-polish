@@ -35,6 +35,7 @@ class SwiftIslandMorphView(context: Context, activity: LiveActivity) : FrameLayo
                     title = activity.title,
                     subtitle = activity.subtitle,
                     appLabel = activity.appLabel,
+                    isOverlay = true,
                     onClose = {},
                 ).Compose(context = ComposeContext())
             }

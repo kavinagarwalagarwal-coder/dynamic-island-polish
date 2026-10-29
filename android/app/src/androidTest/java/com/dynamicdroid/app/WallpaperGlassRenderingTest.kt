@@ -64,18 +64,24 @@ class WallpaperGlassRenderingTest {
                 view.applyWallpaper(WallpaperStyle(enabled = true, strength = .65f), image)
                 view.setSecondary(timer); view.show(music, Presentation.COMPACT)
             }
+            var motionEffects = 0
+            var motionRecordings = 0
             android.os.SystemClock.sleep(1000)
             scenario.onActivity { activity ->
                 val view = find(activity.window.decorView)!!
                 val glass = IslandView::class.java.getDeclaredField("liquidGlass").apply { isAccessible = true }.get(view) as WallpaperLiquidGlass
                 assertTrue("AGSL shader did not compile", glass.hasRuntimeShader)
                 assertTrue("Lens never executed on GPU", glass.wasHardwareRendered)
+                motionEffects = glass.effectBuilds
+                motionRecordings = glass.recordings
                 view.show(music, Presentation.EXPANDED)
             }
             android.os.SystemClock.sleep(1000)
             val area = Rect()
             scenario.onActivity { activity ->
                 val view = find(activity.window.decorView)!!
+                assertTrue("Glass effect rebuilt on animation frames", glass(view).effectBuilds - motionEffects <= 2)
+                assertTrue("Wallpaper re-recorded on animation frames", glass(view).recordings - motionRecordings <= 2)
                 val location = IntArray(2); view.getLocationOnScreen(location)
                 val rect = IslandView::class.java.getDeclaredField("rect").apply { isAccessible = true }.get(view) as RectF
                 area.set((location[0] + rect.left).toInt(), (location[1] + rect.top).toInt(),

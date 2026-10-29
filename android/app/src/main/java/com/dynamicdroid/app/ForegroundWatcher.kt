@@ -31,11 +31,15 @@ class ForegroundWatcher(private val context: Context, private val onChange: (Str
     }
 
     fun start() {
-        if (running) return
-        polling = hasPermission(context)
-        if (!polling && !IslandAccessibilityService.isEnabled(context)) return
+        // Accessibility already supplies foreground events; avoid a second main-thread
+        // UsageStats binder query every 450ms while that fast path is connected.
+        val needsPolling = IslandAccessibilityService.instance == null && hasPermission(context)
+        if (running && polling == needsPolling) return
+        handler.removeCallbacks(tick)
+        polling = needsPolling
+        if (!polling && !IslandAccessibilityService.isEnabled(context)) { running = false; return }
+        if (!running) since = System.currentTimeMillis() - 60_000L
         running = true
-        since = System.currentTimeMillis() - 60_000L
         if (polling) handler.post(tick)
     }
 

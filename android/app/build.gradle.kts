@@ -6,6 +6,7 @@ plugins {
 
 android {
     namespace = "com.dynamicdroid.app"
+    testBuildType = if (providers.gradleProperty("optimizedTest").orNull == "true") "performance" else "debug"
     compileSdk = 36
 
     defaultConfig {
@@ -13,8 +14,8 @@ android {
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 11
-        versionName = "1.6.0"
+        versionCode = 12
+        versionName = "1.6.1"
     }
 
     buildFeatures {
@@ -31,6 +32,19 @@ android {
     kotlin {
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
+    }
+
+    buildTypes {
+        create("performance") {
+            initWith(getByName("release"))
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // Preserve update compatibility with the previously installed debug APK.
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 
@@ -65,6 +79,7 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect:2.3.10")
     implementation("io.coil-kt.coil3:coil-compose:3.4.0")
     debugImplementation(fileTree(mapOf("dir" to "libs/debug", "include" to listOf("*.aar", "*.jar"))))
+    add("performanceImplementation", fileTree(mapOf("dir" to "libs/release", "include" to listOf("*.aar", "*.jar"))))
     releaseImplementation(fileTree(mapOf("dir" to "libs/release", "include" to listOf("*.aar", "*.jar"))))
 
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

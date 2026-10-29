@@ -726,7 +726,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         clip.addRoundRect(rect, r, r, Path.Direction.CW)
         canvas.save()
         canvas.clipPath(clip)
-        if (absorb < .06f) liquidGlass.draw(canvas, rect, r, bodyAlpha, wallpaperSkin)
+        if (absorb < .06f) liquidGlass.draw(canvas, rect, r, bodyAlpha, wallpaperSkin,
+            resizing = !widthS.isAtRest || !heightS.isAtRest || !radiusS.isAtRest)
 
         val ea = expandedA.value.coerceIn(0f, 1f) * reveal
         val ca = compactA.value.coerceIn(0f, 1f) * reveal

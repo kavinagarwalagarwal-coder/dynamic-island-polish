@@ -28,13 +28,13 @@ class WallpaperLiquidGlass(private val context: Context) {
     private var failed = false
     fun resetFailure() { failed = false }
     fun release() { backend?.release(); backend = null }
-    fun draw(canvas: Canvas, rect: RectF, radius: Float, alpha: Int, renderer: WallpaperSkinRenderer) {
+    fun draw(canvas: Canvas, rect: RectF, radius: Float, alpha: Int, renderer: WallpaperSkinRenderer, resizing: Boolean = false) {
         if (!renderer.enabled || alpha <= 0 || rect.width() <= 0f || rect.height() <= 0f) return
         if (renderer.style.glass && canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= 33 && !failed) {
             try {
                 val current = backend ?: Backend().also { backend = it }
                 WallpaperRecovery.markRendering(context)
-                current.draw(canvas, rect, radius, alpha, renderer)
+                current.draw(canvas, rect, radius, alpha, renderer, resizing)
                 wasHardwareRendered = true
                 return
             } catch (_: RuntimeException) {
@@ -66,10 +66,15 @@ class WallpaperLiquidGlass(private val context: Context) {
         var recordings = 0
             private set
         fun release() { node.discardDisplayList(); node.setRenderEffect(null); lastImage = null; lastStyle = null }
-        fun draw(canvas: Canvas, rect: RectF, radius: Float, alpha: Int, renderer: WallpaperSkinRenderer) {
-            val width = ceil(rect.width()).toInt().coerceAtLeast(1)
-            val height = ceil(rect.height()).toInt().coerceAtLeast(1)
-            val r = (kotlin.math.round(radius * 4f) / 4f).coerceIn(0f, min(width, height) / 2f)
+        fun draw(canvas: Canvas, rect: RectF, radius: Float, alpha: Int, renderer: WallpaperSkinRenderer, resizing: Boolean) {
+            // Animate the cached lens as a layer; rebuild at the exact bounds once motion settles.
+            // Do not magnify the tiny idle dot into a full-size wallpaper texture.
+            val reuse = resizing && lastWidth >= 64 && lastHeight >= 32 &&
+                renderer.image === lastImage && renderer.style == lastStyle
+            val width = if (reuse) lastWidth else ceil(rect.width()).toInt().coerceAtLeast(1)
+            val height = if (reuse) lastHeight else ceil(rect.height()).toInt().coerceAtLeast(1)
+            val r = if (reuse) lastRadius else
+                (kotlin.math.round(radius * 4f) / 4f).coerceIn(0f, min(width, height) / 2f)
             val resized = width != lastWidth || height != lastHeight
             if (resized || renderer.image !== lastImage || renderer.style != lastStyle) {
                 local.set(0f, 0f, width.toFloat(), height.toFloat())
@@ -99,6 +104,7 @@ class WallpaperLiquidGlass(private val context: Context) {
             val save = canvas.save()
             try {
                 canvas.translate(rect.left, rect.top)
+                canvas.scale(rect.width() / width, rect.height() / height)
                 node.alpha = alpha / 255f
                 canvas.drawRenderNode(node)
                 rim.alpha = alpha

@@ -360,6 +360,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
      */
     private fun startSwiftMorph(activity: LiveActivity): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
+        if (swiftMorphActive) return true
         removeSwiftMorph()
         val wm = windowManager ?: return false
         val accessibility = IslandAccessibilityService.instance
