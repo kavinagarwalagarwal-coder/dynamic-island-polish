@@ -26,13 +26,13 @@ public struct AppIslandMorphDemo: View {
     public var body: some View {
         GeometryReader { geometry in
             let screen = geometry.size
-            let progress: CGFloat = isCompact ? 1 : 0
-            let pillWidth = min(150, max(118, screen.width - 32))
+            let progress: CGFloat = isCompact ? 1.0 : 0.0
+            let pillWidth = min(150.0, max(118.0, screen.width - 32.0))
             let pillHeight: CGFloat = 40
             let shellWidth = screen.width + (pillWidth - screen.width) * progress
             let shellHeight = screen.height + (pillHeight - screen.height) * progress
             let centerY = screen.height / 2 + (28 - screen.height / 2) * progress
-            let cornerRadius = 32 + (20 - 32) * progress
+            let cornerRadius = 32.0 + (20.0 - 32.0) * progress
 
             ZStack {
                 Color.black.ignoresSafeArea()
@@ -53,7 +53,7 @@ public struct AppIslandMorphDemo: View {
                         // changing shell. The center anchor makes it converge on
                         // the camera/island position as the shell moves upward.
                         .scaleEffect(
-                            x: shellWidth / max(screen.width, 1),
+                            x: shellWidth / max(screen.width, 1.0),
                             y: shellHeight / max(screen.height, 1),
                             anchor: .center
                         )
@@ -126,7 +126,7 @@ public struct AppIslandMorphDemo: View {
             HStack(spacing: 8) {
                 Capsule().fill(Color.white.opacity(0.16)).frame(height: 4)
                     .overlay(alignment: .leading) {
-                        Capsule().fill(Color(red: 0.48, green: 0.82, blue: 1)).frame(width: size.width * 0.36, height: 4)
+                        Capsule().fill(Color(red: 0.48, green: 0.82, blue: 1)).frame(width: size.width * 0.36, height: 4.0)
                     }
             }
             .padding(.top, 28)
@@ -167,7 +167,7 @@ public struct AppIslandMorphDemo: View {
                 .padding(.vertical, 15)
                 .background(Color.white, in: Capsule())
             }
-            .padding(.bottom, max(30, size.height * 0.06))
+            .padding(.bottom, max(30.0, size.height * 0.06))
         }
         .padding(.horizontal, 24)
         .frame(width: size.width, height: size.height, alignment: .topLeading)
