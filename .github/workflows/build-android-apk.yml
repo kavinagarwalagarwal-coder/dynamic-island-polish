@@ -25,11 +25,18 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        id: skip-libraries
+        with:
+          path: android/app/libs
+          key: skip-libraries-v1-${{ runner.os }}-${{ hashFiles('Package.swift', 'Package.resolved', 'Sources/IslandMorphUI/**') }}
       - name: Install Skip
+        if: steps.skip-libraries.outputs.cache-hit != 'true'
         run: |
           brew tap skiptools/skip
           brew install skip
       - name: Export SwiftUI morph for Android
+        if: steps.skip-libraries.outputs.cache-hit != 'true'
         run: |
           skip export --project . --module IslandMorphUI --dir android/app/libs/debug --debug
           skip export --project . --module IslandMorphUI --dir android/app/libs/release --release
