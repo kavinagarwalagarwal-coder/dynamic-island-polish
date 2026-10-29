@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.dynamicdroid.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.dynamicdroid.app"
