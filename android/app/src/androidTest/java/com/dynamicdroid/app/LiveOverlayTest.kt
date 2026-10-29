@@ -83,23 +83,20 @@ class LiveOverlayTest {
                         field<IslandView?>(service, "island")?.activity == null
                 }
                 shell("input keyevent KEYCODE_HOME")
-                await("Leaving the real player for Home did not trigger the handoff") {
+                await("Leaving the real player for Home did not start the SwiftUI morph") {
                     val service = IslandBus.listener as? IslandOverlayService ?: return@await false
-                    field<IslandView?>(service, "island")?.isAbsorbing == true
-                }
-                instrumentation.runOnMainSync {
-                    val service = IslandBus.listener as IslandOverlayService
-                    val view = field<IslandView>(service, "island")
-                    val window = field<android.view.WindowManager.LayoutParams>(service, "params")
-                    assertNotNull("No notification-derived card", field<Bitmap?>(view, "morphCard"))
-                    assertTrue("Flying card blocks Home touches", window.flags and android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0)
+                    field<Boolean>(service, "swiftMorphActive") &&
+                        field<SwiftIslandMorphView?>(service, "morphOverlay") != null &&
+                        field<IslandView?>(service, "island")?.isConcealed == true
                 }
                 capture("live-app-to-island")
-                await("Handoff did not settle into a touchable compact island") {
+                await("SwiftUI handoff did not settle into a touchable compact island") {
                     val service = IslandBus.listener as? IslandOverlayService ?: return@await false
                     val view = field<IslandView>(service, "island")
                     val window = field<android.view.WindowManager.LayoutParams>(service, "params")
-                    !view.isAbsorbing && view.activity?.mode == IslandMode.MUSIC &&
+                    !field<Boolean>(service, "swiftMorphActive") &&
+                        field<SwiftIslandMorphView?>(service, "morphOverlay") == null &&
+                        view.activity?.mode == IslandMode.MUSIC &&
                         window.height < view.resources.displayMetrics.heightPixels / 2 &&
                         window.flags and android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0
                 }
