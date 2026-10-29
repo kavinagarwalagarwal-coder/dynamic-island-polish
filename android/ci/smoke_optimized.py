@@ -11,8 +11,27 @@ def adb(*args, timeout=25):
     return subprocess.check_output(["adb", *args], timeout=timeout).decode(errors="replace")
 
 def hierarchy():
-    adb("shell", "uiautomator", "dump", "/sdcard/optimized-ui.xml")
-    return ET.fromstring(adb("exec-out", "cat", "/sdcard/optimized-ui.xml"))
+    for attempt in range(3):
+        adb("shell", "uiautomator", "dump", "/sdcard/optimized-ui.xml")
+        root = ET.fromstring(adb("exec-out", "cat", "/sdcard/optimized-ui.xml"))
+        labels = [node.get("text", "").casefold() for node in root.iter("node")]
+        launcher_anr = any(("quickstep" in text or "launcher" in text) and
+                           ("isn't responding" in text or "is not responding" in text)
+                           for text in labels)
+        if not launcher_anr:
+            return root
+        # Dismiss only the emulator launcher's ANR. Never hide an app ANR.
+        closed = False
+        for node in root.iter("node"):
+            if node.get("text", "").casefold() == "close app":
+                bounds = list(map(int, re.findall(r"\d+", node.get("bounds", ""))))
+                if len(bounds) == 4:
+                    adb("shell", "input", "tap", str((bounds[0] + bounds[2]) // 2), str((bounds[1] + bounds[3]) // 2))
+                    closed = True
+                    break
+        assert closed, "Cannot dismiss emulator launcher ANR"
+        time.sleep(.5)
+    raise AssertionError("Emulator launcher repeatedly stopped responding")
 
 def click(label, scroll=False):
     for attempt in range(8 if scroll else 4):

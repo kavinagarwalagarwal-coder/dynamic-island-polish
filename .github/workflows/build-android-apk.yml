@@ -188,6 +188,7 @@ jobs:
           api-level: 36
           arch: x86_64
           profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -memory 3072 -cores 2
           disable-animations: false
           script: |
             adb install -r optimized-apk/app-performance.apk
