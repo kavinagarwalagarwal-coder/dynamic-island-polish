@@ -6,7 +6,6 @@ plugins {
 
 android {
     namespace = "com.dynamicdroid.app"
-    testBuildType = if (providers.gradleProperty("optimizedTest").orNull == "true") "performance" else "debug"
     compileSdk = 36
 
     defaultConfig {

@@ -9,7 +9,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
 
-/** Run against the optimized APK too: catches reflection/resource errors hidden by debug builds. */
+/** Basic SwiftUI composition startup guard for the instrumented UI suite. */
 @RunWith(AndroidJUnit4::class)
 class SwiftMorphSmokeTest {
     @Test fun swiftCompositionSurvivesTheFullMorph() {

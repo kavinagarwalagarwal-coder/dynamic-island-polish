@@ -122,7 +122,9 @@ jobs:
             adb shell pm grant com.dynamicdroid.fixture android.permission.POST_NOTIFICATIONS
             gradle --no-daemon -p android :app:connectedDebugAndroidTest
             adb pull /sdcard/Pictures/IslandSmoke island-screenshots
-            gradle --no-daemon -p android :app:connectedPerformanceAndroidTest -PoptimizedTest=true -Pandroid.testInstrumentationRunnerArguments.class=com.dynamicdroid.app.SwiftMorphSmokeTest
+            gradle --no-daemon -p android :app:assemblePerformance
+            adb install -r android/app/build/outputs/apk/performance/app-performance.apk
+            python3 android/ci/smoke_optimized.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
