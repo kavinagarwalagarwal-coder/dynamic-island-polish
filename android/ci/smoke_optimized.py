@@ -6,6 +6,7 @@ import time
 import xml.etree.ElementTree as ET
 
 PACKAGE = "com.dynamicdroid.app"
+recording = None
 
 def adb(*args, timeout=25):
     return subprocess.check_output(["adb", *args], timeout=timeout).decode(errors="replace")
@@ -54,6 +55,7 @@ def check_crash():
     assert "FATAL EXCEPTION" not in adb("logcat", "-d", "-s", "AndroidRuntime:E"), "Optimized app crashed"
 
 def main():
+    global recording
     adb("shell", "am", "force-stop", PACKAGE)
     adb("logcat", "-c")
     adb("shell", "pm", "grant", PACKAGE, "android.permission.POST_NOTIFICATIONS")
@@ -81,6 +83,10 @@ def main():
     adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "player")
     time.sleep(1)
     before = adb("shell", "pidof", PACKAGE).strip()
+    recording = subprocess.Popen(
+        ["adb", "shell", "screenrecord", "--time-limit", "4", "/sdcard/island-return.mp4"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    time.sleep(.3)
     adb("shell", "input", "keyevent", "KEYCODE_HOME")
     time.sleep(2)
     check_crash()
@@ -93,6 +99,13 @@ try:
 finally:
     output = pathlib.Path("island-screenshots")
     output.mkdir(parents=True, exist_ok=True)
+    if recording is not None:
+        try:
+            recording.wait(timeout=8)
+            if recording.returncode == 0:
+                adb("pull", "/sdcard/island-return.mp4", str(output / "optimized-island-return.mp4"))
+        except (subprocess.SubprocessError, OSError) as error:
+            print("Transition recording:", error)
     for name, command in [
         ("optimized-swiftui-morph.png", ["adb", "exec-out", "screencap", "-p"]),
         ("optimized-logcat.txt", ["adb", "logcat", "-d", "-s", "AndroidRuntime:E"]),

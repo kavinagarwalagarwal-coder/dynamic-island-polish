@@ -330,7 +330,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             else -> null to Presentation.IDLE
         }
         // Calls stay visible even over fullscreen video; everything else steps aside.
-        val swiftMorphStarted = absorb && a != null && startSwiftMorph(a)
+        val swiftMorphStarted = absorb && t == null && p == Presentation.COMPACT &&
+            a != null && startSwiftMorph(a)
         val concealed = fullscreen && a?.mode != IslandMode.CALL
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
