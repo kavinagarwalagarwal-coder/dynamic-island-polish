@@ -359,6 +359,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
      * and all post-morph live activity updates continue to use the existing service.
      */
     private fun startSwiftMorph(activity: LiveActivity): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
         removeSwiftMorph()
         val wm = windowManager ?: return false
         val accessibility = IslandAccessibilityService.instance
