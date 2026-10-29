@@ -87,7 +87,17 @@ class LiveOverlayTest {
                     val service = IslandBus.listener as? IslandOverlayService ?: return@await false
                     field<Boolean>(service, "swiftMorphActive") &&
                         field<SwiftIslandMorphView?>(service, "morphOverlay") != null &&
-                        field<IslandView?>(service, "island")?.isConcealed == true
+                        field<IslandView?>(service, "island")?.alpha == 0f
+                }
+                instrumentation.runOnMainSync {
+                    val service = IslandBus.listener as IslandOverlayService
+                    val overlay = field<SwiftIslandMorphView>(service, "morphOverlay")
+                    val layout = overlay.layoutParams as android.view.WindowManager.LayoutParams
+                    val view = field<IslandView>(service, "island")
+                    val expected = view.returnHandoffBounds(view.activity!!)
+                    assertTrue("Live entrance must stay in the status area, never cover Home",
+                        layout.height < view.resources.displayMetrics.heightPixels / 4)
+                    assertTrue(kotlin.math.abs(layout.height - (expected.bottom + 16f * view.resources.displayMetrics.density).toInt()) <= 1)
                 }
                 capture("live-app-to-island")
                 await("SwiftUI handoff did not settle into a touchable compact island") {
