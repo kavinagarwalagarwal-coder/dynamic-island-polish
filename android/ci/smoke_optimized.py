@@ -68,7 +68,25 @@ def main():
     assert adb("shell", "pidof", PACKAGE).strip(), "Optimized app stopped"
     root = hierarchy()
     assert any("close preview" in (node.get("text", "") + node.get("content-desc", "")).casefold() for node in root.iter("node")), "SwiftUI controls did not render"
-    print("Optimized APK: MainActivity, SwiftUI composition, and morph startup passed.")
+    click("Close preview")
+    adb("shell", "pm", "grant", "com.dynamicdroid.fixture", "android.permission.POST_NOTIFICATIONS")
+    adb("shell", "appops", "set", PACKAGE, "SYSTEM_ALERT_WINDOW", "allow")
+    adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + PACKAGE + ".IslandNotificationListener")
+    adb("shell", "settings", "put", "secure", "enabled_accessibility_services", PACKAGE + "/" + PACKAGE + ".IslandAccessibilityService")
+    adb("shell", "settings", "put", "secure", "accessibility_enabled", "1")
+    time.sleep(1)
+    fixture = "com.dynamicdroid.fixture/.FixtureActivity"
+    adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "custom")
+    time.sleep(1)
+    adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "player")
+    time.sleep(1)
+    before = adb("shell", "pidof", PACKAGE).strip()
+    adb("shell", "input", "keyevent", "KEYCODE_HOME")
+    time.sleep(2)
+    check_crash()
+    assert adb("shell", "pidof", PACKAGE).strip() == before, "App restarted during the live handoff"
+    assert "SwiftUI morph started" in adb("logcat", "-d", "-s", "IslandHandoff:I"), "Live SwiftUI handoff did not start"
+    print("Optimized standalone APK: SwiftUI preview and real player-to-Home handoff passed.")
 
 try:
     main()

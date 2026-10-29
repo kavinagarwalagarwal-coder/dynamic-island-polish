@@ -67,7 +67,7 @@ jobs:
           gradle-version: "8.13"
 
       - name: Build APK
-        run: gradle --no-daemon -Pkotlin.jvm.target.validation.mode=warning -p android :app:testDebugUnitTest :app:assembleDebug :app:assemblePerformance
+        run: gradle --no-daemon -Pkotlin.jvm.target.validation.mode=warning -p android :app:testDebugUnitTest :app:assembleDebug :app:assemblePerformance :notification-fixture:assembleDebug
 
       - uses: actions/upload-artifact@v4
         with:
@@ -78,6 +78,11 @@ jobs:
         with:
           name: dynamic-droid-optimized-apk
           path: android/app/build/outputs/apk/performance/app-performance.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notification-fixture-apk
+          path: android/notification-fixture/build/outputs/apk/debug/notification-fixture-debug.apk
 
   swift:
     runs-on: macos-latest
@@ -177,6 +182,10 @@ jobs:
         with:
           name: dynamic-droid-optimized-apk
           path: optimized-apk
+      - uses: actions/download-artifact@v4
+        with:
+          name: notification-fixture-apk
+          path: notification-fixture
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -192,6 +201,7 @@ jobs:
           disable-animations: false
           script: |
             adb install -r optimized-apk/app-performance.apk
+            adb install -r notification-fixture/notification-fixture-debug.apk
             python3 android/ci/smoke_optimized.py
       - uses: actions/upload-artifact@v4
         if: always()
