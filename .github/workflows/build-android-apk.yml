@@ -122,9 +122,6 @@ jobs:
             adb shell pm grant com.dynamicdroid.fixture android.permission.POST_NOTIFICATIONS
             gradle --no-daemon -p android :app:connectedDebugAndroidTest
             adb pull /sdcard/Pictures/IslandSmoke island-screenshots
-            gradle --no-daemon -p android :app:assemblePerformance
-            adb install -r android/app/build/outputs/apk/performance/app-performance.apk
-            python3 android/ci/smoke_optimized.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -169,3 +166,34 @@ jobs:
         with:
           name: compatibility-api-${{ matrix.api }}
           path: android/app/build/outputs/androidTest-results
+
+  optimized-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dynamic-droid-optimized-apk
+          path: optimized-apk
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Enable emulator acceleration
+        run: sudo chmod 666 /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          profile: pixel_2
+          disable-animations: false
+          script: |
+            adb install -r optimized-apk/app-performance.apk
+            python3 android/ci/smoke_optimized.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: optimized-app-smoke
+          path: island-screenshots/optimized*
