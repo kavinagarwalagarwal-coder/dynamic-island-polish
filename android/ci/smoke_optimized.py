@@ -37,6 +37,7 @@ def check_crash():
 def main():
     adb("shell", "am", "force-stop", PACKAGE)
     adb("logcat", "-c")
+    adb("shell", "pm", "grant", PACKAGE, "android.permission.POST_NOTIFICATIONS")
     adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.MainActivity")
     time.sleep(1)
     check_crash()
