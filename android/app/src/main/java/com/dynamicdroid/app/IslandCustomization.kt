@@ -1,7 +1,6 @@
 package com.dynamicdroid.app
 
 import android.content.Context
-import android.graphics.Color
 import java.time.LocalTime
 
 /** User choices for notification visibility, priority, actions, app accents and quiet rules. */

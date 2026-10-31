@@ -20,7 +20,6 @@ import android.os.Looper
 import android.os.PowerManager
 import android.provider.Settings
 import android.view.Gravity
-import android.view.View
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -139,6 +138,11 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                     island?.hideForIntro()
                 }
                 Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> {
+                    if (intent.action == Intent.ACTION_USER_PRESENT) {
+                        // The wallpaper may not have been readable before the first unlock.
+                        island?.applyWallpaper(WallpaperSkinStore.read(this@IslandOverlayService),
+                            WallpaperSkinStore.image(this@IslandOverlayService))
+                    }
                     handler.removeCallbacks(waitForUnlock)
                     handler.post(waitForUnlock)
                 }

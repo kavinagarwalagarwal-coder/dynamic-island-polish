@@ -16,7 +16,9 @@ import android.content.Context
 import android.graphics.*
 import android.os.Build
 import kotlin.math.ceil
+import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.round
 
 class WallpaperLiquidGlass(private val context: Context) {
     internal val hasRuntimeShader get() = backend != null
@@ -28,55 +30,81 @@ class WallpaperLiquidGlass(private val context: Context) {
     private var failed = false
     fun resetFailure() { failed = false }
     fun release() { backend?.release(); backend = null }
-    fun draw(canvas: Canvas, rect: RectF, radius: Float, alpha: Int, renderer: WallpaperSkinRenderer, resizing: Boolean = false) {
-        if (!renderer.enabled || alpha <= 0 || rect.width() <= 0f || rect.height() <= 0f) return
+
+    /** Drop cached GPU content so the next frame re-records it (after screen off, trim, etc.). */
+    fun invalidateContent() { backend?.invalidate() }
+
+    /**
+     * [stage] is the fixed area the wallpaper is laid out in; [rect] is the island shape inside it.
+     * The caller has already clipped [canvas] to the island shape. Keeping the wallpaper anchored
+     * to the stage means it stays still while the island morphs, and the GPU layer never resizes.
+     * While [resizing], the lens is left off (plain still wallpaper) and rebuilt once at rest.
+     */
+    fun draw(canvas: Canvas, stage: RectF, rect: RectF, radius: Float, alpha: Int, renderer: WallpaperSkinRenderer,
+             resizing: Boolean = false) {
+        if (!renderer.enabled || alpha <= 0 || rect.width() <= 0f || rect.height() <= 0f || stage.isEmpty) return
         if (renderer.style.glass && canvas.isHardwareAccelerated && Build.VERSION.SDK_INT >= 33 && !failed) {
             try {
                 val current = backend ?: Backend().also { backend = it }
                 WallpaperRecovery.markRendering(context)
-                current.draw(canvas, rect, radius, alpha, renderer, resizing)
+                current.draw(canvas, stage, rect, radius, alpha, renderer, resizing)
                 wasHardwareRendered = true
                 return
             } catch (_: RuntimeException) {
-                failed = true; release(); WallpaperRecovery.shaderFailed(context)
+                fail()
             } catch (_: LinkageError) {
-                failed = true; release(); WallpaperRecovery.shaderFailed(context)
+                fail()
             } catch (_: OutOfMemoryError) {
-                failed = true; release(); WallpaperRecovery.shaderFailed(context)
+                fail()
             }
         }
-        renderer.draw(canvas, rect, alpha)
+        renderer.draw(canvas, stage, alpha)
+    }
+
+    private fun fail() {
+        failed = true; release(); WallpaperRecovery.shaderFailed(context)
     }
 
     @TargetApi(33)
     private class Backend {
         private val node = RenderNode("Wallpaper liquid glass")
         private val shader = RuntimeShader(SHADER)
-        private val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 1.3f }
+        // Gradient is defined over a unit square once and stretched with a local matrix, so the
+        // rim never allocates while the shape animates.
+        private val rimMatrix = Matrix()
+        private val rimGradient = LinearGradient(0f, 0f, 1f, 1f, intArrayOf(0x38FFFFFF, 0x05FFFFFF, 0x18FFFFFF),
+            floatArrayOf(0f, .55f, 1f), Shader.TileMode.CLAMP)
+        private val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE; strokeWidth = 1f; this.shader = rimGradient
+        }
         private val local = RectF()
-        private val colours = intArrayOf(0x70FFFFFF, 0x08FFFFFF, 0x30FFFFFF)
-        private val stops = floatArrayOf(0f, .55f, 1f)
-        private var lastWidth = 0
-        private var lastHeight = 0
-        private var lastRadius = -1f
+        private var stageWidth = 0
+        private var stageHeight = 0
+        private val shape = FloatArray(5) { -1f }
         private var lastImage: Bitmap? = null
         private var lastStyle: WallpaperStyle? = null
+        private var stale = true
+        private var lensOn = false
         var effectBuilds = 0
             private set
         var recordings = 0
             private set
-        fun release() { node.discardDisplayList(); node.setRenderEffect(null); lastImage = null; lastStyle = null }
-        fun draw(canvas: Canvas, rect: RectF, radius: Float, alpha: Int, renderer: WallpaperSkinRenderer, resizing: Boolean) {
-            // Animate the cached lens as a layer; rebuild at the exact bounds once motion settles.
-            // Do not magnify the tiny idle dot into a full-size wallpaper texture.
-            val reuse = resizing && lastWidth >= 64 && lastHeight >= 32 &&
-                renderer.image === lastImage && renderer.style == lastStyle
-            val width = if (reuse) lastWidth else ceil(rect.width()).toInt().coerceAtLeast(1)
-            val height = if (reuse) lastHeight else ceil(rect.height()).toInt().coerceAtLeast(1)
-            val r = if (reuse) lastRadius else
-                (kotlin.math.round(radius * 4f) / 4f).coerceIn(0f, min(width, height) / 2f)
-            val resized = width != lastWidth || height != lastHeight
-            if (resized || renderer.image !== lastImage || renderer.style != lastStyle) {
+
+        fun invalidate() { stale = true }
+        fun release() {
+            node.discardDisplayList(); node.setRenderEffect(null)
+            lastImage = null; lastStyle = null; stale = true; lensOn = false; shape.fill(-1f)
+        }
+
+        fun draw(canvas: Canvas, stage: RectF, rect: RectF, radius: Float, alpha: Int, renderer: WallpaperSkinRenderer,
+                 resizing: Boolean) {
+            val width = ceil(stage.width()).toInt().coerceAtLeast(1)
+            val height = ceil(stage.height()).toInt().coerceAtLeast(1)
+            val resized = width != stageWidth || height != stageHeight
+            // HWUI frees display lists of detached/hidden windows (screen off, memory trim). Without
+            // the hasDisplayList() check the island drew an empty node — just black — until a tap
+            // happened to resize it.
+            if (resized || stale || !node.hasDisplayList() || renderer.image !== lastImage || renderer.style != lastStyle) {
                 local.set(0f, 0f, width.toFloat(), height.toFloat())
                 node.setPosition(0, 0, width, height)
                 val recording = node.beginRecording(width, height)
@@ -86,32 +114,48 @@ class WallpaperLiquidGlass(private val context: Context) {
                     renderer.draw(recording, local, 255)
                 } finally { node.endRecording() }
                 recordings++
-                lastImage = renderer.image; lastStyle = renderer.style
+                lastImage = renderer.image; lastStyle = renderer.style; stale = false
+                stageWidth = width; stageHeight = height
             }
-            if (resized || r != lastRadius) {
-                shader.setFloatUniform("size", width.toFloat(), height.toFloat())
-                shader.setFloatUniform("offset", 0f, 0f)
+            // Shape in node space, quantised to half pixels so sub-pixel spring noise near rest
+            // does not rebuild the effect.
+            val l = q(rect.left - stage.left); val t = q(rect.top - stage.top)
+            val w = q(rect.width()).coerceAtLeast(1f); val h = q(rect.height()).coerceAtLeast(1f)
+            val r = q(radius).coerceIn(0f, min(w, h) / 2f)
+            if (resizing) {
+                // A lens built for one frame's shape is wrong on the next; rebuilding it every
+                // frame churned GPU layers. Show the still wallpaper and restore the lens at rest.
+                if (lensOn) { node.setRenderEffect(null); lensOn = false; shape.fill(-1f) }
+            } else if (resized || !lensOn || shape[0] != l || shape[1] != t || shape[2] != w || shape[3] != h || shape[4] != r) {
+                shader.setFloatUniform("size", w, h)
+                shader.setFloatUniform("offset", -l, -t)
                 shader.setFloatUniform("cornerRadii", r, r, r, r)
-                shader.setFloatUniform("refractionHeight", min(height * .28f, 24f).coerceAtLeast(1f))
-                shader.setFloatUniform("refractionAmount", -min(height * .16f, 16f))
+                shader.setFloatUniform("refractionHeight", min(h * .28f, 24f).coerceAtLeast(1f))
+                shader.setFloatUniform("refractionAmount", -min(h * .16f, 16f))
                 shader.setFloatUniform("depthEffect", .35f)
-                shader.setFloatUniform("chromaticAberration", .25f)
+                shader.setFloatUniform("chromaticAberration", .2f)
+                // The effect snapshots uniforms, so it is recreated; the layer size stays fixed.
                 node.setRenderEffect(RenderEffect.createRuntimeShaderEffect(shader, "content"))
+                lensOn = true
                 effectBuilds++
+                shape[0] = l; shape[1] = t; shape[2] = w; shape[3] = h; shape[4] = r
             }
-            if (resized) rim.shader = LinearGradient(0f, 0f, width.toFloat(), height.toFloat(), colours, stops, Shader.TileMode.CLAMP)
-            lastWidth = width; lastHeight = height; lastRadius = r
             val save = canvas.save()
             try {
-                canvas.translate(rect.left, rect.top)
-                canvas.scale(rect.width() / width, rect.height() / height)
+                canvas.translate(stage.left, stage.top)
                 node.alpha = alpha / 255f
                 canvas.drawRenderNode(node)
-                rim.alpha = alpha
-                val inset = rim.strokeWidth / 2
-                canvas.drawRoundRect(inset, inset, width - inset, height - inset, r, r, rim)
             } finally { canvas.restoreToCount(save) }
+            // Thin highlight just inside the clip; it fades with the body instead of flashing white.
+            val inset = rim.strokeWidth / 2f
+            rimMatrix.setScale(rect.width(), rect.height()); rimMatrix.postTranslate(rect.left, rect.top)
+            rimGradient.setLocalMatrix(rimMatrix)
+            rim.alpha = alpha
+            canvas.drawRoundRect(rect.left + inset, rect.top + inset, rect.right - inset, rect.bottom - inset,
+                max(0f, radius - inset), max(0f, radius - inset), rim)
         }
+
+        private fun q(value: Float) = round(value * 2f) / 2f
     }
 
     private companion object {
@@ -125,7 +169,6 @@ uniform float refractionHeight;
 uniform float refractionAmount;
 uniform float depthEffect;
 uniform float chromaticAberration;
-
 
 float2 safeNormalize(float2 value) {
     return value * inversesqrt(max(dot(value, value), 0.0001));
@@ -166,14 +209,16 @@ float circleMap(float x) {
 half4 main(float2 coord) {
     float2 halfSize = size * 0.5;
     float2 centeredCoord = (coord + offset) - halfSize;
-    float radius = radiusAt(coord, cornerRadii);
-    
+    // Modified from upstream: corner lookup uses the shape-centred coordinate.
+    float radius = radiusAt(centeredCoord, cornerRadii);
+
     float sd = sdRoundedRect(centeredCoord, halfSize, radius);
-    if (-sd >= refractionHeight) {
+    // Outside the island (clipped by the caller) or in the flat centre: no refraction needed.
+    if (sd > 0.5 || -sd >= refractionHeight) {
         return content.eval(coord);
     }
     sd = min(sd, 0.0);
-    
+
     float d = circleMap(1.0 - -sd / refractionHeight) * refractionAmount;
     float gradRadius = min(radius * 1.5, min(halfSize.x, halfSize.y));
     float2 grad = safeNormalize(gradSdRoundedRect(centeredCoord, halfSize, gradRadius) + depthEffect * safeNormalize(centeredCoord));
@@ -181,7 +226,7 @@ half4 main(float2 coord) {
     float2 refractedCoord = coord + d * grad;
     float dispersionIntensity = chromaticAberration * ((centeredCoord.x * centeredCoord.y) / (halfSize.x * halfSize.y));
     float2 dispersedCoord = d * grad * dispersionIntensity;
-    
+
     // Modified from upstream: three taps instead of seven spectral taps on mobile GPUs.
     half4 color = content.eval(refractedCoord);
     color.r = content.eval(refractedCoord + dispersedCoord).r;
@@ -191,4 +236,3 @@ half4 main(float2 coord) {
 }"""
     }
 }
-

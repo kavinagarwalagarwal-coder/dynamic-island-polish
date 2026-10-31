@@ -32,8 +32,12 @@ object WallpaperSkinStore {
     }
     @Synchronized fun image(context: Context): Bitmap? {
         if (!loaded) {
-            cached = runCatching { AtomicFile(file(context)).openRead().use { BitmapFactory.decodeStream(it) } }.getOrNull()
-            loaded = true
+            val source = file(context)
+            // Before the first unlock after a reboot, credential storage is unreadable. Only
+            // remember a result once the read really succeeded or the file is truly absent.
+            val result = runCatching { AtomicFile(source).openRead().use { BitmapFactory.decodeStream(it) } }
+            cached = result.getOrNull()
+            loaded = cached != null || (result.isSuccess && !source.exists())
         }
         return cached
     }
