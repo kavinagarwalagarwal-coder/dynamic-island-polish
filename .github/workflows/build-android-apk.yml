@@ -127,6 +127,17 @@ jobs:
             adb shell pm grant com.dynamicdroid.fixture android.permission.POST_NOTIFICATIONS
             gradle --no-daemon -p android :app:connectedDebugAndroidTest
             adb pull /sdcard/Pictures/IslandSmoke island-screenshots
+      - name: Report failed instrumentation tests
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import glob, xml.etree.ElementTree as ET
+          for path in glob.glob("android/app/build/outputs/androidTest-results/**/*.xml", recursive=True):
+              for case in ET.parse(path).getroot().iter("testcase"):
+                  for f in list(case.iter("failure")) + list(case.iter("error")):
+                      text = (f.get("message") or f.text or "").strip().splitlines()
+                      print(f"::error title={case.get('classname')}.{case.get('name')}::{' | '.join(text[:6])[:900]}")
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:
