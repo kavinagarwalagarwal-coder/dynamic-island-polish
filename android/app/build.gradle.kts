@@ -6,15 +6,15 @@ plugins {
 
 android {
     namespace = "com.dynamicdroid.app"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.dynamicdroid.app"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 11
-        versionName = "1.6.0"
+        versionCode = 13
+        versionName = "1.6.2"
     }
 
     buildFeatures {
@@ -28,7 +28,24 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions { jvmTarget = "17" }
+    kotlin {
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+        }
+    }
+
+    buildTypes {
+        create("performance") {
+            initWith(getByName("release"))
+            isDebuggable = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            // Installable test build; uses the same key as this CI run's debug variant.
+            signingConfig = signingConfigs.getByName("debug")
+            matchingFallbacks += listOf("release")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }
+    }
 
     lint { abortOnError = false }
 }
@@ -58,9 +75,10 @@ dependencies {
     implementation("com.squareup.okhttp3:okhttp")
     implementation("org.commonmark:commonmark:0.28.0")
     implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.28.0")
-    implementation("org.jetbrains.kotlin:kotlin-reflect:2.1.0")
+    implementation("org.jetbrains.kotlin:kotlin-reflect:2.3.10")
     implementation("io.coil-kt.coil3:coil-compose:3.4.0")
     debugImplementation(fileTree(mapOf("dir" to "libs/debug", "include" to listOf("*.aar", "*.jar"))))
+    add("performanceImplementation", fileTree(mapOf("dir" to "libs/release", "include" to listOf("*.aar", "*.jar"), "exclude" to listOf("SkipUnit*.aar", "SkipUnit*.jar"))))
     releaseImplementation(fileTree(mapOf("dir" to "libs/release", "include" to listOf("*.aar", "*.jar"))))
 
     androidTestImplementation("androidx.test.ext:junit:1.2.1")

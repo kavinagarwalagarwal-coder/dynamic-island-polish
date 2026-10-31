@@ -494,6 +494,34 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         return Pair(resources.displayMetrics.widthPixels, ((baseTop + spec.h + dp(14f)) * fit.scale).toInt())
     }
 
+    /** The live SwiftUI entrance must end at exactly the native island's fitted bounds. */
+    fun returnHandoffBounds(next: LiveActivity): RectF {
+        val spec = specFor(Presentation.COMPACT, next)
+        val cx = IslandFit.center(layoutWidth() / fit.scale, spec.w, spec.cx, dp(4f))
+        return RectF((cx - spec.w / 2f) * fit.scale, baseTop * fit.scale,
+            (cx + spec.w / 2f) * fit.scale, (baseTop + spec.h) * fit.scale)
+    }
+
+    /** Settle the real layout under the SwiftUI shell; content fades in at handoff. */
+    fun prepareReturnHandoff() {
+        val spec = specFor(presentation, activity)
+        cancelAppMorph()
+        widthS.snap(spec.w); heightS.snap(spec.h); radiusS.snap(spec.r)
+        centerS.snap(spec.cx); topS.snap(targetTop(presentation))
+        concealS.snap(1f); presenceS.snap(1f); introS.snap(1f)
+        compactA.snap(0f)
+        alpha = 0f
+        kick()
+    }
+
+    fun finishReturnHandoff() {
+        alpha = 1f
+        compactA.snap(0f)
+        setContentTargets(presentation)
+        settled = false
+        kick()
+    }
+
     val isAbsorbing: Boolean get() = absorbS.value > 0.002f
 
     // ---------------------------------------------------------------- layout specs
@@ -726,7 +754,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         clip.addRoundRect(rect, r, r, Path.Direction.CW)
         canvas.save()
         canvas.clipPath(clip)
-        if (absorb < .06f) liquidGlass.draw(canvas, rect, r, bodyAlpha, wallpaperSkin)
+        if (absorb < .06f) liquidGlass.draw(canvas, rect, r, bodyAlpha, wallpaperSkin,
+            resizing = !widthS.isAtRest || !heightS.isAtRest || !radiusS.isAtRest)
 
         val ea = expandedA.value.coerceIn(0f, 1f) * reveal
         val ca = compactA.value.coerceIn(0f, 1f) * reveal

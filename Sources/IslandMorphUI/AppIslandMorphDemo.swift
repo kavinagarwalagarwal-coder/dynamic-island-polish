@@ -5,6 +5,7 @@ import SwiftUI
 /// into the island instead of simply switching between two unrelated screens.
 public struct AppIslandMorphDemo: View {
     private let onClose: () -> Void
+    private let isOverlay: Bool
     private let trackTitle: String
     private let trackSubtitle: String
     private let appLabel: String
@@ -15,27 +16,29 @@ public struct AppIslandMorphDemo: View {
         title: String = "Midnight City",
         subtitle: String = "M83 · Hurry Up, We're Dreaming",
         appLabel: String = "Music",
+        isOverlay: Bool = false,
         onClose: @escaping () -> Void = {}
     ) {
         self.trackTitle = title
         self.trackSubtitle = subtitle
         self.appLabel = appLabel
         self.onClose = onClose
+        self.isOverlay = isOverlay
     }
 
     public var body: some View {
         GeometryReader { geometry in
             let screen = geometry.size
-            let progress: CGFloat = isCompact ? 1 : 0
-            let pillWidth = min(150, max(118, screen.width - 32))
+            let progress: CGFloat = isCompact ? 1.0 : 0.0
+            let pillWidth = min(150.0, max(118.0, screen.width - 32.0))
             let pillHeight: CGFloat = 40
             let shellWidth = screen.width + (pillWidth - screen.width) * progress
             let shellHeight = screen.height + (pillHeight - screen.height) * progress
             let centerY = screen.height / 2 + (28 - screen.height / 2) * progress
-            let cornerRadius = 32 + (20 - 32) * progress
+            let cornerRadius = 32.0 + (20.0 - 32.0) * progress
 
             ZStack {
-                Color.black.ignoresSafeArea()
+                if !isOverlay { Color.black.ignoresSafeArea() }
 
                 ZStack(alignment: .topLeading) {
                     RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
@@ -53,26 +56,23 @@ public struct AppIslandMorphDemo: View {
                         // changing shell. The center anchor makes it converge on
                         // the camera/island position as the shell moves upward.
                         .scaleEffect(
-                            x: shellWidth / max(screen.width, 1),
+                            x: shellWidth / max(screen.width, 1.0),
                             y: shellHeight / max(screen.height, 1),
                             anchor: .center
                         )
                         .opacity(1 - min(progress * 1.18, 1))
-                        .frame(width: shellWidth, height: shellHeight)
+                        // Keep dashboard measurement fixed throughout the morph.
+                        .offset(x: (shellWidth - screen.width) / 2, y: (shellHeight - screen.height) / 2)
 
                     islandPill(width: pillWidth, height: pillHeight)
                         .frame(width: shellWidth, height: shellHeight, alignment: .center)
                         .opacity(progress)
-                        .animation(.easeIn(duration: 0.2).delay(0.06), value: isCompact)
                 }
                 .frame(width: shellWidth, height: shellHeight, alignment: .topLeading)
                 .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
                 .position(x: screen.width / 2, y: centerY)
-                .animation(
-                    reduceMotion ? .easeOut(duration: 0.16) : .interpolatingSpring(stiffness: 205, damping: 23.77),
-                    value: isCompact
-                )
 
+                if !isOverlay {
                 Button("Close preview", action: onClose)
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(.white.opacity(0.75))
@@ -81,17 +81,17 @@ public struct AppIslandMorphDemo: View {
                     .background(Color.white.opacity(0.08), in: Capsule())
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
                     .padding(.bottom, 24)
+                }
             }
-            .contentShape(Rectangle())
             .onAppear {
                 // Opening the demo mimics leaving a media app: its full-screen
                 // surface contracts into the island. Tapping the pill reverses it.
-                withAnimation(reduceMotion ? .easeOut(duration: 0.16) : .interpolatingSpring(stiffness: 205, damping: 23.77)) {
+                withAnimation(reduceMotion ? .easeOut(duration: 0.16) : .interpolatingSpring(stiffness: 205, damping: 26)) {
                     isCompact = true
                 }
             }
         }
-        .background(Color.black.ignoresSafeArea())
+        .background(isOverlay ? Color.clear : Color.black)
         .ignoresSafeArea()
         .preferredColorScheme(.dark)
     }
@@ -127,7 +127,7 @@ public struct AppIslandMorphDemo: View {
             HStack(spacing: 8) {
                 Capsule().fill(Color.white.opacity(0.16)).frame(height: 4)
                     .overlay(alignment: .leading) {
-                        Capsule().fill(Color(red: 0.48, green: 0.82, blue: 1)).frame(width: size.width * 0.36, height: 4)
+                        Capsule().fill(Color(red: 0.48, green: 0.82, blue: 1)).frame(width: size.width * 0.36, height: 4.0)
                     }
             }
             .padding(.top, 28)
@@ -168,7 +168,7 @@ public struct AppIslandMorphDemo: View {
                 .padding(.vertical, 15)
                 .background(Color.white, in: Capsule())
             }
-            .padding(.bottom, max(30, size.height * 0.06))
+            .padding(.bottom, max(30.0, size.height * 0.06))
         }
         .padding(.horizontal, 24)
         .frame(width: size.width, height: size.height, alignment: .topLeading)
@@ -206,20 +206,19 @@ public struct AppIslandMorphDemo: View {
             .frame(width: width, height: height)
             .background(Color.black)
             .clipShape(Capsule())
-            .contentShape(Capsule())
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Open the activity dashboard")
     }
 
     private func morphToIsland() {
-        withAnimation(reduceMotion ? .easeOut(duration: 0.16) : .interpolatingSpring(stiffness: 205, damping: 23.77)) {
+        withAnimation(reduceMotion ? .easeOut(duration: 0.16) : .interpolatingSpring(stiffness: 205, damping: 26)) {
             isCompact = true
         }
     }
 
     private func expandToApp() {
-        withAnimation(reduceMotion ? .easeOut(duration: 0.16) : .interpolatingSpring(stiffness: 205, damping: 23.77)) {
+        withAnimation(reduceMotion ? .easeOut(duration: 0.16) : .interpolatingSpring(stiffness: 205, damping: 26)) {
             isCompact = false
         }
     }

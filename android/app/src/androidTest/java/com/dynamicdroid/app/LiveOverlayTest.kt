@@ -83,23 +83,29 @@ class LiveOverlayTest {
                         field<IslandView?>(service, "island")?.activity == null
                 }
                 shell("input keyevent KEYCODE_HOME")
-                await("Leaving the real player for Home did not trigger the handoff") {
+                await("Leaving the real player for Home did not start the SwiftUI morph") {
                     val service = IslandBus.listener as? IslandOverlayService ?: return@await false
-                    field<IslandView?>(service, "island")?.isAbsorbing == true
-                }
-                instrumentation.runOnMainSync {
-                    val service = IslandBus.listener as IslandOverlayService
-                    val view = field<IslandView>(service, "island")
-                    val window = field<android.view.WindowManager.LayoutParams>(service, "params")
-                    assertNotNull("No notification-derived card", field<Bitmap?>(view, "morphCard"))
-                    assertTrue("Flying card blocks Home touches", window.flags and android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0)
+                    val overlay = field<SwiftIslandMorphView?>(service, "morphOverlay") ?: return@await false
+                    val view = field<IslandView?>(service, "island") ?: return@await false
+                    if (!field<Boolean>(service, "swiftMorphActive") || view.alpha != 0f) return@await false
+                    // Inspect in the same main-thread observation as the active check:
+                    // a second dispatch can run after this short animation has ended.
+                    val layout = overlay.layoutParams as android.view.WindowManager.LayoutParams
+                    val expected = view.returnHandoffBounds(view.activity!!)
+                    assertTrue("Live entrance must stay in the status area, never cover Home",
+                        layout.height < view.resources.displayMetrics.heightPixels / 4)
+                    assertTrue(kotlin.math.abs(layout.height -
+                        (expected.bottom + 16f * view.resources.displayMetrics.density).toInt()) <= 1)
+                    true
                 }
                 capture("live-app-to-island")
-                await("Handoff did not settle into a touchable compact island") {
+                await("SwiftUI handoff did not settle into a touchable compact island") {
                     val service = IslandBus.listener as? IslandOverlayService ?: return@await false
                     val view = field<IslandView>(service, "island")
                     val window = field<android.view.WindowManager.LayoutParams>(service, "params")
-                    !view.isAbsorbing && view.activity?.mode == IslandMode.MUSIC &&
+                    !field<Boolean>(service, "swiftMorphActive") &&
+                        field<SwiftIslandMorphView?>(service, "morphOverlay") == null &&
+                        view.activity?.mode == IslandMode.MUSIC &&
                         window.height < view.resources.displayMetrics.heightPixels / 2 &&
                         window.flags and android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0
                 }

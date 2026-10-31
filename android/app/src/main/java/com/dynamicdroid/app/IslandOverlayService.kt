@@ -175,7 +175,10 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                     packageManager.getLaunchIntentForPackage(pkg) != null)) watcher?.hint(pkg)
         }
         status = StatusMonitor(this) { info -> island?.applyStatus(info) }.also { it.start() }
-        IslandAccessibilityService.onChanged = { handler.post { reattach() } }
+        IslandAccessibilityService.onChanged = { handler.post {
+            reattach()
+            if (activities.all().isNotEmpty()) watcher?.start()
+        } }
         attachWindow()
         IslandBus.listener = this
         if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)
@@ -327,12 +330,13 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             else -> null to Presentation.IDLE
         }
         // Calls stay visible even over fullscreen video; everything else steps aside.
-        val swiftMorphStarted = absorb && a != null && startSwiftMorph(a)
-        val concealed = (fullscreen && a?.mode != IslandMode.CALL) || swiftMorphActive
+        val swiftMorphStarted = absorb && t == null && p == Presentation.COMPACT &&
+            a != null && startSwiftMorph(a)
+        val concealed = fullscreen && a?.mode != IslandMode.CALL
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
         params?.let { lp ->
-            val touchable = a != null && !concealed && !absorb && !view.isAbsorbing
+            val touchable = a != null && !concealed && !swiftMorphActive && !absorb && !view.isAbsorbing
             val isOff = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0
             if (touchable == isOff) {
                 lp.flags = if (touchable) lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
@@ -349,27 +353,31 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 handler.postDelayed(autoCollapse, delay)
             }
         }
-        growWindow(view.windowSizeFor(a, p), absorb && !swiftMorphStarted)
-        view.show(a?.let { appTint(this, it) }, p, absorb && !swiftMorphStarted)
+        growWindow(view.windowSizeFor(a, p), false)
+        view.show(a?.let { appTint(this, it) }, p, false)
+        if (swiftMorphStarted) view.prepareReturnHandoff()
     }
 
     /**
-     * The Skip-translated SwiftUI surface takes over the outgoing-app transition. The native
-     * island remains underneath it, so Android overlay permissions, notifications, gestures,
-     * and all post-morph live activity updates continue to use the existing service.
+     * A short SwiftUI capsule entrance shares the native island's calibrated bounds.
+     * The launcher owns the outgoing app animation. Never overlay a second full-screen
+     * dashboard after Home: it looks like a detached, broken miniature app window.
      */
     private fun startSwiftMorph(activity: LiveActivity): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
+        if (swiftMorphActive) return true
         removeSwiftMorph()
         val wm = windowManager ?: return false
         val accessibility = IslandAccessibilityService.instance
         val host: Context = accessibility ?: this
-        val view = runCatching { SwiftIslandMorphView(host, activity) }.getOrNull() ?: return false
+        val bounds = island?.returnHandoffBounds(activity) ?: return false
+        val view = runCatching { SwiftIslandMorphView(host, bounds) }.getOrNull() ?: return false
         val type = if (accessibility != null) WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
         else WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         val dm = resources.displayMetrics
         val layout = WindowManager.LayoutParams(
             dm.widthPixels,
-            dm.heightPixels,
+            (bounds.bottom + 16f * dm.density).toInt(),
             type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                 WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
@@ -394,6 +402,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         morphOverlay = view
         morphOverlayManager = wm
         swiftMorphActive = true
+        android.util.Log.i("IslandHandoff", "SwiftUI morph started")
         handler.removeCallbacks(finishSwiftMorph)
         val motionScale = runCatching {
             Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
@@ -407,7 +416,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         morphOverlay?.let { overlay -> runCatching { morphOverlayManager?.removeView(overlay) } }
         morphOverlay = null
         morphOverlayManager = null
+        val wasActive = swiftMorphActive
         swiftMorphActive = false
+        if (wasActive) island?.finishReturnHandoff()
     }
 
     override fun onActivity(activity: LiveActivity) {
@@ -591,7 +602,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         // Idle island: the window still spans the top for the next intro, so let touches
         // fall through to the app underneath instead of deadening that strip.
-        if ((a == null || view.isConcealed) && lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
+        if ((a == null || view.isConcealed || swiftMorphActive) && lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
             lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             changed = true
         }
@@ -685,7 +696,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         private const val EXPANDED_TIMEOUT_MS = 6_000L
         private const val MESSAGE_TIMEOUT_MS = 5_000L
         private const val TIMER_PEEK_MS = 2_600L
-        private const val SWIFT_MORPH_DURATION_MS = 900L
+        private const val SWIFT_MORPH_DURATION_MS = 520L
         /** Lets the system's unlock animation finish so the intro is actually visible. */
         private const val UNLOCK_SETTLE_MS = 320L
     }

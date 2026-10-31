@@ -39,6 +39,11 @@ object WallpaperRecovery {
 class DynamicDroidApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        // Skip must receive the real application context before any SwiftUI environment reads.
+        // Its test-context fallback is not present in an installed standalone APK.
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+            skip.foundation.ProcessInfo.launch(this)
+        }
         WallpaperSkinStore.migrate(this)
         WallpaperRecovery.onProcessStart(this)
     }

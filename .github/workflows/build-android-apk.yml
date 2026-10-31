@@ -25,11 +25,18 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/cache@v4
+        id: skip-libraries
+        with:
+          path: android/app/libs
+          key: skip-libraries-v1-${{ runner.os }}-${{ hashFiles('Package.swift', 'Package.resolved', 'Sources/IslandMorphUI/**') }}
       - name: Install Skip
+        if: steps.skip-libraries.outputs.cache-hit != 'true'
         run: |
           brew tap skiptools/skip
           brew install skip
       - name: Export SwiftUI morph for Android
+        if: steps.skip-libraries.outputs.cache-hit != 'true'
         run: |
           skip export --project . --module IslandMorphUI --dir android/app/libs/debug --debug
           skip export --project . --module IslandMorphUI --dir android/app/libs/release --release
@@ -57,15 +64,25 @@ jobs:
 
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.13"
 
       - name: Build APK
-        run: gradle --no-daemon -Pkotlin.jvm.target.validation.mode=warning -p android :app:testDebugUnitTest :app:assembleDebug
+        run: gradle --no-daemon -Pkotlin.jvm.target.validation.mode=warning -p android :app:testDebugUnitTest :app:assembleDebug :app:assemblePerformance :notification-fixture:assembleDebug
 
       - uses: actions/upload-artifact@v4
         with:
           name: dynamic-droid-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dynamic-droid-optimized-apk
+          path: android/app/build/outputs/apk/performance/app-performance.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: notification-fixture-apk
+          path: android/notification-fixture/build/outputs/apk/debug/notification-fixture-debug.apk
 
   swift:
     runs-on: macos-latest
@@ -94,7 +111,7 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.13"
       - name: Enable emulator acceleration
         run: sudo chmod 666 /dev/kvm
       - uses: reactivecircus/android-emulator-runner@v2
@@ -139,7 +156,7 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: "8.9"
+          gradle-version: "8.13"
       - name: Enable emulator acceleration
         run: sudo chmod 666 /dev/kvm
       - uses: reactivecircus/android-emulator-runner@v2
@@ -154,3 +171,40 @@ jobs:
         with:
           name: compatibility-api-${{ matrix.api }}
           path: android/app/build/outputs/androidTest-results
+
+  optimized-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: dynamic-droid-optimized-apk
+          path: optimized-apk
+      - uses: actions/download-artifact@v4
+        with:
+          name: notification-fixture-apk
+          path: notification-fixture
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Enable emulator acceleration
+        run: sudo chmod 666 /dev/kvm
+      - uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 36
+          arch: x86_64
+          profile: pixel_2
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -memory 3072 -cores 2
+          disable-animations: false
+          script: |
+            adb install -r optimized-apk/app-performance.apk
+            adb install -r notification-fixture/notification-fixture-debug.apk
+            python3 android/ci/smoke_optimized.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: optimized-app-smoke
+          path: island-screenshots/optimized*

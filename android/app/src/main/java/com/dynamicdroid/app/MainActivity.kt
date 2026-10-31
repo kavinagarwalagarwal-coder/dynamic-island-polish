@@ -294,9 +294,13 @@ class MainActivity : AppCompatActivity() {
             demo = a; demoPresentation = Presentation.COMPACT
             preview.setSecondary(null); preview.show(a, Presentation.COMPACT, absorb = true)
         }, row(-2).apply { topMargin = dp(8) })
-        column.addView(chip("Preview SwiftUI morph") {
-            startActivity(Intent(this, SwiftIslandMorphPreviewActivity::class.java))
-        }, row(-2).apply { topMargin = dp(8) })
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            column.addView(chip("Preview SwiftUI morph") {
+                startActivity(Intent(this, SwiftIslandMorphPreviewActivity::class.java))
+            }, row(-2).apply { topMargin = dp(8) })
+        } else {
+            column.addView(label("SwiftUI morph preview requires Android 9 or newer.", 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
+        }
 
         column.addView(label("Previews use sample content. Your real activities appear after Setup.", 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(16) })
         column = page("Rules")
