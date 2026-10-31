@@ -48,7 +48,7 @@ swift build
 
 ## Island interaction and timer refinement
 
-The island uses an opaque black surface. Liquid Glass, screen capture, refraction, and their settings/permissions have been removed. Wallpaper matching affects accents only.
+The island body is opaque black. Wallpaper matching tints accents; an optional still-wallpaper skin with Liquid Glass refraction is described under *Still wallpaper and Liquid Glass* below. No screen capture is used.
 
 - Motion remains authored in SwiftUI with the existing interruptible Android Canvas spring port. Tighter damping, elastic dragging, press feedback, and system reduced-motion support keep transitions responsive without restarting shape velocity.
 - Tap a compact activity or its separate minimal bubble to open its app immediately. Hold either activity for 350 ms, or pull down, to expand it. Swipe upward or tap outside the expanded Android overlay to collapse. Notification controls remain immediate; no double-tap delay is imposed on opening an app.
@@ -99,3 +99,9 @@ A second live activity now pulls out of the main pill as a droplet: the pill nar
 Leaving an active music/call owner for Home now uses the reference sequence: a portrait card narrows, travels toward the camera as a strip, then widens into the compact island. The card is a small in-memory replica built from notification artwork/title/artist/app metadata, not the other app's real window or a screenshot. A pre-downsampled card provides a soft shrinking appearance without full-screen GPU blur. It is discarded when the transition finishes or is interrupted. SwiftUI views remain intact; Android's spring renderer drives the overlay handoff. Try **App → island** in the preview.
 
 Foreground detection now checks the unfiltered activity shelf (the owner's activity is intentionally hidden while its app is open). Existing accessibility window-state events supply package names only for relevant apps/Home, with Usage Access polling as a fallback. Window text/content retrieval remains disabled. The effect runs on return to Home, not arbitrary app switches; entering another app cancels it. Its full-screen overlay remains touch-through and shrinks back to the compact window when settled. No screenshot, camera, Internet or new permission is added. This approximates the reference motion without controlling Amazon Music's or Android's actual minimise animation.
+
+### Wallpaper and glass stability (1.6.3)
+
+- **Black pill after unlock:** Android can free an overlay's GPU display lists while the screen is off. The glass layer now notices (`RenderNode.hasDisplayList()`) and is also invalidated on screen-off, window re-show and attach, so the wallpaper redraws on the first frame after unlock instead of waiting for a tap. If the phone was rebooted, the saved wallpaper is re-read after the first unlock rather than staying empty.
+- **White edges / glitch while expanding:** the glass layer used to be re-recorded, resized and given a new shader effect on every animation frame. The wallpaper is now laid out once on a fixed stage behind the island, so the GPU layer never resizes or stretches (the 1.6.2 stopgap scaled the cached lens during motion). While the island moves, the lens is switched off and the still wallpaper shows through; the lens is rebuilt once when the shape settles. The picture stays still as the island opens over it (no zoom pumping), refraction near the edges samples real wallpaper instead of the layer border, and the rim highlight is fainter and fades with the island.
+- Smaller polish: no gradient allocations per frame for the rim or artwork placeholder, and some unused imports removed.

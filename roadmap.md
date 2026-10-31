@@ -7,4 +7,5 @@
 - [x] Adopt user's uploaded code as base; restore floating pill (idle/compact) with status readout inside.
 - [x] Expanded card covers full screen width, centred on screen instead of hanging off the camera.
 - [x] Dynamic-Island-style motion: bouncier shape springs (damping ~0.62/0.68), content fades in later during the morph.
+- [x] Wallpaper skin no longer turns black after unlock; Liquid Glass no longer flashes white or glitches during expand (fixed stage, no per-frame layer resize).
 - [ ] Verify on a phone; blocked by lack of an Android device/emulator in this workspace.

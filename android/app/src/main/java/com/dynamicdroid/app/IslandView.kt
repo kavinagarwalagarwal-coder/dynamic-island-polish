@@ -152,6 +152,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private val wallpaperSkin = WallpaperSkinRenderer()
     private val liquidGlass = WallpaperLiquidGlass(context)
+    // Fixed area the wallpaper is laid out in, so it stays still while the island morphs over it.
+    private val wallpaperStage = RectF()
 
     fun applyWallpaper(style: WallpaperStyle, image: Bitmap?) {
         wallpaperSkin.style = style
@@ -404,6 +406,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     /** Screen went off: collapse into an invisible dot so the next wake can grow out of it. */
     fun hideForIntro() {
+        // The window's GPU resources may be dropped while the screen is off; re-record on wake.
+        liquidGlass.invalidateContent()
         Choreographer.getInstance().removeFrameCallback(this)
         running = false; delayedFrame = false; lastFrame = 0L
         tracking = false; seeking = false
@@ -647,12 +651,19 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
+        liquidGlass.invalidateContent()
         kick()
     }
 
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
-        if (visibility == VISIBLE) kick()
+        if (visibility == VISIBLE) { liquidGlass.invalidateContent(); kick() }
+    }
+
+    override fun onWindowVisibilityChanged(visibility: Int) {
+        super.onWindowVisibilityChanged(visibility)
+        // Screen-off and lock hide the overlay window; HWUI may free its display lists meanwhile.
+        if (visibility == VISIBLE) { liquidGlass.invalidateContent(); invalidate() }
     }
 
     override fun onDetachedFromWindow() {
@@ -754,8 +765,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         clip.addRoundRect(rect, r, r, Path.Direction.CW)
         canvas.save()
         canvas.clipPath(clip)
-        if (absorb < .06f) liquidGlass.draw(canvas, rect, r, bodyAlpha, wallpaperSkin,
-            resizing = !widthS.isAtRest || !heightS.isAtRest || !radiusS.isAtRest)
+        if (absorb < .06f) {
+            wallpaperStage.set(0f, 0f, width / fit.scale, max(baseTop + dp(WALLPAPER_STAGE_DP), rect.bottom))
+            liquidGlass.draw(canvas, wallpaperStage, rect, r, bodyAlpha, wallpaperSkin,
+                resizing = shapeSprings.any { !it.isAtRest } || !pressS.isAtRest || !stretchS.isAtRest)
+        }
 
         val ea = expandedA.value.coerceIn(0f, 1f) * reveal
         val ca = compactA.value.coerceIn(0f, 1f) * reveal
@@ -1348,10 +1362,16 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     // ---------------------------------------------------------------- drawing helpers
 
+    private val artworkPlaceholder = LinearGradient(0f, 0f, 1f, 1f, NothingStyle.foreground,
+        ColorUtils.blendARGB(NothingStyle.foreground, Color.BLACK, 0.6f), Shader.TileMode.CLAMP)
+
     private fun drawArtwork(canvas: Canvas, a: LiveActivity, l: Float, t: Float, size: Float, radius: Float, alpha: Int) {
         val art = a.artwork
         if (art != null) { drawImage(canvas, art, l, t, size, radius, alpha); return }
-        fillPaint.shader = LinearGradient(l, t, l + size, t + size, NothingStyle.foreground, ColorUtils.blendARGB(NothingStyle.foreground, Color.BLACK, 0.6f), Shader.TileMode.CLAMP)
+        // Unit gradient stretched per call: music placeholders redraw every frame without allocating.
+        matrix.setScale(size, size); matrix.postTranslate(l, t)
+        artworkPlaceholder.setLocalMatrix(matrix)
+        fillPaint.shader = artworkPlaceholder
         fillPaint.alpha = alpha
         canvas.drawRoundRect(l, t, l + size, t + size, radius, radius, fillPaint)
         fillPaint.shader = null
@@ -1673,6 +1693,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     companion object {
         private val GREY = NothingStyle.muted
         private const val LONG_PRESS_MS = 350L
+        /** Wallpaper stage height below the island's top; taller than any expanded card. */
+        private const val WALLPAPER_STAGE_DP = 240f
         private const val SHEEN_MS = 800L
         private const val INTRO_HOLD_MS = 190L
         private const val ROLL_MS = 240L
