@@ -675,7 +675,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 // Just wide enough for the glyph and its word, like a small switch label.
                 val h = dp(RINGER_HEIGHT_DP)
                 val want = h + dp(14f) + titlePaint.measureText(a.title) + dp(22f)
-                Spec(want.coerceIn(dp(150f), w), h, h / 2f, cameraCenter())
+                Spec(want.coerceIn(dp(136f), w), h, h / 2f, cameraCenter())
             }
             else -> Spec(w, dp(84f), cardRadius(dp(42f)), screenCenter())
         }
@@ -1427,12 +1427,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             Color.WHITE, 0.3f)
         val now = SystemClock.uptimeMillis()
         val flare = if (now < eventOutlineUntil) 1f + 0.7f * ((eventOutlineUntil - now) / OUTLINE_EVENT_MS.toFloat()) else 1f
-        val step = dp(1.15f)
-        haloPaint.strokeWidth = step * 1.5f
-        for (i in 1..GLOW_STEPS) {
-            val o = i * step - step / 2f
-            val f = 1f - i / (GLOW_STEPS + 1f)
-            haloPaint.color = withAlpha(base, (alpha * 0.36f * flare * f * f).toInt())
+        // Many hairline rings with a smooth falloff read as one soft halo, not separate lines.
+        val step = dp(GLOW_REACH_DP) / GLOW_STEPS
+        haloPaint.strokeWidth = step * 1.25f
+        for (i in 0 until GLOW_STEPS) {
+            val d = (i + 0.5f) / GLOW_STEPS
+            val o = (i + 0.5f) * step
+            val f = exp(-d * d * 4.2f)
+            haloPaint.color = withAlpha(base, (alpha * 0.2f * flare * f).toInt())
             canvas.drawRoundRect(rect.left - o, rect.top - o, rect.right + o, rect.bottom + o, r + o, r + o, haloPaint)
         }
     }
@@ -1477,8 +1479,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val tx = gx + icon / 2f + dp(12f)
         // The word slides in a touch behind the glyph.
         val lag = easeOut(((t - 0.05f) * 2.5f).coerceIn(0f, 1f))
-        text(canvas, a.title, right + (1f - lag) * dp(6f), cy + dp(5.5f), right - tx, titlePaint, tint,
-            (alpha * lag).toInt(), alignRight = true)
+        // Centred in the space beside the glyph, so short words don't float off to one side.
+        val room = right - tx
+        val textW = min(titlePaint.measureText(a.title), room)
+        text(canvas, a.title, tx + (room - textW) / 2f + (1f - lag) * dp(6f), cy + dp(5.5f), room, titlePaint, tint,
+            (alpha * lag).toInt())
     }
 
     private fun easeOut(x: Float): Float { val c = x.coerceIn(0f, 1f); return 1f - (1f - c) * (1f - c) * (1f - c) }
@@ -2401,7 +2406,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val OUTLINE_EVENT_MS = 4_000L
         private const val RINGER_HEIGHT_DP = 46f
         private const val RINGER_ANIM_MS = 900L
-        private const val GLOW_STEPS = 6
+        private const val GLOW_STEPS = 16
+        private const val GLOW_REACH_DP = 10f
         private val SILENT_RED = Color.rgb(255, 92, 72)
         private val DND_PURPLE = Color.rgb(150, 132, 255)
         private const val NUMBER_ROLL_MS = 260L
