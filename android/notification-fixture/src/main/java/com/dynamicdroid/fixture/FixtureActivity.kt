@@ -27,6 +27,17 @@ object FixturePoster {
             nm.cancelAll(); session?.release(); session = null
             return
         }
+        if (kind == "message" || kind == "message2") {
+            // High importance, so the phone shows its own pop-up for it.
+            nm.createNotificationChannel(NotificationChannel("alerts", "Alerts", NotificationManager.IMPORTANCE_HIGH))
+            val second = kind == "message2"
+            nm.notify(if (second) 304 else 303, Notification.Builder(context, "alerts")
+                .setSmallIcon(android.R.drawable.sym_action_chat)
+                .setContentTitle(if (second) "Popup second" else "Popup first")
+                .setContentText("Island takes this one")
+                .setCategory(Notification.CATEGORY_MESSAGE).build())
+            return
+        }
         if (session == null) session = MediaSession(context, "fixture").apply {
             setMetadata(MediaMetadata.Builder().putString(MediaMetadata.METADATA_KEY_TITLE, "Fixture music")
                 .putString(MediaMetadata.METADATA_KEY_ARTIST, "Test artist").putLong(MediaMetadata.METADATA_KEY_DURATION, 600_000).build())
