@@ -65,8 +65,7 @@ class PhonePopupTest {
             if (root?.packageName == "com.android.systemui") walk(root, 0)
             "${root?.packageName}/t${w.type}/${Rect().also(w::getBoundsInScreen)} $texts"
         }
-        val posted = shell("dumpsys notification").lines().filter { title in it || "alerts" in it }.take(6)
-        return "headsUp=${shell("settings get global heads_up_notifications_enabled").trim()} posted=$posted windows=$windows"
+        return "windows=$windows"
     }
 
     private fun stillInShade(title: String) =
