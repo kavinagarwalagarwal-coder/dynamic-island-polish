@@ -131,10 +131,10 @@ Everything here can be switched on or off on the new **Features** page, and each
 
 ### Hide the phone's own pop-ups
 
-Features → **Hide phone notification pop-ups** stops the system's heads-up banners so they don't cover the island. Notifications still land in the shade. Android only lets an app change this after a one-time grant from a computer (USB debugging on):
+Features → **Hide the phone's pop-up notifications** is a single toggle. When the island shows a new message, Dynamic Droid's accessibility service finds the system's own pop-up for it and swipes it up, which tucks it into the shade, so nothing is lost. Pop-ups stay as usual when the island isn't running, during quiet hours, or in apps where the island is hidden. An emulator test posts a real high-importance notification and checks the pop-up is gone while the notification is still in the shade.
+
+Optional: to stop pop-ups from flashing at all, grant a one-time permission from a computer (USB debugging on). Dynamic Droid then switches the phone's pop-ups off while the island runs and restores your setting afterwards. If you use this, turn the option off before uninstalling.
 
 ```
 adb shell pm grant com.dynamicdroid.app android.permission.WRITE_SECURE_SETTINGS
 ```
-
-Pop-ups come back on their own whenever the island isn't running, during quiet hours, or if notification access is lost, and your previous setting is restored when you turn the option off. Turn it off before uninstalling.
