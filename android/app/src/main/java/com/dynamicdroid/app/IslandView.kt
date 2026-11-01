@@ -118,6 +118,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val musicBarS = Spring(0f, 420f, 1f, 0.0008f)
     // A brief thickening of the volume bar on each key press.
     private val barPulse = Spring(0f, 260f, 0.85f, 0.004f)
+    // Waveform energy: eases to still dots on pause instead of snapping.
+    private val waveS = Spring(0f, 160f, 1f, 0.003f)
     private val burnInTick = Runnable { invalidate() }
     private val outlineTick = Runnable { invalidate() }
 
@@ -291,7 +293,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
     private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -396,6 +398,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 (old.clockMs() ?: 0L) > 0L && next.clockMs() == 0L)) {
             timerFeedback.snap(1f); timerFeedback.target = 0f
         }
+        val playing = next?.mode == IslandMode.MUSIC && next.isPlaying
+        if (next?.key != old?.key) waveS.snap(if (playing) 1f else 0f) else waveS.target = if (playing) 1f else 0f
         if (next == null && activity != null) departingActivity = activity
         if (next != null) departingActivity = null
         if (next != null && next.key != old?.key) {
@@ -726,7 +730,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (isLiveTimer(a) && (a.chronometerText() != rollText ||
                 rollAt != 0L && SystemClock.uptimeMillis() - rollAt < ROLL_MS)) return 16L
         return when {
-            a.mode == IslandMode.MUSIC && a.isPlaying -> 16L
+            // The small island's waveform reads fine at 30 fps; the open card's progress bar gets 60.
+            a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else 33L
             a.mode == IslandMode.CALL -> 33L
             a.mode == IslandMode.ALARM -> 33L
             a.clockBaseElapsed != null && a.pausedTimerMs == null -> {
@@ -1172,7 +1177,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         when (a.mode) {
             IslandMode.MUSIC -> {
                 // Artwork and waveform flank the camera, matching the SwiftUI compact layout.
-                drawWave(canvas, right - dp(20f), cy, dp(20f), dp(14f), userAccent ?: waveColor, a.isPlaying, alpha)
+                drawWave(canvas, right - dp(20f), cy, dp(20f), dp(14f), userAccent ?: waveColor, waveS.value, alpha)
             }
             IslandMode.CALL -> {
                 val t = a.chronometerText()
@@ -1206,7 +1211,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         drawArtwork(canvas, a, l, t, art, dp(14f), alpha)
         val tx = l + art + dp(14f)
         val waveW = dp(24f)
-        drawWave(canvas, rr - waveW, t + dp(20f), waveW, dp(18f), userAccent ?: waveColor, a.isPlaying, alpha)
+        drawWave(canvas, rr - waveW, t + dp(20f), waveW, dp(18f), userAccent ?: waveColor, waveS.value, alpha)
         text(canvas, a.title, tx, t + dp(25f), rr - waveW - dp(12f) - tx, titlePaint, Color.WHITE, alpha)
         text(canvas, a.subtitle, tx, t + dp(46f), rr - tx, bodyPaint, GREY, alpha)
 
@@ -1813,14 +1818,22 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         imagePaint.shader = null
     }
 
-    private fun drawWave(canvas: Canvas, left: Float, cy: Float, w: Float, maxH: Float, color: Int, active: Boolean, alpha: Int) {
+    private fun drawWave(canvas: Canvas, left: Float, cy: Float, w: Float, maxH: Float, color: Int, active: Boolean, alpha: Int) =
+        drawWave(canvas, left, cy, w, maxH, color, if (active) 1f else 0f, alpha)
+
+    /**
+     * Five bars breathing on two slow, offset sines. [energy] eases them between still dots (0)
+     * and full motion (1), so play and pause fade rather than snap.
+     */
+    private fun drawWave(canvas: Canvas, left: Float, cy: Float, w: Float, maxH: Float, color: Int, energy: Float, alpha: Int) {
         val bars = 5
         val bw = w / (bars * 2 - 1)
         fillPaint.color = withAlpha(color, alpha)
         val t = SystemClock.uptimeMillis() / 1000f
+        val e = energy.coerceIn(0f, 1f)
         for (i in 0 until bars) {
-            val phase = sin(t * (6f + i * 1.7f) + i * 1.3f) * 0.5f + 0.5f
-            val h = if (active) maxH * (0.25f + 0.75f * phase) else bw
+            val phase = .5f + .3f * sin(t * (4.2f + i * .9f) + i * 1.7f) + .2f * sin(t * (2.3f + i * .5f) + i * .6f)
+            val h = bw + (maxH * (.3f + .7f * phase) - bw) * e
             val x = left + i * bw * 2
             canvas.drawRoundRect(x, cy - h / 2, x + bw, cy + h / 2, bw / 2, bw / 2, fillPaint)
         }
