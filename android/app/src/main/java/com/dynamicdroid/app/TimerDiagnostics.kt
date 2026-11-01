@@ -10,5 +10,5 @@ object TimerDiagnostics {
         if (prefs.getString("last", null) != value) prefs.edit().putString("last", value).apply()
     }
     fun read(context: Context): String = context.getSharedPreferences("clock_signal", Context.MODE_PRIVATE)
-        .getString("last", null) ?: "No Clock notification received yet. Start a timer after enabling notification access."
+        .getString("last", null) ?: context.getString(R.string.clock_none)
 }

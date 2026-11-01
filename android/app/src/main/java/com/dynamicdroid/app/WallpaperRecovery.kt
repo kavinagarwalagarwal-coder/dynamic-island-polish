@@ -13,7 +13,7 @@ object WallpaperRecovery {
         val recover = p.getBoolean("glassActive", false) && since in 0L..30_000L
         if (recover) {
             WallpaperSkinStore.save(context, WallpaperSkinStore.read(context).copy(glass = false))
-            p.edit().putString("status", "Glass paused after a rapid restart. Your wallpaper still works; turn Liquid Glass on to retry.").commit()
+            p.edit().putString("status", STATUS_RESTART).commit()
         }
         p.edit().putLong("processStart", now).putBoolean("glassActive", false).commit()
         marked = false
@@ -27,10 +27,18 @@ object WallpaperRecovery {
     fun shaderFailed(context: Context) {
         WallpaperSkinStore.save(context, WallpaperSkinStore.read(context).copy(glass = false))
         context.getSharedPreferences("wallpaper_recovery", Context.MODE_PRIVATE).edit()
-            .putString("status", "Glass is unavailable on this device. Showing the plain wallpaper instead.").apply()
+            .putString("status", STATUS_UNAVAILABLE).apply()
     }
-    fun status(context: Context): String = context.getSharedPreferences("wallpaper_recovery", Context.MODE_PRIVATE)
-        .getString("status", "Wallpaper stays still. Glass bends it as the pill changes shape.") ?: ""
+    fun status(context: Context): String {
+        val stored = context.getSharedPreferences("wallpaper_recovery", Context.MODE_PRIVATE).getString("status", null)
+        return context.getString(when {
+            stored == STATUS_RESTART || stored?.startsWith("Glass paused") == true -> R.string.glass_status_restart
+            stored == STATUS_UNAVAILABLE || stored?.startsWith("Glass is unavailable") == true -> R.string.glass_status_unavailable
+            else -> R.string.glass_status_default
+        })
+    }
+    private const val STATUS_RESTART = "restart"
+    private const val STATUS_UNAVAILABLE = "unavailable"
     fun clearStatus(context: Context) {
         context.getSharedPreferences("wallpaper_recovery", Context.MODE_PRIVATE).edit().remove("status").apply()
     }

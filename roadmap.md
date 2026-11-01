@@ -8,4 +8,5 @@
 - [x] Expanded card covers full screen width, centred on screen instead of hanging off the camera.
 - [x] Dynamic-Island-style motion: bouncier shape springs (damping ~0.62/0.68), content fades in later during the morph.
 - [x] Wallpaper skin no longer turns black after unlock; Liquid Glass no longer flashes white or glitches during expand (fixed stage, no per-frame layer resize).
+- [x] Volume, headphones / Bluetooth lost, download, alarm and Calling… islands; medium messages with Reply; look, haptics and lock-screen options; 13 languages.
 - [ ] Verify on a phone; blocked by lack of an Android device/emulator in this workspace.

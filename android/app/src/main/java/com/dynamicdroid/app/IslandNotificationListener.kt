@@ -30,6 +30,7 @@ class IslandNotificationListener : NotificationListenerService() {
     private var controller: MediaController? = null
     private val timers = HashMap<String, LiveActivity>()
     private val lastMessageText = HashMap<String, String>()
+    private val lastProgress = HashMap<String, Float>()
 
     private var artKey: String? = null
     private var artBitmap: Bitmap? = null
@@ -99,12 +100,25 @@ class IslandNotificationListener : NotificationListenerService() {
             TimerDiagnostics.record(this, sbn.packageName, customClock?.source ?: "standard fields",
                 recognizedTimer, n.contentView != null || n.bigContentView != null)
         }
+        val features = IslandFeatures.read(this)
+        val actionLabels = n.actions.orEmpty().map { it.title?.toString().orEmpty() }
+        val progress = IslandSignals.progressFraction(extras.getInt(Notification.EXTRA_PROGRESS),
+            extras.getInt(Notification.EXTRA_PROGRESS_MAX), extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
         val mode = when {
             n.category == Notification.CATEGORY_CALL -> IslandMode.CALL
+            features.alarms && IslandSignals.isRingingAlarm(n.category, clockApp, actionLabels) -> IslandMode.ALARM
             n.category == Notification.CATEGORY_NAVIGATION && sbn.isOngoing -> IslandMode.NAVIGATION
             recognizedTimer -> IslandMode.TIMER
+            features.downloads && progress != null && progress < 1f &&
+                (sbn.isOngoing || n.category == Notification.CATEGORY_PROGRESS) -> IslandMode.DOWNLOAD
+            sbn.key in lastProgress -> { finishProgress(sbn.key); if (sbn.isOngoing) return else IslandMode.MESSAGE }
             sbn.isOngoing -> return
             else -> IslandMode.MESSAGE
+        }
+        if (mode == IslandMode.DOWNLOAD) {
+            val fraction = progress ?: return
+            if (!IslandSignals.progressWorthPosting(lastProgress[sbn.key], fraction)) return
+            lastProgress[sbn.key] = fraction
         }
 
         if (mode == IslandMode.MESSAGE) {
@@ -119,6 +133,14 @@ class IslandNotificationListener : NotificationListenerService() {
             .filter { it.actionIntent != null && (mode == IslandMode.CALL || it.remoteInputs.isNullOrEmpty()) }
             .map { IslandAction(it.title?.toString().orEmpty(), it.actionIntent) }
             .filter { it.label.isNotBlank() }
+        // The app's own reply action (free-form text), sent back through its RemoteInput.
+        val reply = if (mode == IslandMode.MESSAGE && features.inlineReply) n.actions.orEmpty().firstNotNullOfOrNull { a ->
+            val input = a.remoteInputs?.firstOrNull { it.allowFreeFormInput } ?: return@firstNotNullOfOrNull null
+            val intent = a.actionIntent ?: return@firstNotNullOfOrNull null
+            ReplyAction(a.title?.toString()?.takeIf { it.isNotBlank() } ?: "Reply", intent, input)
+        } else null
+        val callState = if (mode == IslandMode.CALL) IslandSignals.callState(
+            extras.getInt(EXTRA_CALL_TYPE, 0), actionLabels, chronometer) else null
 
         val previousTimer = timers[sbn.key]
         val parsedRemaining = if (mode == IslandMode.TIMER && !chronometer) {
@@ -129,7 +151,9 @@ class IslandNotificationListener : NotificationListenerService() {
                 text.contains("paused", ignoreCase = true))
         val remaining = parsedRemaining ?: customClock?.remainingMs ?: previousTimer?.clockMs()
         val base = when {
-            chronometer || mode == IslandMode.CALL -> n.`when`.takeIf { it > 0L }
+            // A call's timer starts only once it connects; "Calling…" shows until then.
+            mode == IslandMode.CALL -> if (callState == CallState.ACTIVE) n.`when`.takeIf { it > 0L } else null
+            chronometer -> n.`when`.takeIf { it > 0L }
             remaining != null && !paused -> System.currentTimeMillis() + remaining
             else -> null
         }
@@ -152,6 +176,9 @@ class IslandNotificationListener : NotificationListenerService() {
                 SystemClock.elapsedRealtime() + (it - System.currentTimeMillis())
             },
             pausedTimerMs = if (paused) remaining else null,
+            progress = if (mode == IslandMode.DOWNLOAD) progress else null,
+            callState = callState,
+            reply = reply,
         )
         if (mode == IslandMode.TIMER) timers[sbn.key] = activity
         IslandBus.post(activity)
@@ -159,6 +186,7 @@ class IslandNotificationListener : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         timers.remove(sbn.key)
+        lastProgress.remove(sbn.key)
         lastMessageText.remove(sbn.key)
         IslandBus.remove(sbn.key)
         if (sbn.key == mediaNotification?.key) {
@@ -179,6 +207,12 @@ class IslandNotificationListener : NotificationListenerService() {
         IslandBus.mediaControl = null
         main.removeCallbacksAndMessages(null)
         super.onDestroy()
+    }
+
+    /** A progress notification finished or stopped reporting progress: drop its island. */
+    private fun finishProgress(key: String) {
+        lastProgress.remove(key)
+        IslandBus.remove(key)
     }
 
     // ---------------------------------------------------------------- filtering
@@ -314,5 +348,7 @@ class IslandNotificationListener : NotificationListenerService() {
     companion object {
         @Volatile var instance: IslandNotificationListener? = null
             private set
+        /** Notification.EXTRA_CALL_TYPE (API 31); read by name so older SDK levels still work. */
+        private const val EXTRA_CALL_TYPE = "android.callType"
     }
 }

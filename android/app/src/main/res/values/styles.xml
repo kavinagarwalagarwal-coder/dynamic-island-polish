@@ -6,5 +6,28 @@
         <item name="android:navigationBarColor">#0D0D0D</item>
         <item name="android:statusBarColor">#0D0D0D</item>
         <item name="android:windowLightStatusBar">false</item>
+        <!-- Dark from the first frame, so the launch flourish never follows a white flash. -->
+        <item name="android:windowBackground">@color/island_background</item>
+        <item name="android:windowAnimationStyle">@style/IslandWindowAnimation</item>
+    </style>
+
+    <!-- New windows inside the app slide up and settle; the one beneath steps back. -->
+    <style name="IslandWindowAnimation" parent="@android:style/Animation.Activity">
+        <item name="android:activityOpenEnterAnimation">@anim/island_slide_in</item>
+        <item name="android:activityOpenExitAnimation">@anim/island_fade_back</item>
+        <item name="android:activityCloseEnterAnimation">@anim/island_fade_forward</item>
+        <item name="android:activityCloseExitAnimation">@anim/island_slide_out</item>
+    </style>
+
+    <!-- Dialogs grow out of the centre with a slight overshoot. -->
+    <style name="IslandDialog" parent="@android:style/Theme.Material.Dialog.Alert">
+        <item name="android:colorAccent">#F2F2F2</item>
+        <item name="android:colorBackground">#1E1E1E</item>
+        <item name="android:windowAnimationStyle">@style/IslandDialogAnimation</item>
+    </style>
+
+    <style name="IslandDialogAnimation" parent="@android:style/Animation.Dialog">
+        <item name="android:windowEnterAnimation">@anim/island_pop_in</item>
+        <item name="android:windowExitAnimation">@anim/island_pop_out</item>
     </style>
 </resources>

@@ -105,3 +105,26 @@ Foreground detection now checks the unfiltered activity shelf (the owner's activ
 - **Black pill after unlock:** Android can free an overlay's GPU display lists while the screen is off. The glass layer now notices (`RenderNode.hasDisplayList()`) and is also invalidated on screen-off, window re-show and attach, so the wallpaper redraws on the first frame after unlock instead of waiting for a tap. If the phone was rebooted, the saved wallpaper is re-read after the first unlock rather than staying empty.
 - **White edges / glitch while expanding:** the glass layer used to be re-recorded, resized and given a new shader effect on every animation frame. The wallpaper is now laid out once on a fixed stage behind the island, so the GPU layer never resizes or stretches (the 1.6.2 stopgap scaled the cached lens during motion). While the island moves, the lens is switched off and the still wallpaper shows through; the lens is rebuilt once when the shape settles. The picture stays still as the island opens over it (no zoom pumping), refraction near the edges samples real wallpaper instead of the layer border, and the rim highlight is fainter and fades with the island.
 - Smaller polish: no gradient allocations per frame for the rim or artwork placeholder, and some unused imports removed.
+
+### More islands, settings and languages (1.7.0)
+
+Everything here can be switched on or off on the new **Features** page, and each new island has a Playground demo.
+
+- **Volume island.** Volume keys show a level bar in the island instead of the system slider; drag the bar to set the level. The accessibility service filters key events but only ever looks at the two volume keys. The system slider still handles the keys when the screen is off, while locked (unless the island shows on the lock screen), while the phone is ringing, or when the island window is not attached. After updating, Android may need the accessibility service switched off and on once before it delivers key events.
+- **Headphones and Bluetooth lost.** When Bluetooth headphones or a wearable connect, a medium island shows the name and battery; when one drops away, a red one says so. This uses only the system's connection broadcasts and asks for the Nearby devices permission on Android 12+. Battery comes from Android's battery broadcast, which most but not all devices send.
+- **Downloads.** Any notification with a determinate progress bar becomes a progress island (ring and percent when small, bar when expanded). Updates are coalesced to whole percents.
+- **Alarms.** A ringing alarm (a Clock notification with Snooze) opens an amber island using the clock app's own Snooze and Dismiss buttons. It stays open until handled and shows over fullscreen apps.
+- **Calls.** Outgoing calls show *Calling…* until they connect, then the call timer. Android 12+ CallStyle types are used directly; older dialers are read from their buttons and chronometer.
+- **Messages.** New messages arrive as a medium island; hold to grow the full card. **Reply** sends text back through the app's own reply action; the text field is a small focusable window under the card, so the island itself never takes keyboard focus.
+- **Look.** Short or long small island, small island height (30–44 dp), full-width cards that follow the phone's own screen corners (Android 12+), coloured side bubbles whose timer outline shows the time left, an island outline (off / on events / always), burn-in care (static glyphs drift a pixel each minute), and an optional grey island on the lock screen (camera-area overlay only).
+- **Haptics.** Separate switches for tap, hold, side swipe and swipe up, and an option to stay quiet in Do Not Disturb.
+- **Languages.** UI text moved to string resources and translated into Hindi, Spanish, Portuguese (Brazil), French, German, Italian, Dutch, Polish, Russian, Turkish, Indonesian and Japanese. Translations are machine-written and would benefit from native-speaker review.
+
+`FeatureIslandRenderTest` renders each new island state on the emulator and saves screenshots with the other render checks.
+
+### Logo, launch and guided tour (1.7.0)
+
+- **Mark.** An original logo drawn in code: a red camera dot, the island pill growing out of it, and a droplet pinching off, the same story the island tells. It is also the adaptive launcher icon, with a themed (monochrome) version.
+- **Launch flourish.** The mark builds itself, the dot-matrix name sweeps in, then the sheet lifts away while the screen rises into place. The system splash uses the same black, so there is no white flash. It plays on a real launch, not on rotation.
+- **Guided tour.** Shown on first run and from *How to use the island* in Playground and Setup. Each page drives a real island with synthetic touches (tap, hold, swipe up, side swipe, then the volume, headphones and alarm islands), so it behaves exactly as on the phone. Touching the island pauses the demo so people can try it.
+- **Motion.** The header logo rebuilds on every page; pages stagger in; buttons spring; dialogs and new windows grow in. Everything follows the system animation scale. Instrumented tests run through `IslandTestRunner`, which skips the flourish and the tour; `TourAndLogoRenderTest` captures the logo frames and every tour page.

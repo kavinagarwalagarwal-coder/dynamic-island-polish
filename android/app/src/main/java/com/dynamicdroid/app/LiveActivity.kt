@@ -1,14 +1,21 @@
 package com.dynamicdroid.app
 
 import android.app.PendingIntent
+import android.app.RemoteInput
 import android.graphics.Bitmap
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 
-enum class IslandMode { MUSIC, CALL, TIMER, NAVIGATION, CHARGING, MESSAGE }
+enum class IslandMode { MUSIC, CALL, TIMER, NAVIGATION, CHARGING, MESSAGE, VOLUME, DEVICE, DOWNLOAD, ALARM }
+
+/** Incoming rings, Calling… while an outgoing call connects, Active once the call timer runs. */
+enum class CallState { INCOMING, CALLING, ACTIVE }
 
 data class IslandAction(val label: String, val intent: PendingIntent)
+
+/** A notification's own reply action; the island sends typed text back through it. */
+data class ReplyAction(val label: String, val intent: PendingIntent, val remoteInput: RemoteInput)
 
 /** One thing the island can show. Built by the notification listener, drawn by IslandView. */
 data class LiveActivity(
@@ -38,8 +45,15 @@ data class LiveActivity(
     val clockBaseElapsed: Long? = chronometerBase?.let {
         SystemClock.elapsedRealtime() + (it - System.currentTimeMillis())
     },
+    /** 0..1 for downloads, volume and device battery; null when unknown or indeterminate. */
+    val progress: Float? = null,
+    val callState: CallState? = null,
+    val reply: ReplyAction? = null,
+    /** Device islands: true for a disconnect ("Bluetooth lost"). */
+    val lost: Boolean = false,
 ) {
-    val isTransient: Boolean get() = mode == IslandMode.MESSAGE || mode == IslandMode.CHARGING
+    val isTransient: Boolean get() = mode == IslandMode.MESSAGE || mode == IslandMode.CHARGING ||
+        mode == IslandMode.VOLUME || mode == IslandMode.DEVICE
 
     fun livePositionMs(now: Long = SystemClock.elapsedRealtime()): Long {
         val p = if (isPlaying) positionMs + ((now - positionUpdatedAt) * playbackSpeed).toLong() else positionMs

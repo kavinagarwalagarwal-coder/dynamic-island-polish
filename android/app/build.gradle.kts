@@ -12,9 +12,9 @@ android {
         applicationId = "com.dynamicdroid.app"
         minSdk = 26
         targetSdk = 35
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        versionCode = 14
-        versionName = "1.6.3"
+        testInstrumentationRunner = "com.dynamicdroid.app.IslandTestRunner"
+        versionCode = 15
+        versionName = "1.7.0"
     }
 
     buildFeatures {
