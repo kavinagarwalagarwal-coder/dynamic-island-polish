@@ -121,3 +121,10 @@ Everything here can be switched on or off on the new **Features** page, and each
 - **Languages.** UI text moved to string resources and translated into Hindi, Spanish, Portuguese (Brazil), French, German, Italian, Dutch, Polish, Russian, Turkish, Indonesian and Japanese. Translations are machine-written and would benefit from native-speaker review.
 
 `FeatureIslandRenderTest` renders each new island state on the emulator and saves screenshots with the other render checks.
+
+### Logo, launch and guided tour (1.7.0)
+
+- **Mark.** An original logo drawn in code: a red camera dot, the island pill growing out of it, and a droplet pinching off, the same story the island tells. It is also the adaptive launcher icon, with a themed (monochrome) version.
+- **Launch flourish.** The mark builds itself, the dot-matrix name sweeps in, then the sheet lifts away while the screen rises into place. The system splash uses the same black, so there is no white flash. It plays on a real launch, not on rotation.
+- **Guided tour.** Shown on first run and from *How to use the island* in Playground and Setup. Each page drives a real island with synthetic touches (tap, hold, swipe up, side swipe, then the volume, headphones and alarm islands), so it behaves exactly as on the phone. Touching the island pauses the demo so people can try it.
+- **Motion.** The header logo rebuilds on every page; pages stagger in; buttons spring; dialogs and new windows grow in. Everything follows the system animation scale. Instrumented tests run through `IslandTestRunner`, which skips the flourish and the tour; `TourAndLogoRenderTest` captures the logo frames and every tour page.
