@@ -4,6 +4,7 @@ import android.content.Intent
 import android.media.AudioManager
 import android.os.ParcelFileDescriptor
 import android.os.SystemClock
+import android.view.KeyEvent
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
@@ -41,6 +42,18 @@ class VolumeAndRingerTest {
 
     private var keyCalls = 0
 
+    /**
+     * Keys typed by the test tool skip the accessibility key filter (only real buttons go through
+     * it), so hand the service the same events a real volume button would.
+     */
+    private fun key(action: Int) {
+        var taken = false
+        instrumentation.runOnMainSync {
+            taken = IslandAccessibilityService.instance!!.onKeyEvent(KeyEvent(action, KeyEvent.KEYCODE_VOLUME_UP))
+        }
+        assertTrue("The island should take the volume key: " + state(), taken)
+    }
+
     private fun state(): String {
         val service = IslandBus.listener as? IslandOverlayService
         val island = service?.javaClass?.getDeclaredField("island")?.apply { isAccessible = true }?.get(service)
@@ -71,14 +84,16 @@ class VolumeAndRingerTest {
 
                 // One press: one step.
                 audio.setStreamVolume(AudioManager.STREAM_MUSIC, 1, 0)
-                shell("input keyevent KEYCODE_VOLUME_UP")
+                key(KeyEvent.ACTION_DOWN); key(KeyEvent.ACTION_UP)
                 if (!waitFor(2_000) { audio.getStreamVolume(AudioManager.STREAM_MUSIC) == 2 }) fail("A single press should step once: " + state())
                 Thread.sleep(600)
                 assertEquals("A single press must not repeat", 2, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
 
                 // Held for 1.5 s: keeps going.
                 audio.setStreamVolume(AudioManager.STREAM_MUSIC, 1, 0)
-                shell("input keyevent --duration 1500 KEYCODE_VOLUME_UP")
+                key(KeyEvent.ACTION_DOWN)
+                Thread.sleep(1_500)
+                key(KeyEvent.ACTION_UP)
                 Thread.sleep(300)
                 val held = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
                 assertTrue("Holding volume up only reached $held: " + state(), held >= 6)
