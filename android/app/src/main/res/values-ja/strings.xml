@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Dynamic Droid アイランド</string>
-    <string name="accessibility_description">アイランドをステータスバーの上に表示し、パッケージ名でアプリの切り替えを検出し、音量ボタンで音量アイランドを表示します。確認するのは音量ボタンだけで、その他のキーはそのまま通過します。画面の内容は読み取らず、スクリーンショットも撮りません。</string>
+    <string name="accessibility_description">アイランドをステータスバーの上に配置し、アプリの切り替えを検出するためにアプリのパッケージ名を使い、音量ボタンで音量アイランドを表示します。確認するのは音量ボタンだけで、ほかのキーはそのまま通します。端末のポップアップを隠すをオンにすると、アイランドが表示中の通知のシステムポップアップを見つけて通知シェードへスワイプします。その際に見るのは System UI だけで、画面のほかの部分は見ません。スクリーンショットは一切撮りません。</string>
     <string name="island_calling">発信中…</string>
     <string name="island_connected">接続済み</string>
     <string name="island_disconnected">切断されました</string>
@@ -263,13 +263,14 @@
     <string name="onb_ready_title">準備完了</string>
     <string name="onb_ready_body">アイランドは接続済みです。このツアーはお試しからいつでも見直せます。</string>
     <string name="feature_hide_popups">端末のポップアップ通知を隠す</string>
-    <string name="feature_hide_popups_note">端末のバナーの代わりに、アイランドが新しい通知を表示します。通知は引き続き通知シェードに届きます。アイランドが動いていないとき、非表示の時間帯、または通知へのアクセスが切れたときは、ポップアップが自動で戻ります。</string>
+    <string name="feature_hide_popups_note">端末のバナーの代わりにアイランドが新しい通知を表示し、ポップアップは出た瞬間に片付けます。通知は引き続き通知シェードに届きます。アイランドが動いていないとき、非表示の時間帯、アイランドを隠しているアプリでは、ポップアップは通常どおりです。</string>
     <string name="popups_status_active">有効 • アイランドの動作中は端末のポップアップを隠しています</string>
     <string name="popups_status_waiting">オン • アイランドと通知へのアクセスが接続されるとポップアップを隠します</string>
-    <string name="popups_status_needs_grant">パソコンからの一度きりの許可が必要です</string>
-    <string name="popups_grant_button">許可する方法</string>
-    <string name="popups_grant_title">ポップアップの制御を許可</string>
-    <string name="popups_grant_body">Android では、一度きりの許可がないとアプリはこの設定を変更できません。USB デバッグをオンにし、端末をパソコンにつないで次を実行してください:\n\n%1$s\n\nDynamic Droid をアンインストールする前にこのオプションをオフにすると、ポップアップが元に戻ります。</string>
+    <string name="popups_grant_button">ポップアップを完全に止める(任意)</string>
+    <string name="popups_grant_title">ポップアップを完全に止める</string>
+    <string name="popups_grant_body">これは任意です。設定しなくても、アイランドはポップアップを表示の直後に片付けます。パソコンから一度だけ許可すると、Dynamic Droid は端末のポップアップ自体をオフにでき、一瞬も表示されなくなります。USB デバッグをオンにして端末をつなぎ、次を実行してください:\n\n%1$s\n\nDynamic Droid をアンインストールする前にこのオプションをオフにすると、ポップアップが元に戻ります。</string>
+    <string name="popups_status_swipe">オン • 端末のポップアップは出た瞬間にアイランドが片付けます</string>
+    <string name="popups_status_needs_access">ポップアップを片付けられるよう、ユーザー補助で Dynamic Droid をオンにしてください</string>
     <string name="popups_copy">コマンドをコピー</string>
     <string name="popups_copied">コマンドをコピーしました</string>
 </resources>

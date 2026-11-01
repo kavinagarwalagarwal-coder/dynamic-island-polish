@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Dynamic Droid Insel</string>
-    <string name="accessibility_description">Platziert die Insel über der Statusleiste, erkennt App-Wechsel anhand von Paketnamen und lässt die Lautstärketasten die Lautstärke-Insel zeigen. Nur die Lautstärketasten werden geprüft; alle anderen Tasten werden unverändert weitergegeben. Liest keine Bildschirminhalte und erstellt keine Screenshots.</string>
+    <string name="accessibility_description">Legt die Insel über die Statusleiste, nutzt App-Paketnamen, um App-Wechsel zu erkennen, und lässt die Lautstärketasten die Lautstärke-Insel zeigen. Nur die Lautstärketasten werden geprüft; alle anderen Tasten bleiben unberührt. Wenn du das Ausblenden der Pop-ups des Handys einschaltest, sucht er außerdem das System-Pop-up einer Benachrichtigung, die die Insel gerade zeigt, und wischt es in die Benachrichtigungsleiste; dafür schaut er nur auf System UI und auf nichts anderes am Bildschirm. Er macht nie Screenshots.</string>
     <string name="island_calling">Anruf wird aufgebaut…</string>
     <string name="island_connected">Verbunden</string>
     <string name="island_disconnected">Getrennt</string>
@@ -263,13 +263,14 @@
     <string name="onb_ready_title">Alles bereit</string>
     <string name="onb_ready_body">Deine Insel ist verbunden. Du kannst diese Tour jederzeit unter Ausprobieren wiederholen.</string>
     <string name="feature_hide_popups">Pop-up-Benachrichtigungen des Handys ausblenden</string>
-    <string name="feature_hide_popups_note">Die Insel zeigt neue Benachrichtigungen statt der Banner des Handys. Sie landen weiterhin in der Benachrichtigungsleiste. Pop-ups kehren von selbst zurück, wenn die Insel nicht läuft, während Ruhezeiten oder wenn der Benachrichtigungszugriff wegfällt.</string>
+    <string name="feature_hide_popups_note">Die Insel zeigt neue Benachrichtigungen statt der Banner des Handys und wischt jedes Pop-up weg, sobald es erscheint. Sie landen weiterhin in der Benachrichtigungsleiste. Pop-ups bleiben wie gewohnt, wenn die Insel nicht läuft, während Ruhezeiten oder in Apps, in denen die Insel ausgeblendet ist.</string>
     <string name="popups_status_active">Aktiv • Pop-ups des Handys sind ausgeblendet, solange die Insel läuft</string>
     <string name="popups_status_waiting">An • Pop-ups verschwinden, sobald Insel und Benachrichtigungszugriff verbunden sind</string>
-    <string name="popups_status_needs_grant">Braucht eine einmalige Berechtigung über einen Computer</string>
-    <string name="popups_grant_button">So erlaubst du es</string>
-    <string name="popups_grant_title">Pop-up-Steuerung erlauben</string>
-    <string name="popups_grant_body">Android erlaubt Apps diese Einstellung nur nach einer einmaligen Berechtigung. Aktiviere USB-Debugging, verbinde das Handy mit einem Computer und führe aus:\n\n%1$s\n\nSchalte diese Option vor dem Deinstallieren von Dynamic Droid aus, damit deine Pop-ups zurückkommen.</string>
+    <string name="popups_grant_button">Pop-ups ganz abschalten (optional)</string>
+    <string name="popups_grant_title">Pop-ups ganz abschalten</string>
+    <string name="popups_grant_body">Das ist optional. Ohne das wischt die Insel jedes Pop-up einen Moment nach dem Erscheinen weg. Mit einer einmaligen Berechtigung über einen Computer kann Dynamic Droid die Pop-ups des Handys ganz abschalten, sodass sie nie aufblitzen. Aktiviere USB-Debugging, verbinde das Handy und führe aus:\n\n%1$s\n\nSchalte diese Option vor dem Deinstallieren von Dynamic Droid aus, damit deine Pop-ups zurückkommen.</string>
+    <string name="popups_status_swipe">An • die Insel wischt Pop-ups des Handys weg, sobald sie erscheinen</string>
+    <string name="popups_status_needs_access">Schalte Dynamic Droid unter Bedienungshilfen ein, damit es Pop-ups wegwischen kann</string>
     <string name="popups_copy">Befehl kopieren</string>
     <string name="popups_copied">Befehl kopiert</string>
 </resources>

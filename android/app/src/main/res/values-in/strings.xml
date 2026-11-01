@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Pulau Dynamic Droid</string>
-    <string name="accessibility_description">Menempatkan pulau di atas bilah status, memakai nama paket untuk mendeteksi pergantian aplikasi, dan membuat tombol volume menampilkan pulau volume. Hanya tombol volume yang diperiksa; semua tombol lain diteruskan tanpa diubah. Tidak membaca isi layar dan tidak mengambil screenshot.</string>
+    <string name="accessibility_description">Menempatkan pulau di atas bilah status, memakai nama paket aplikasi untuk mendeteksi pergantian aplikasi, dan membuat tombol volume menampilkan pulau volume. Hanya tombol volume yang diperiksa; tombol lain diteruskan tanpa disentuh. Jika Anda menyalakan sembunyikan pop-up ponsel, layanan ini juga mencari pop-up sistem dari notifikasi yang sedang ditampilkan pulau lalu menggesernya ke panel; untuk itu hanya System UI yang dilihat, tidak ada hal lain di layar. Tidak pernah mengambil tangkapan layar.</string>
     <string name="island_calling">Memanggil…</string>
     <string name="island_connected">Terhubung</string>
     <string name="island_disconnected">Terputus</string>
@@ -263,13 +263,14 @@
     <string name="onb_ready_title">Semua siap</string>
     <string name="onb_ready_body">Pulau Anda terhubung. Ulangi tur ini kapan saja dari Coba.</string>
     <string name="feature_hide_popups">Sembunyikan notifikasi pop-up ponsel</string>
-    <string name="feature_hide_popups_note">Pulau menampilkan notifikasi baru sebagai ganti banner ponsel. Notifikasi tetap masuk ke panel notifikasi. Pop-up kembali sendiri saat pulau tidak berjalan, selama jam tenang, atau jika akses notifikasi hilang.</string>
+    <string name="feature_hide_popups_note">Pulau menampilkan notifikasi baru sebagai ganti banner ponsel dan menyingkirkan setiap pop-up begitu muncul. Notifikasi tetap masuk ke panel notifikasi. Pop-up tetap seperti biasa saat pulau tidak berjalan, selama jam tenang, atau di aplikasi tempat pulau disembunyikan.</string>
     <string name="popups_status_active">Aktif • pop-up ponsel disembunyikan selama pulau berjalan</string>
     <string name="popups_status_waiting">Nyala • pop-up akan disembunyikan setelah pulau dan akses notifikasi terhubung</string>
-    <string name="popups_status_needs_grant">Memerlukan izin satu kali dari komputer</string>
-    <string name="popups_grant_button">Cara mengizinkannya</string>
-    <string name="popups_grant_title">Izinkan kontrol pop-up</string>
-    <string name="popups_grant_body">Android hanya mengizinkan aplikasi mengubah setelan ini setelah izin satu kali. Aktifkan debugging USB, hubungkan ponsel ke komputer, lalu jalankan:\n\n%1$s\n\nMatikan opsi ini sebelum menghapus Dynamic Droid agar pop-up kembali.</string>
+    <string name="popups_grant_button">Hentikan pop-up sepenuhnya (opsional)</string>
+    <string name="popups_grant_title">Hentikan pop-up sepenuhnya</string>
+    <string name="popups_grant_body">Ini opsional. Tanpa ini, pulau menyingkirkan setiap pop-up sesaat setelah muncul. Dengan izin satu kali dari komputer, Dynamic Droid bisa mematikan pop-up ponsel sehingga tidak pernah muncul. Aktifkan debugging USB, hubungkan ponsel, lalu jalankan:\n\n%1$s\n\nMatikan opsi ini sebelum menghapus Dynamic Droid agar pop-up kembali.</string>
+    <string name="popups_status_swipe">Nyala • pulau menyingkirkan pop-up ponsel begitu muncul</string>
+    <string name="popups_status_needs_access">Nyalakan Dynamic Droid di setelan Aksesibilitas agar bisa menyingkirkan pop-up</string>
     <string name="popups_copy">Salin perintah</string>
     <string name="popups_copied">Perintah disalin</string>
 </resources>

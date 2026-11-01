@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Îlot Dynamic Droid</string>
-    <string name="accessibility_description">Place l\'îlot au-dessus de la barre d\'état, utilise les noms de paquets pour détecter les changements d\'app et permet aux touches de volume d\'afficher l\'îlot de volume. Seules les touches de volume sont vérifiées ; toutes les autres passent sans modification. Il ne lit pas le contenu de l\'écran et ne fait pas de captures.</string>
+    <string name="accessibility_description">Place l\'îlot au-dessus de la barre d\'état, utilise les noms de paquet des apps pour détecter les changements d\'app et permet aux touches de volume d\'afficher l\'îlot de volume. Seules les touches de volume sont examinées ; toutes les autres passent intactes. Si vous activez le masquage des pop-ups du téléphone, il repère aussi le pop-up système d\'une notification affichée par l\'îlot et le glisse dans le volet ; pour cela il ne regarde que System UI, rien d\'autre à l\'écran. Il ne fait jamais de captures d\'écran.</string>
     <string name="island_calling">Appel en cours…</string>
     <string name="island_connected">Connecté</string>
     <string name="island_disconnected">Déconnecté</string>
@@ -263,13 +263,14 @@
     <string name="onb_ready_title">Tout est prêt</string>
     <string name="onb_ready_body">Votre îlot est connecté. Revoyez cette visite quand vous voulez depuis Essai.</string>
     <string name="feature_hide_popups">Masquer les notifications pop-up du téléphone</string>
-    <string name="feature_hide_popups_note">L\'îlot affiche les nouvelles notifications à la place des bannières du téléphone. Elles arrivent toujours dans le volet des notifications. Les pop-ups reviennent d\'eux-mêmes quand l\'îlot ne tourne pas, pendant les heures calmes ou si l\'accès aux notifications est perdu.</string>
+    <string name="feature_hide_popups_note">L\'îlot affiche les nouvelles notifications à la place des bannières du téléphone et écarte chaque pop-up dès qu\'il apparaît. Elles arrivent toujours dans le volet des notifications. Les pop-ups restent normaux quand l\'îlot ne tourne pas, pendant les heures calmes ou dans les apps où l\'îlot est masqué.</string>
     <string name="popups_status_active">Actif • les pop-ups du téléphone sont masqués tant que l\'îlot fonctionne</string>
     <string name="popups_status_waiting">Activé • les pop-ups seront masqués une fois l\'îlot et l\'accès aux notifications connectés</string>
-    <string name="popups_status_needs_grant">Nécessite une autorisation unique depuis un ordinateur</string>
-    <string name="popups_grant_button">Comment l\'autoriser</string>
-    <string name="popups_grant_title">Autoriser le contrôle des pop-ups</string>
-    <string name="popups_grant_body">Android ne laisse les apps modifier ce réglage qu\'après une autorisation unique. Activez le débogage USB, branchez le téléphone à un ordinateur et lancez :\n\n%1$s\n\nDésactivez cette option avant de désinstaller Dynamic Droid pour retrouver vos pop-ups.</string>
+    <string name="popups_grant_button">Couper complètement les pop-ups (facultatif)</string>
+    <string name="popups_grant_title">Couper complètement les pop-ups</string>
+    <string name="popups_grant_body">C\'est facultatif. Sans cela, l\'îlot écarte chaque pop-up un instant après son apparition. Avec une autorisation unique depuis un ordinateur, Dynamic Droid peut couper les pop-ups du téléphone pour qu\'ils n\'apparaissent jamais. Activez le débogage USB, branchez le téléphone et lancez :\n\n%1$s\n\nDésactivez cette option avant de désinstaller Dynamic Droid pour retrouver vos pop-ups.</string>
+    <string name="popups_status_swipe">Activé • l\'îlot écarte les pop-ups du téléphone dès qu\'ils apparaissent</string>
+    <string name="popups_status_needs_access">Activez Dynamic Droid dans Accessibilité pour qu\'il puisse écarter les pop-ups</string>
     <string name="popups_copy">Copier la commande</string>
     <string name="popups_copied">Commande copiée</string>
 </resources>

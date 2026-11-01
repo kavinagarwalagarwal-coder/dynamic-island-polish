@@ -658,10 +658,12 @@ class MainActivity : AppCompatActivity() {
         section(R.string.features_messages)
         toggle(R.string.feature_reply, "inline_reply", features.inlineReply)
         toggle(R.string.feature_medium, "messages_medium", features.messagesMediumFirst, R.string.feature_medium_note)
-        toggle(R.string.feature_hide_popups, "hide_phone_popups", features.hidePhonePopups, R.string.feature_hide_popups_note) { on ->
-            if (on && !HeadsUpControl.canControl(this)) explainPopupGrant()
-        }
+        toggle(R.string.feature_hide_popups, "hide_phone_popups", features.hidePhonePopups, R.string.feature_hide_popups_note)
         popupStatus = label("", 13f, NothingStyle.foreground).also { column.addView(it, row(-2).apply { topMargin = dp(2) }) }
+        column.addView(action("popups-a11y", getString(R.string.setup_a11y_allow)) {
+            toast(getString(R.string.setup_a11y_toast))
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }, row(-2).apply { topMargin = dp(8) })
         column.addView(action("popups-grant", getString(R.string.popups_grant_button)) { explainPopupGrant() },
             row(-2).apply { topMargin = dp(8) })
         refreshPopupStatus()
@@ -740,13 +742,19 @@ class MainActivity : AppCompatActivity() {
         val status = popupStatus ?: return
         val wanted = IslandFeatures.read(this).hidePhonePopups
         val granted = HeadsUpControl.canControl(this)
+        val a11y = IslandAccessibilityService.instance != null
+        val working = HeadsUpControl.hiding(this) || !granted && a11y
         status.visibility = if (wanted) View.VISIBLE else View.GONE
         status.text = getString(when {
-            !granted -> R.string.popups_status_needs_grant
             HeadsUpControl.hiding(this) -> R.string.popups_status_active
-            else -> R.string.popups_status_waiting
+            granted -> R.string.popups_status_waiting
+            a11y -> R.string.popups_status_swipe
+            else -> R.string.popups_status_needs_access
         })
-        status.setTextColor(if (granted && HeadsUpControl.hiding(this)) 0xFF9BE4BE.toInt() else NothingStyle.muted)
+        status.setTextColor(if (working) 0xFF9BE4BE.toInt() else NothingStyle.muted)
+        // Without the system switch, swiping pop-ups away needs the accessibility service.
+        buttons["popups-a11y"]?.visibility = if (wanted && !granted && !a11y) View.VISIBLE else View.GONE
+        // The computer step is optional: it stops pop-ups outright instead of swiping them.
         buttons["popups-grant"]?.visibility = if (wanted && !granted) View.VISIBLE else View.GONE
     }
 

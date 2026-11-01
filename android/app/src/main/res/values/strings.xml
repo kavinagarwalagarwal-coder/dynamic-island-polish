@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Dynamic Droid island</string>
-    <string name="accessibility_description">Places the island above the status bar, uses app package names to detect app switches, and lets the volume keys show the volume island. Only the volume keys are checked; every other key passes through untouched. It does not read screen contents or capture screenshots.</string>
+    <string name="accessibility_description">Places the island above the status bar, uses app package names to detect app switches, and lets the volume keys show the volume island. Only the volume keys are checked; every other key passes through untouched. If you turn on hiding the phone\'s pop-ups, it also finds the system\'s pop-up for a notification the island is showing and swipes it into the shade; it looks only at System UI for that and nothing else on screen. It never captures screenshots.</string>
     <!-- Island -->
     <string name="island_calling">Calling…</string>
     <string name="island_connected">Connected</string>
@@ -274,13 +274,14 @@
 
     <!-- Phone pop-ups -->
     <string name="feature_hide_popups">Hide the phone\'s pop-up notifications</string>
-    <string name="feature_hide_popups_note">The island shows new notifications instead of the phone\'s banners. They still arrive in the notification shade. Pop-ups come back on their own whenever the island isn\'t running, during quiet hours, or if notification access is lost.</string>
+    <string name="feature_hide_popups_note">The island shows new notifications instead of the phone\'s banners and swipes each pop-up away as it appears. They still arrive in the notification shade. Pop-ups stay as usual whenever the island isn\'t running, during quiet hours, or in apps where the island is hidden.</string>
     <string name="popups_status_active">Active • the phone\'s pop-ups are hidden while the island runs</string>
     <string name="popups_status_waiting">On • pop-ups hide once the island and notification access are connected</string>
-    <string name="popups_status_needs_grant">Needs a one-time permission from a computer</string>
-    <string name="popups_grant_button">How to allow this</string>
-    <string name="popups_grant_title">Allow pop-up control</string>
-    <string name="popups_grant_body">Android only lets apps change this setting after a one-time permission. Turn on USB debugging, connect your phone to a computer and run:\n\n%1$s\n\nTurn this option off before uninstalling Dynamic Droid so your pop-ups come back.</string>
+    <string name="popups_grant_button">Stop pop-ups completely (optional)</string>
+    <string name="popups_grant_title">Stop pop-ups completely</string>
+    <string name="popups_grant_body">This is optional. Without it, the island swipes each pop-up away a moment after it appears. With a one-time permission from a computer, Dynamic Droid can switch the phone\'s pop-ups off instead, so they never flash at all. Turn on USB debugging, connect your phone and run:\n\n%1$s\n\nTurn this option off before uninstalling Dynamic Droid so your pop-ups come back.</string>
+    <string name="popups_status_swipe">On • the island swipes the phone\'s pop-ups away as they appear</string>
+    <string name="popups_status_needs_access">Turn on Dynamic Droid in Accessibility settings so it can clear pop-ups</string>
     <string name="popups_copy">Copy command</string>
     <string name="popups_copied">Command copied</string>
 </resources>

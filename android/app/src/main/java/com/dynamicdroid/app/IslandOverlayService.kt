@@ -495,6 +495,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             }
             transient = activity
             armTransientTimeout(activity)
+            clearPhonePopup(activity)
         } else {
             val isNew = activities.put(activity)
             ongoing = activities.pair { it.mode == IslandMode.TIMER || it.packageName != foregroundPkg }.first
@@ -513,6 +514,17 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             watcher?.start()
         }
         render()
+    }
+
+    /**
+     * The island is showing this message, so the phone's own pop-up for it is redundant. With the
+     * system switch granted there is none; otherwise the accessibility service swipes it up.
+     */
+    private fun clearPhonePopup(activity: LiveActivity) {
+        if (activity.mode != IslandMode.MESSAGE || island == null) return
+        if (!IslandFeatures.read(this).hidePhonePopups || HeadsUpControl.hiding(this)) return
+        if (IslandCustomization.quietNow(this) || IslandCustomization.isHiddenForForeground(this, foregroundPkg)) return
+        IslandAccessibilityService.instance?.swipeAwayPopup(activity.title, activity.subtitle)
     }
 
     override fun onRemoved(key: String) {

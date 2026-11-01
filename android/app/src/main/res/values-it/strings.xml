@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Isola Dynamic Droid</string>
-    <string name="accessibility_description">Posiziona l\'isola sopra la barra di stato, usa i nomi dei pacchetti per rilevare il cambio di app e fa mostrare ai tasti del volume l\'isola del volume. Vengono controllati solo i tasti del volume; tutti gli altri passano senza modifiche. Non legge i contenuti dello schermo e non fa screenshot.</string>
+    <string name="accessibility_description">Posiziona l\'isola sopra la barra di stato, usa i nomi dei pacchetti delle app per rilevare i cambi di app e permette ai tasti del volume di mostrare l\'isola del volume. Vengono controllati solo i tasti del volume; tutti gli altri passano intatti. Se attivi l\'opzione per nascondere i pop-up del telefono, trova anche il pop-up di sistema di una notifica che l\'isola sta mostrando e lo scorre nella tendina; per farlo guarda solo System UI e nient\'altro sullo schermo. Non acquisisce mai screenshot.</string>
     <string name="island_calling">Chiamata in corso…</string>
     <string name="island_connected">Connesso</string>
     <string name="island_disconnected">Disconnesso</string>
@@ -263,13 +263,14 @@
     <string name="onb_ready_title">Tutto pronto</string>
     <string name="onb_ready_body">La tua isola è collegata. Rivedi questo tour quando vuoi da Prova.</string>
     <string name="feature_hide_popups">Nascondi le notifiche pop-up del telefono</string>
-    <string name="feature_hide_popups_note">L\'isola mostra le nuove notifiche al posto dei banner del telefono. Arrivano comunque nella tendina delle notifiche. I pop-up tornano da soli quando l\'isola non è attiva, durante le ore di silenzio o se si perde l\'accesso alle notifiche.</string>
+    <string name="feature_hide_popups_note">L\'isola mostra le nuove notifiche al posto dei banner del telefono e toglie ogni pop-up appena compare. Arrivano comunque nella tendina delle notifiche. I pop-up restano come sempre quando l\'isola non è attiva, durante le ore di silenzio o nelle app in cui l\'isola è nascosta.</string>
     <string name="popups_status_active">Attivo • i pop-up del telefono sono nascosti finché l\'isola funziona</string>
     <string name="popups_status_waiting">Attivato • i pop-up spariranno quando isola e accesso alle notifiche saranno collegati</string>
-    <string name="popups_status_needs_grant">Serve un\'autorizzazione una tantum da un computer</string>
-    <string name="popups_grant_button">Come consentirlo</string>
-    <string name="popups_grant_title">Consenti il controllo dei pop-up</string>
-    <string name="popups_grant_body">Android consente alle app di cambiare questa impostazione solo dopo un\'autorizzazione una tantum. Attiva il debug USB, collega il telefono a un computer ed esegui:\n\n%1$s\n\nDisattiva questa opzione prima di disinstallare Dynamic Droid così i pop-up tornano.</string>
+    <string name="popups_grant_button">Ferma del tutto i pop-up (facoltativo)</string>
+    <string name="popups_grant_title">Ferma del tutto i pop-up</string>
+    <string name="popups_grant_body">È facoltativo. Senza, l\'isola toglie ogni pop-up un attimo dopo che compare. Con un\'autorizzazione una tantum da un computer, Dynamic Droid può spegnere i pop-up del telefono così non compaiono mai. Attiva il debug USB, collega il telefono ed esegui:\n\n%1$s\n\nDisattiva questa opzione prima di disinstallare Dynamic Droid così i pop-up tornano.</string>
+    <string name="popups_status_swipe">Attivo • l\'isola toglie i pop-up del telefono appena compaiono</string>
+    <string name="popups_status_needs_access">Attiva Dynamic Droid in Accessibilità così può togliere i pop-up</string>
     <string name="popups_copy">Copia comando</string>
     <string name="popups_copied">Comando copiato</string>
 </resources>
