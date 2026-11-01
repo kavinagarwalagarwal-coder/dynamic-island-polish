@@ -39,6 +39,17 @@ class VolumeAndRingerTest {
         return service.javaClass.getDeclaredField("transient").apply { isAccessible = true }.get(service) as LiveActivity?
     }
 
+    private var keyCalls = 0
+
+    private fun state(): String {
+        val service = IslandBus.listener as? IslandOverlayService
+        val island = service?.javaClass?.getDeclaredField("island")?.apply { isAccessible = true }?.get(service)
+        val locked = context.getSystemService(android.app.KeyguardManager::class.java).isKeyguardLocked
+        return "music=${audio.getStreamVolume(AudioManager.STREAM_MUSIC)} ring=${audio.getStreamVolume(AudioManager.STREAM_RING)} " +
+            "keyCalls=$keyCalls island=${island != null} locked=$locked transient=${transient()?.mode} " +
+            "a11y=${IslandAccessibilityService.instance != null} audioMode=${audio.mode}"
+    }
+
     @Test fun heldVolumeKeyKeepsSteppingAndRingerChangesShow() {
         shell("appops set com.dynamicdroid.app SYSTEM_ALERT_WINDOW allow")
         val startVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
@@ -52,11 +63,16 @@ class VolumeAndRingerTest {
                 })
                 shell("input keyevent KEYCODE_HOME")
                 Thread.sleep(800)
+                // Count presses the island handles, without changing what happens.
+                instrumentation.runOnMainSync {
+                    val real = IslandAccessibilityService.onVolumeKey
+                    IslandAccessibilityService.onVolumeKey = { up -> keyCalls++; real?.invoke(up) == true }
+                }
 
                 // One press: one step.
                 audio.setStreamVolume(AudioManager.STREAM_MUSIC, 1, 0)
                 shell("input keyevent KEYCODE_VOLUME_UP")
-                assertTrue("A single press should step once", waitFor(2_000) { audio.getStreamVolume(AudioManager.STREAM_MUSIC) == 2 })
+                if (!waitFor(2_000) { audio.getStreamVolume(AudioManager.STREAM_MUSIC) == 2 }) fail("A single press should step once: " + state())
                 Thread.sleep(600)
                 assertEquals("A single press must not repeat", 2, audio.getStreamVolume(AudioManager.STREAM_MUSIC))
 
@@ -65,7 +81,7 @@ class VolumeAndRingerTest {
                 shell("input keyevent --duration 1500 KEYCODE_VOLUME_UP")
                 Thread.sleep(300)
                 val held = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
-                assertTrue("Holding volume up only reached $held", held >= 6)
+                assertTrue("Holding volume up only reached $held: " + state(), held >= 6)
                 assertEquals("The volume island should be showing", IslandMode.VOLUME, transient()?.mode)
 
                 // Ringer: switching to vibrate shows the ringer island.
