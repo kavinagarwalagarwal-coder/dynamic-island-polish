@@ -1,0 +1,23 @@
+name: Export island renders (temporary)
+on:
+  push:
+    branches: [tmp/export-renders]
+permissions:
+  actions: read
+  contents: write
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: island-render-checks
+          run-id: 41290925390
+          github-token: ${{ github.token }}
+          path: renders
+      - run: |
+          mkdir out && find renders -type f \( -name 'tour-*.png' -o -name 'design-*.png' \) -exec cp {} out/ \;
+          ls out
+          cd out && git init -q -b tmp/island-renders && git add . \
+            && git -c user.name=ci -c user.email=ci@example.com commit -qm "Tour renders" \
+            && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" tmp/island-renders
