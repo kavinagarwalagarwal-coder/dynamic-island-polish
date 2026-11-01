@@ -11,7 +11,8 @@ jobs:
     steps:
       - uses: actions/download-artifact@v4
         with:
-          artifact-ids: 13086298353
+          pattern: island-render-checks
+          merge-multiple: true
           run-id: 41312155535
           github-token: ${{ github.token }}
           path: renders
