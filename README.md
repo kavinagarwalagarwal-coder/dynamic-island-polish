@@ -128,3 +128,13 @@ Everything here can be switched on or off on the new **Features** page, and each
 - **Launch flourish.** The mark builds itself, the dot-matrix name sweeps in, then the sheet lifts away while the screen rises into place. The system splash uses the same black, so there is no white flash. It plays on a real launch, not on rotation.
 - **Guided tour.** Shown on first run and from *How to use the island* in Playground and Setup. Each page drives a real island with synthetic touches (tap, hold, swipe up, side swipe, then the volume, headphones and alarm islands), so it behaves exactly as on the phone. Touching the island pauses the demo so people can try it.
 - **Motion.** The header logo rebuilds on every page; pages stagger in; buttons spring; dialogs and new windows grow in. Everything follows the system animation scale. Instrumented tests run through `IslandTestRunner`, which skips the flourish and the tour; `TourAndLogoRenderTest` captures the logo frames and every tour page.
+
+### Hide the phone's own pop-ups
+
+Features → **Hide the phone's pop-up notifications** is a single toggle. When the island shows a new message, Dynamic Droid's accessibility service finds the system's own pop-up for it and swipes it up, which tucks it into the shade, so nothing is lost. Pop-ups stay as usual when the island isn't running, during quiet hours, or in apps where the island is hidden. An emulator test posts a real high-importance notification and checks the pop-up is gone while the notification is still in the shade.
+
+Optional: to stop pop-ups from flashing at all, grant a one-time permission from a computer (USB debugging on). Dynamic Droid then switches the phone's pop-ups off while the island runs and restores your setting afterwards. If you use this, turn the option off before uninstalling.
+
+```
+adb shell pm grant com.dynamicdroid.app android.permission.WRITE_SECURE_SETTINGS
+```

@@ -15,6 +15,10 @@
     <!-- Headphones and Bluetooth-lost islands: connection broadcasts only, no scanning. -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Optional, granted once over ADB: lets the island switch the phone's own pop-ups off and back on. -->
+    <uses-permission
+        android:name="android.permission.WRITE_SECURE_SETTINGS"
+        tools:ignore="ProtectedPermissions" />
     <!-- Lets the island know which app is open, for the swipe-into-island animation. -->
     <uses-permission
         android:name="android.permission.PACKAGE_USAGE_STATS"

@@ -7,6 +7,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.graphics.Color
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -19,6 +20,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
@@ -83,6 +85,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private val refreshQuietRules = object : Runnable {
         override fun run() {
             render()
+            HeadsUpControl.sync(this@IslandOverlayService, island != null)
             if (IslandCustomization.quietEnabled(this@IslandOverlayService)) handler.postDelayed(this, 60_000L)
         }
     }
@@ -111,6 +114,52 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 appIcon = null, artwork = null, accent = AppStyle.GREEN,
             ))
         }
+    }
+
+    // ---------------------------------------------------------------- ring / vibrate / silent
+
+    // Remembered so the broadcast Android sends on registration (and repeats) show nothing.
+    private var lastRingerMode = -1
+    private var lastDnd: Boolean? = null
+
+    private val ringerReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val state = when (intent?.action) {
+                AudioManager.RINGER_MODE_CHANGED_ACTION -> {
+                    val mode = audio?.ringerMode ?: return
+                    if (mode == lastRingerMode) return
+                    lastRingerMode = mode
+                    when (mode) {
+                        AudioManager.RINGER_MODE_SILENT -> RingerState.SILENT
+                        AudioManager.RINGER_MODE_VIBRATE -> RingerState.VIBRATE
+                        else -> RingerState.RING
+                    }
+                }
+                NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED -> {
+                    val on = IslandFeatures.dndActive(this@IslandOverlayService)
+                    if (on == lastDnd) return
+                    lastDnd = on
+                    if (on) RingerState.DND_ON else RingerState.DND_OFF
+                }
+                else -> return
+            }
+            if (IslandFeatures.read(this@IslandOverlayService).ringer) showRinger(state)
+        }
+    }
+
+    private fun showRinger(state: RingerState) {
+        val label = getString(when (state) {
+            RingerState.RING -> R.string.ringer_ring
+            RingerState.VIBRATE -> R.string.ringer_vibrate
+            RingerState.SILENT -> R.string.ringer_silent
+            RingerState.DND_ON -> R.string.ringer_dnd_on
+            RingerState.DND_OFF -> R.string.ringer_dnd_off
+        })
+        onActivity(LiveActivity(
+            key = "ringer", packageName = packageName, mode = IslandMode.RINGER,
+            title = label, subtitle = "", appLabel = getString(R.string.mode_ringer),
+            appIcon = null, artwork = null, accent = Color.WHITE, ringer = state,
+        ))
     }
 
     // ---------------------------------------------------------------- wake / unlock intro
@@ -190,6 +239,12 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             .setCategory(Notification.CATEGORY_SERVICE)
             .setOngoing(true)
             .build())
+        lastRingerMode = audio?.ringerMode ?: -1
+        lastDnd = IslandFeatures.dndActive(this)
+        ContextCompat.registerReceiver(this, ringerReceiver, IntentFilter().apply {
+            addAction(AudioManager.RINGER_MODE_CHANGED_ACTION)
+            addAction(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
+        }, ContextCompat.RECEIVER_EXPORTED)
         ContextCompat.registerReceiver(
             this, powerReceiver, IntentFilter(Intent.ACTION_POWER_CONNECTED), ContextCompat.RECEIVER_EXPORTED
         )
@@ -218,6 +273,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         devices = DeviceMonitor(this) { onActivity(it) }.also { it.start() }
         reply = ReplyPanel(this, ::onReplySent) { armTransientTimeout(transient) }
         IslandAccessibilityService.onVolumeKey = ::handleVolumeKey
+        IslandBus.listenerChanged = { HeadsUpControl.sync(this, island != null) }
+        IslandAccessibilityService.beforePopupSwipe = { passTouchesFor(it) }
+        HeadsUpControl.sync(this, island != null)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -241,6 +299,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         if (intent?.action == ACTION_CUSTOMIZATION) {
             island?.applyFeatures(IslandFeatures.read(this))
+            HeadsUpControl.sync(this, island != null)
             devices?.stop(); devices?.start()
             handler.removeCallbacks(refreshQuietRules)
             if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)
@@ -322,6 +381,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private fun reattach() {
         detachWindow()
         if (attachWindow()) render()
+        HeadsUpControl.sync(this, island != null)
     }
 
     // ---------------------------------------------------------------- state
@@ -378,7 +438,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
         params?.let { lp ->
-            val touchable = a != null && !concealed && !swiftMorphActive && !absorb && !view.isAbsorbing
+            val touchable = a != null && !concealed && !swiftMorphActive && !absorb && !view.isAbsorbing && !passingTouches
             val isOff = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0
             if (touchable == isOff) {
                 lp.flags = if (touchable) lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
@@ -475,6 +535,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             IslandMode.CHARGING -> 3_000L
             IslandMode.VOLUME -> VOLUME_TIMEOUT_MS
             IslandMode.DEVICE -> DEVICE_TIMEOUT_MS
+            IslandMode.RINGER -> RINGER_TIMEOUT_MS
             else -> if (transientExpanded) MESSAGE_TIMEOUT_MS * 2 else MESSAGE_TIMEOUT_MS
         })
     }
@@ -490,6 +551,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             }
             transient = activity
             armTransientTimeout(activity)
+            clearPhonePopup(activity)
         } else {
             val isNew = activities.put(activity)
             ongoing = activities.pair { it.mode == IslandMode.TIMER || it.packageName != foregroundPkg }.first
@@ -508,6 +570,33 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             watcher?.start()
         }
         render()
+    }
+
+    /** Until when the island window lets every touch through (while a pop-up is swiped away under it). */
+    private var passTouchesUntil = 0L
+    private val passingTouches get() = SystemClock.uptimeMillis() < passTouchesUntil
+
+    private fun passTouchesFor(ms: Long) {
+        passTouchesUntil = SystemClock.uptimeMillis() + ms
+        val view = island ?: return
+        params?.let { lp ->
+            if (lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
+                lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                runCatching { windowManager?.updateViewLayout(view, lp) }
+            }
+        }
+        handler.postDelayed({ if (!passingTouches) render() }, ms + 16L)
+    }
+
+    /**
+     * The island is showing this message, so the phone's own pop-up for it is redundant. With the
+     * system switch granted there is none; otherwise the accessibility service swipes it up.
+     */
+    private fun clearPhonePopup(activity: LiveActivity) {
+        if (activity.mode != IslandMode.MESSAGE || island == null) return
+        if (!IslandFeatures.read(this).hidePhonePopups || HeadsUpControl.hiding(this)) return
+        if (IslandCustomization.quietNow(this) || IslandCustomization.isHiddenForForeground(this, foregroundPkg)) return
+        IslandAccessibilityService.instance?.swipeAwayPopup(activity.title, activity.subtitle)
     }
 
     override fun onRemoved(key: String) {
@@ -738,7 +827,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         val a = view.activity
         val (w, h) = view.windowSizeFor(a, view.presentation)
         var changed = false
-        if (lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0) {
+        if (lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0 && !passingTouches) {
             lp.flags = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
             changed = true
         }
@@ -814,12 +903,17 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         IslandAccessibilityService.onChanged = null
         IslandAccessibilityService.onForegroundPackage = null
         if (IslandAccessibilityService.onVolumeKey != null) IslandAccessibilityService.onVolumeKey = null
+        IslandBus.listenerChanged = null
+        IslandAccessibilityService.beforePopupSwipe = null
+        // The island is going away: the phone's own pop-ups must come back.
+        HeadsUpControl.restore(this)
         devices?.stop()
         watcher?.stop()
         status?.stop()
         handler.removeCallbacksAndMessages(null)
         detachWindow()
         runCatching { unregisterReceiver(powerReceiver) }
+        runCatching { unregisterReceiver(ringerReceiver) }
         runCatching { unregisterReceiver(wakeReceiver) }
         super.onDestroy()
     }
@@ -847,6 +941,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         private const val TIMER_PEEK_MS = 2_600L
         private const val VOLUME_TIMEOUT_MS = 1_600L
         private const val DEVICE_TIMEOUT_MS = 3_600L
+        private const val RINGER_TIMEOUT_MS = 2_000L
         private const val SENT_TIMEOUT_MS = 1_400L
         private const val SWIFT_MORPH_DURATION_MS = 520L
         /** Lets the system's unlock animation finish so the intro is actually visible. */

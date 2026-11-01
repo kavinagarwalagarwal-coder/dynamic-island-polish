@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private var shellView: LinearLayout? = null
     private var onboarding: OnboardingOverlay? = null
     private var currentPage: String? = null
+    private var popupStatus: TextView? = null
     private lateinit var preview: IslandView
     private var demo: LiveActivity? = null
     private var demoPresentation = Presentation.EXPANDED
@@ -212,6 +213,9 @@ class MainActivity : AppCompatActivity() {
         readiness?.setTextColor(if (ready) 0xFF9BE4BE.toInt() else NothingStyle.foreground)
         placementInfo?.text = placementExplanation()
         if (overlay || a11y) startIsland()
+        // A grant over ADB may have happened while we were away: let the service apply it.
+        if (IslandFeatures.read(this).hidePhonePopups && (overlay || a11y)) refreshCustomization()
+        popupStatus?.postDelayed({ refreshPopupStatus() }, 400L)
     }
 
     // ---------------------------------------------------------------- live preview
@@ -281,6 +285,21 @@ class MainActivity : AppCompatActivity() {
         title = getString(R.string.island_volume_media), subtitle = "", appLabel = "Volume",
         appIcon = null, artwork = null, accent = NothingStyle.foreground, progress = level,
     )
+
+    internal fun demoRinger(state: RingerState) = LiveActivity(
+        key = "demo-ringer", packageName = packageName, mode = IslandMode.RINGER,
+        title = getString(when (state) {
+            RingerState.RING -> R.string.ringer_ring
+            RingerState.VIBRATE -> R.string.ringer_vibrate
+            RingerState.SILENT -> R.string.ringer_silent
+            RingerState.DND_ON -> R.string.ringer_dnd_on
+            RingerState.DND_OFF -> R.string.ringer_dnd_off
+        }), subtitle = "", appLabel = getString(R.string.mode_ringer),
+        appIcon = null, artwork = null, accent = Color.WHITE, ringer = state,
+    )
+
+    /** Each tap of the demo chip shows the next ringer state. */
+    private var demoRingerStep = 0
 
     internal fun demoDevice(lost: Boolean) = LiveActivity(
         key = "demo-device", packageName = packageName, mode = IslandMode.DEVICE,
@@ -420,8 +439,15 @@ class MainActivity : AppCompatActivity() {
         eventRow.addView(chip(getString(R.string.demo_download)) { preview.setSecondary(null); showDemo(demoDownload(), Presentation.EXPANDED) })
         eventRow.addView(chip(getString(R.string.demo_alarm)) { preview.setSecondary(null); showDemo(demoAlarm(), Presentation.EXPANDED) })
         eventRow.addView(chip(getString(R.string.demo_calling)) { preview.setSecondary(null); showDemo(demoCalling(), Presentation.EXPANDED) })
+        val ringerRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        ringerRow.addView(chip(getString(R.string.demo_ringer)) {
+            val states = listOf(RingerState.SILENT, RingerState.VIBRATE, RingerState.RING, RingerState.DND_ON)
+            preview.setSecondary(null)
+            showDemo(demoRinger(states[demoRingerStep++ % states.size]), Presentation.EXPANDED)
+        })
         column.addView(systemRow, row(-2).apply { topMargin = dp(8) })
         column.addView(eventRow, row(-2).apply { topMargin = dp(8) })
+        column.addView(ringerRow, row(-2).apply { topMargin = dp(8) })
         timerLabelInput = android.widget.EditText(this).apply {
             hint = getString(R.string.timer_name_hint); setSingleLine(); textSize = 15f
             setTextColor(NothingStyle.foreground); setHintTextColor(NothingStyle.muted)
@@ -457,7 +483,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         column.addView(timerBubbleSwitch, row(-2))
-        IslandMode.values().filter { it != IslandMode.VOLUME && it != IslandMode.DEVICE }.forEach { mode ->
+        IslandMode.values().filter { it != IslandMode.VOLUME && it != IslandMode.DEVICE && it != IslandMode.RINGER }.forEach { mode ->
             val initial = IslandCustomization.priority(this, mode)
             column.addView(priorityControl(mode, initial), row(-2))
         }
@@ -650,10 +676,20 @@ class MainActivity : AppCompatActivity() {
         toggle(R.string.feature_bluetooth_lost, "bluetooth_lost", features.bluetoothLost) { on -> if (on) requestBluetoothIfNeeded() }
         toggle(R.string.feature_downloads, "downloads", features.downloads)
         toggle(R.string.feature_alarms, "alarms", features.alarms)
+        toggle(R.string.feature_ringer, "ringer", features.ringer, R.string.feature_ringer_note)
 
         section(R.string.features_messages)
         toggle(R.string.feature_reply, "inline_reply", features.inlineReply)
         toggle(R.string.feature_medium, "messages_medium", features.messagesMediumFirst, R.string.feature_medium_note)
+        toggle(R.string.feature_hide_popups, "hide_phone_popups", features.hidePhonePopups, R.string.feature_hide_popups_note)
+        popupStatus = label("", 13f, NothingStyle.foreground).also { column.addView(it, row(-2).apply { topMargin = dp(2) }) }
+        column.addView(action("popups-a11y", getString(R.string.setup_a11y_allow)) {
+            toast(getString(R.string.setup_a11y_toast))
+            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+        }, row(-2).apply { topMargin = dp(8) })
+        column.addView(action("popups-grant", getString(R.string.popups_grant_button)) { explainPopupGrant() },
+            row(-2).apply { topMargin = dp(8) })
+        refreshPopupStatus()
 
         section(R.string.features_look)
         toggle(R.string.feature_short, "short_compact", features.shortCompact, R.string.feature_short_note)
@@ -665,6 +701,7 @@ class MainActivity : AppCompatActivity() {
         column.addView(height, row(-2))
         toggle(R.string.feature_corners, "phone_corners", features.phoneCorners)
         toggle(R.string.feature_bubbles, "coloured_bubbles", features.colouredBubbles, R.string.feature_bubbles_note)
+        toggle(R.string.feature_glow, "edge_glow", features.edgeGlow, R.string.feature_glow_note)
         column.addView(label(getString(R.string.feature_outline), 16f, NothingStyle.foreground).apply {
             typeface = NothingStyle.body; setPadding(0, dp(12), 0, 0)
         }, row(-2))
@@ -716,6 +753,7 @@ class MainActivity : AppCompatActivity() {
         IslandMode.DEVICE -> R.string.mode_device
         IslandMode.DOWNLOAD -> R.string.mode_download
         IslandMode.ALARM -> R.string.mode_alarm
+        IslandMode.RINGER -> R.string.mode_ringer
     })
 
     private fun accentName(index: Int) = getString(when (index) {
@@ -723,6 +761,39 @@ class MainActivity : AppCompatActivity() {
         4 -> R.string.accent_green; 5 -> R.string.accent_blue; 6 -> R.string.accent_purple
         7 -> R.string.accent_pink; else -> R.string.accent_default
     })
+
+    /** One line on whether the phone's own pop-ups are hidden right now, and why not if they aren't. */
+    private fun refreshPopupStatus() {
+        val status = popupStatus ?: return
+        val wanted = IslandFeatures.read(this).hidePhonePopups
+        val granted = HeadsUpControl.canControl(this)
+        val a11y = IslandAccessibilityService.instance != null
+        val working = HeadsUpControl.hiding(this) || !granted && a11y
+        status.visibility = if (wanted) View.VISIBLE else View.GONE
+        status.text = getString(when {
+            HeadsUpControl.hiding(this) -> R.string.popups_status_active
+            granted -> R.string.popups_status_waiting
+            a11y -> R.string.popups_status_swipe
+            else -> R.string.popups_status_needs_access
+        })
+        status.setTextColor(if (working) 0xFF9BE4BE.toInt() else NothingStyle.muted)
+        // Without the system switch, swiping pop-ups away needs the accessibility service.
+        buttons["popups-a11y"]?.visibility = if (wanted && !granted && !a11y) View.VISIBLE else View.GONE
+        // The computer step is optional: it stops pop-ups outright instead of swiping them.
+        buttons["popups-grant"]?.visibility = if (wanted && !granted) View.VISIBLE else View.GONE
+    }
+
+    private fun explainPopupGrant() {
+        android.app.AlertDialog.Builder(this, R.style.IslandDialog)
+            .setTitle(getString(R.string.popups_grant_title))
+            .setMessage(getString(R.string.popups_grant_body, HeadsUpControl.GRANT_COMMAND))
+            .setNegativeButton(getString(R.string.common_done), null)
+            .setPositiveButton(getString(R.string.popups_copy)) { _, _ ->
+                getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(
+                    android.content.ClipData.newPlainText("adb", HeadsUpControl.GRANT_COMMAND))
+                toast(getString(R.string.popups_copied))
+            }.show()
+    }
 
     private fun requestBluetoothIfNeeded() {
         val permission = DeviceMonitor.permission() ?: return
@@ -734,6 +805,9 @@ class MainActivity : AppCompatActivity() {
         preview.applyFeatures(features)
         wallpaperPreview?.applyFeatures(features)
         refreshCustomization()
+        // The service applies the change asynchronously; check again once it has.
+        popupStatus?.postDelayed({ refreshPopupStatus() }, 400L)
+        refreshPopupStatus()
     }
 
     private data class InstalledApp(val packageName: String, val label: String)

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Isla de Dynamic Droid</string>
-    <string name="accessibility_description">Coloca la isla sobre la barra de estado, usa nombres de paquetes para detectar cambios de app y permite que las teclas de volumen muestren la isla de volumen. Solo se comprueban las teclas de volumen; las demás pasan sin tocarse. No lee el contenido de la pantalla ni hace capturas.</string>
+    <string name="accessibility_description">Coloca la isla sobre la barra de estado, usa los nombres de paquete de las apps para detectar cambios de app y permite que los botones de volumen muestren la isla de volumen. Solo se revisan los botones de volumen; las demás teclas pasan sin tocarse. Si activas ocultar los avisos del teléfono, también busca el aviso del sistema de una notificación que la isla está mostrando y lo desliza al panel; para ello solo mira System UI y nada más de la pantalla. Nunca hace capturas de pantalla.</string>
     <string name="island_calling">Llamando…</string>
     <string name="island_connected">Conectado</string>
     <string name="island_disconnected">Desconectado</string>
@@ -262,4 +262,26 @@
     <string name="onb_finish_body">Da a Dynamic Droid acceso a las notificaciones y la superposición del área de la cámara, y tu isla cobrará vida.</string>
     <string name="onb_ready_title">Todo listo</string>
     <string name="onb_ready_body">Tu isla está conectada. Repite este recorrido cuando quieras desde Prueba.</string>
+    <string name="feature_hide_popups">Ocultar las notificaciones emergentes del teléfono</string>
+    <string name="feature_hide_popups_note">La isla muestra las notificaciones nuevas en lugar de los avisos del teléfono y retira cada aviso en cuanto aparece. Siguen llegando al panel de notificaciones. Los avisos funcionan como siempre cuando la isla no está activa, en horas de silencio o en apps donde la isla está oculta.</string>
+    <string name="popups_status_active">Activo • los avisos del teléfono se ocultan mientras la isla funciona</string>
+    <string name="popups_status_waiting">Activado • los avisos se ocultarán cuando la isla y el acceso a notificaciones estén conectados</string>
+    <string name="popups_grant_button">Detener los avisos por completo (opcional)</string>
+    <string name="popups_grant_title">Detener los avisos por completo</string>
+    <string name="popups_grant_body">Esto es opcional. Sin ello, la isla retira cada aviso un instante después de que aparece. Con un permiso único desde un ordenador, Dynamic Droid puede apagar los avisos del teléfono para que no aparezcan nunca. Activa la depuración USB, conecta el teléfono y ejecuta:\n\n%1$s\n\nDesactiva esta opción antes de desinstalar Dynamic Droid para que vuelvan los avisos.</string>
+    <string name="popups_status_swipe">Activado • la isla retira los avisos del teléfono en cuanto aparecen</string>
+    <string name="popups_status_needs_access">Activa Dynamic Droid en Accesibilidad para que pueda retirar los avisos</string>
+    <string name="popups_copy">Copiar comando</string>
+    <string name="popups_copied">Comando copiado</string>
+    <string name="ringer_ring">Sonido</string>
+    <string name="ringer_vibrate">Vibración</string>
+    <string name="ringer_silent">Silencio</string>
+    <string name="ringer_dnd_on">No molestar</string>
+    <string name="ringer_dnd_off">No molestar desactivado</string>
+    <string name="mode_ringer">Sonido y silencio</string>
+    <string name="demo_ringer">Silencio</string>
+    <string name="feature_ringer">Sonido, vibración y silencio</string>
+    <string name="feature_ringer_note">Muestra la isla cuando el teléfono cambia entre sonido, vibración y silencio, o cuando se activa o desactiva No molestar.</string>
+    <string name="feature_glow">Brillo suave en los bordes</string>
+    <string name="feature_glow_note">Un brillo suave alrededor de la píldora para que destaque sobre fondos y apps oscuros. Se intensifica un momento cuando llega algo nuevo.</string>
 </resources>

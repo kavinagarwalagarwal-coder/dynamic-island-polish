@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Dynamic Droid adası</string>
-    <string name="accessibility_description">Adayı durum çubuğunun üstüne yerleştirir, uygulama geçişlerini paket adlarından algılar ve ses tuşlarının ses adasını göstermesini sağlar. Yalnızca ses tuşlarına bakılır; diğer tüm tuşlar dokunulmadan geçer. Ekran içeriğini okumaz ve ekran görüntüsü almaz.</string>
+    <string name="accessibility_description">Adayı durum çubuğunun üstüne yerleştirir, uygulama geçişlerini algılamak için uygulama paket adlarını kullanır ve ses tuşlarının ses adasını göstermesini sağlar. Yalnızca ses tuşları incelenir; diğer tüm tuşlar dokunulmadan geçer. Telefonun açılır bildirimlerini gizlemeyi açarsanız, adanın gösterdiği bir bildirimin sistem açılır penceresini bulup panele kaydırır; bunun için yalnızca System UI\'a bakar, ekrandaki başka hiçbir şeye bakmaz. Asla ekran görüntüsü almaz.</string>
     <string name="island_calling">Aranıyor…</string>
     <string name="island_connected">Bağlandı</string>
     <string name="island_disconnected">Bağlantı kesildi</string>
@@ -262,4 +262,26 @@
     <string name="onb_finish_body">Dynamic Droid\'e bildirim erişimi ve kamera alanı katmanı verin, adanız canlansın.</string>
     <string name="onb_ready_title">Her şey hazır</string>
     <string name="onb_ready_body">Adanız bağlı. Bu turu istediğiniz zaman Deneme\'den yeniden izleyin.</string>
+    <string name="feature_hide_popups">Telefonun açılır bildirimlerini gizle</string>
+    <string name="feature_hide_popups_note">Ada, telefonun afişleri yerine yeni bildirimleri gösterir ve her açılır bildirimi belirir belirmez kaldırır. Bildirimler yine de bildirim panelinize gelir. Ada çalışmadığında, sessiz saatlerde veya adanın gizlendiği uygulamalarda açılır bildirimler her zamanki gibi kalır.</string>
+    <string name="popups_status_active">Etkin • ada çalıştığı sürece telefonun açılır bildirimleri gizli</string>
+    <string name="popups_status_waiting">Açık • ada ve bildirim erişimi bağlanınca açılır bildirimler gizlenecek</string>
+    <string name="popups_grant_button">Açılır bildirimleri tamamen durdur (isteğe bağlı)</string>
+    <string name="popups_grant_title">Açılır bildirimleri tamamen durdur</string>
+    <string name="popups_grant_body">Bu isteğe bağlıdır. Bu olmadan ada, her açılır bildirimi belirdikten bir an sonra kaldırır. Bilgisayardan tek seferlik bir izinle Dynamic Droid, telefonun açılır bildirimlerini tamamen kapatabilir; böylece hiç görünmezler. USB hata ayıklamayı açın, telefonu bağlayın ve şunu çalıştırın:\n\n%1$s\n\nAçılır bildirimlerin geri gelmesi için Dynamic Droid\'i kaldırmadan önce bu seçeneği kapatın.</string>
+    <string name="popups_status_swipe">Açık • ada, telefonun açılır bildirimlerini belirir belirmez kaldırır</string>
+    <string name="popups_status_needs_access">Açılır bildirimleri kaldırabilmesi için Erişilebilirlik ayarlarında Dynamic Droid\'i açın</string>
+    <string name="popups_copy">Komutu kopyala</string>
+    <string name="popups_copied">Komut kopyalandı</string>
+    <string name="ringer_ring">Zil</string>
+    <string name="ringer_vibrate">Titreşim</string>
+    <string name="ringer_silent">Sessiz</string>
+    <string name="ringer_dnd_on">Rahatsız Etmeyin</string>
+    <string name="ringer_dnd_off">Rahatsız Etmeyin kapalı</string>
+    <string name="mode_ringer">Zil ve sessiz</string>
+    <string name="demo_ringer">Sessiz</string>
+    <string name="feature_ringer">Zil, titreşim ve sessiz</string>
+    <string name="feature_ringer_note">Telefon zil, titreşim ve sessiz arasında geçtiğinde ya da Rahatsız Etmeyin açılıp kapandığında adayı göster.</string>
+    <string name="feature_glow">Kenarlarda yumuşak parıltı</string>
+    <string name="feature_glow_note">Hapın çevresinde hafif bir parıltı; koyu duvar kâğıtlarında ve uygulamalarda öne çıkar. Yeni bir şey geldiğinde bir anlığına parlar.</string>
 </resources>

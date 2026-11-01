@@ -28,6 +28,7 @@ import android.view.ViewConfiguration
 import android.view.WindowInsets
 import androidx.core.graphics.ColorUtils
 import java.util.WeakHashMap
+import kotlin.math.PI
 import kotlin.math.abs
 import kotlin.math.exp
 import kotlin.math.max
@@ -110,9 +111,20 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var screenCorner = 0f
     private var lockDim = false
     private var eventOutlineUntil = 0L
+    /** When the current ringer state first showed; drives its one-shot glyph animation. */
+    private var ringerAnimAt = 0L
+    private val moonCut = Path()
+    private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val dimPaint = Paint().apply { colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) }) }
-    private val levelS = Spring(0f, 520f, 0.9f, 0.002f)
+    // Levels glide to new values: critically damped, so they settle without wobbling.
+    private val levelS = Spring(0f, 340f, 1f, 0.0015f)
+    private val bubbleLevelS = Spring(0f, 300f, 1f, 0.0015f)
+    private val musicBarS = Spring(0f, 420f, 1f, 0.0008f)
+    // A brief thickening of the volume bar on each key press.
+    private val barPulse = Spring(0f, 260f, 0.85f, 0.004f)
+    // Waveform energy: eases to still dots on pause instead of snapping.
+    private val waveS = Spring(0f, 160f, 1f, 0.003f)
     private val burnInTick = Runnable { invalidate() }
     private val outlineTick = Runnable { invalidate() }
 
@@ -142,6 +154,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     fun setSecondary(next: LiveActivity?) {
         secondaryAccent = next?.let { IslandCustomization.customAccent(context, it.packageName) ?: it.accent }
+        next?.progress?.let { if (next.key != secondary?.key) bubbleLevelS.snap(it) else bubbleLevelS.target = it }
         val fresh = next != null && secondary == null && dropS.value < 0.01f
         if (next != null) departingSecondary = next
         secondary = next
@@ -285,7 +298,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
     private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -390,14 +403,26 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 (old.clockMs() ?: 0L) > 0L && next.clockMs() == 0L)) {
             timerFeedback.snap(1f); timerFeedback.target = 0f
         }
+        val playing = next?.mode == IslandMode.MUSIC && next.isPlaying
+        if (next?.key != old?.key) waveS.snap(if (playing) 1f else 0f) else waveS.target = if (playing) 1f else 0f
         if (next == null && activity != null) departingActivity = activity
         if (next != null) departingActivity = null
+        if (next?.mode == IslandMode.RINGER && (old?.mode != IslandMode.RINGER || old.ringer != next.ringer)) {
+            ringerAnimAt = SystemClock.uptimeMillis()
+            eventOutlineUntil = ringerAnimAt + OUTLINE_EVENT_MS
+            removeCallbacks(outlineTick); postDelayed(outlineTick, OUTLINE_EVENT_MS + 32L)
+        }
         if (next != null && next.key != old?.key) {
             eventOutlineUntil = SystemClock.uptimeMillis() + OUTLINE_EVENT_MS
             removeCallbacks(outlineTick); postDelayed(outlineTick, OUTLINE_EVENT_MS + 32L)
             next.progress?.let { levelS.snap(it) }
         }
-        next?.progress?.let { if (!volumeDragging) levelS.target = it }
+        next?.progress?.let { level ->
+            if (!volumeDragging) levelS.target = level
+            if (next.mode == IslandMode.VOLUME && old?.key == next.key && old.progress != level && !reduceMotion) {
+                barPulse.snap(1f); barPulse.target = 0f
+            }
+        }
         activity = next
         userAccent = next?.let { IslandCustomization.customAccent(context, it.packageName) }
         mediaActions = next?.let { activity -> IslandCustomization.mediaSelection(context, activity.packageName)
@@ -646,6 +671,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             IslandMode.DOWNLOAD -> Spec(w, dp(100f), cardRadius(dp(40f)), screenCenter())
             IslandMode.VOLUME -> Spec(min(w, dp(VOLUME_WIDTH_DP)), dp(VOLUME_HEIGHT_DP), dp(VOLUME_HEIGHT_DP) / 2f, cameraCenter())
             IslandMode.DEVICE -> Spec(min(w, dp(MEDIUM_WIDTH_DP)), dp(MEDIUM_HEIGHT_DP), dp(MEDIUM_HEIGHT_DP) / 2f, cameraCenter())
+            IslandMode.RINGER -> {
+                // Just wide enough for the glyph and its word, like a small switch label.
+                val h = dp(RINGER_HEIGHT_DP)
+                val want = h + dp(14f) + titlePaint.measureText(a.title) + dp(22f)
+                Spec(want.coerceIn(dp(150f), w), h, h / 2f, cameraCenter())
+            }
             else -> Spec(w, dp(84f), cardRadius(dp(42f)), screenCenter())
         }
     }
@@ -702,6 +733,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     /** Waveforms and clocks keep redrawing even when the shape is at rest. */
     private fun continuousDelay(): Long? {
+        if (SystemClock.uptimeMillis() < rollingUntil) return 16L
         val a = activity ?: return null
         if (presentation == Presentation.IDLE) return null
         if (isConcealed || introS.value < 0.01f || !isShown) return null
@@ -713,8 +745,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         // last 0:01 → 0:00 roll (and paused updates) gets frames all the way to completion.
         if (isLiveTimer(a) && (a.chronometerText() != rollText ||
                 rollAt != 0L && SystemClock.uptimeMillis() - rollAt < ROLL_MS)) return 16L
+        if (a.mode == IslandMode.RINGER && SystemClock.uptimeMillis() - ringerAnimAt < RINGER_ANIM_MS + 50L) return 16L
         return when {
-            a.mode == IslandMode.MUSIC && a.isPlaying -> 16L
+            // The small island's waveform reads fine at 30 fps; the open card's progress bar gets 60.
+            a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else 33L
             a.mode == IslandMode.CALL -> 33L
             a.mode == IslandMode.ALARM -> 33L
             a.clockBaseElapsed != null && a.pausedTimerMs == null -> {
@@ -841,6 +875,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
         val bodyAlpha = (255 * presenceS.value.coerceIn(0f, 1f) * min(1f, intro * 2.5f)).toInt()
         drawSecondary(canvas, intro * reveal)
+        if (a != null) drawGlow(canvas, a, r, bodyAlpha)
         shapePaint.color = Color.BLACK
         shapePaint.alpha = bodyAlpha
         canvas.drawRoundRect(rect, r, r, shapePaint)
@@ -879,6 +914,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 IslandMode.TIMER -> if (liveTimer) drawTimerExpanded(canvas, a, alpha, stagger(ea, 0.22f)) else drawGenericExpanded(canvas, a, alpha)
                 IslandMode.VOLUME -> drawVolumeExpanded(canvas, a, alpha)
                 IslandMode.DEVICE -> drawDeviceExpanded(canvas, a, alpha)
+                IslandMode.RINGER -> drawRingerExpanded(canvas, a, alpha)
                 IslandMode.DOWNLOAD -> drawDownloadExpanded(canvas, a, alpha, stagger(ea, 0.22f))
                 IslandMode.ALARM -> drawAlarmExpanded(canvas, a, alpha)
                 else -> drawGenericExpanded(canvas, a, alpha)
@@ -966,14 +1002,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 paint.textSize = dp(10f)
                 val textWidth = paint.measureText(digits)
                 if (textWidth > dp(29f)) paint.textSize *= dp(29f) / textWidth
-                paint.color = withAlpha(timerColor, timerAlpha)
-                canvas.drawText(digits, center - paint.measureText(digits) / 2,
-                    cy - (paint.ascent() + paint.descent()) / 2, paint)
+                rolling(canvas, "bubble", digits, center - paint.measureText(digits) / 2,
+                    cy - (paint.ascent() + paint.descent()) / 2, paint, timerColor, timerAlpha, travel = .7f)
             }
             IslandMode.MUSIC -> drawWave(canvas, center - dp(9f), cy, dp(18f), dp(14f), userAccent ?: waveColor, a.isPlaying, alpha)
             IslandMode.CALL -> drawPhone(canvas, center, cy, dp(18f), alpha, false)
             IslandMode.ALARM -> drawAlarmGlyph(canvas, center, cy, dp(15f), withAlpha(ALARM, alpha))
-            IslandMode.DOWNLOAD -> drawMiniProgress(canvas, center, cy, dp(10f), a.progress ?: 0f, alpha)
+            IslandMode.DOWNLOAD -> drawMiniProgress(canvas, center, cy, dp(10f), bubbleLevelS.value, alpha)
             else -> text(canvas, a.appLabel.take(1), center - dp(4f), cy + dp(5f), dp(15f), bodyPaint, Color.WHITE, alpha)
         }
     }
@@ -1109,11 +1144,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         matrix.reset()
         matrix.setTranslate(rect.left + dp(48f), rect.top + dp(44f))
         shader.setLocalMatrix(matrix)
-        glowPaint.shader = shader
-        glowPaint.alpha = (255 * ea).toInt()
-        canvas.drawRect(rect, glowPaint)
-        glowPaint.shader = null
-        glowPaint.alpha = 255
+        haloPaint.shader = shader
+        haloPaint.alpha = (255 * ea).toInt()
+        canvas.drawRect(rect, haloPaint)
+        haloPaint.shader = null
+        haloPaint.alpha = 255
     }
 
     private val sheenPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -1161,21 +1196,21 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         when (a.mode) {
             IslandMode.MUSIC -> {
                 // Artwork and waveform flank the camera, matching the SwiftUI compact layout.
-                drawWave(canvas, right - dp(20f), cy, dp(20f), dp(14f), userAccent ?: waveColor, a.isPlaying, alpha)
+                drawWave(canvas, right - dp(20f), cy, dp(20f), dp(14f), userAccent ?: waveColor, waveS.value, alpha)
             }
             IslandMode.CALL -> {
                 val t = a.chronometerText()
                 when {
                     a.callState == CallState.CALLING ->
                         text(canvas, callingLabel(), right, cy + dp(4.5f), dp(90f), smallPaint, NothingStyle.muted, pulse(alpha), alignRight = true)
-                    t != null -> text(canvas, t, right, cy + dp(4.5f), dp(80f), smallPaint, NothingStyle.muted, alpha, alignRight = true)
+                    t != null -> rolling(canvas, "call", t, right, cy + dp(4.5f), smallPaint, NothingStyle.muted, alpha, alignRight = true)
                     else -> drawWave(canvas, right - dp(20f), cy, dp(20f), dp(12f), NothingStyle.muted, true, alpha)
                 }
             }
             IslandMode.DOWNLOAD -> {
-                val fraction = a.progress ?: 0f
+                val fraction = levelS.value
                 drawMiniProgress(canvas, right - dp(9f), cy, dp(8.5f), fraction, alpha)
-                text(canvas, "${IslandSignals.percent(fraction)}%", right - dp(24f), cy + dp(4.5f), dp(48f),
+                rolling(canvas, "download", "${IslandSignals.percent(a.progress ?: 0f)}%", right - dp(24f), cy + dp(4.5f),
                     smallPaint, NothingStyle.foreground, alpha, alignRight = true)
             }
             IslandMode.ALARM -> text(canvas, a.title, right, cy + dp(4.5f), rect.width() / 2f - dp(24f), smallPaint, ALARM, alpha, alignRight = true)
@@ -1195,7 +1230,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         drawArtwork(canvas, a, l, t, art, dp(14f), alpha)
         val tx = l + art + dp(14f)
         val waveW = dp(24f)
-        drawWave(canvas, rr - waveW, t + dp(20f), waveW, dp(18f), userAccent ?: waveColor, a.isPlaying, alpha)
+        drawWave(canvas, rr - waveW, t + dp(20f), waveW, dp(18f), userAccent ?: waveColor, waveS.value, alpha)
         text(canvas, a.title, tx, t + dp(25f), rr - waveW - dp(12f) - tx, titlePaint, Color.WHITE, alpha)
         text(canvas, a.subtitle, tx, t + dp(46f), rr - tx, bodyPaint, GREY, alpha)
 
@@ -1207,17 +1242,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         barLeft = l + dp(44f)
         barRight = rr - dp(48f)
         if (showsMediaAction(IslandBus.MEDIA_SEEK)) {
-            text(canvas, elapsed, l, barY + dp(4f), dp(40f), smallPaint, GREY, late)
-            text(canvas, remaining, rr, barY + dp(4f), dp(46f), smallPaint, GREY, late, alignRight = true)
-            val thick = if (seeking) dp(8f) else dp(5f)
+            rolling(canvas, "elapsed", elapsed, l, barY + dp(4f), smallPaint, GREY, late, travel = .4f)
+            rolling(canvas, "remaining", remaining, rr, barY + dp(4f), smallPaint, GREY, late, alignRight = true, travel = .4f)
             val fraction = if (a.durationMs > 0L) (pos.toFloat() / a.durationMs).coerceIn(0f, 1f) else 0f
-            fillPaint.color = withAlpha(userAccent ?: waveColor, late * 50 / 255)
-            canvas.drawRoundRect(barLeft, barY - thick / 2, barRight, barY + thick / 2, thick / 2, thick / 2, fillPaint)
-            fillPaint.color = withAlpha(userAccent ?: waveColor, late)
-            if (fraction > 0f) canvas.drawRoundRect(
-                barLeft, barY - thick / 2, barLeft + (barRight - barLeft) * fraction, barY + thick / 2,
-                thick / 2, thick / 2, fillPaint
-            )
+            // Steady playback is followed exactly; jumps (seek, next track) glide instead of snapping.
+            if (seeking || abs(musicBarS.value - fraction) < .004f || reduceMotion) musicBarS.snap(fraction)
+            else { musicBarS.target = fraction; kick() }
+            drawBar(canvas, barLeft, barRight, barY, musicBarS.value, userAccent ?: waveColor, late,
+                if (seeking) dp(7f) else dp(4f))
         }
 
         // Controls
@@ -1282,10 +1314,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             buttonsLeft = x - dp(12f)
         }
         val tx = l + av + dp(12f)
-        val sub = if (a.callState == CallState.CALLING) "${a.appLabel} · ${callingLabel()}"
-            else a.chronometerText()?.let { "${a.appLabel} · $it" } ?: a.subtitle.ifBlank { a.appLabel }
-        val subAlpha = if (a.callState == CallState.CALLING) pulse(alpha) else alpha
-        text(canvas, sub, tx, cy - dp(6f), buttonsLeft - tx, smallPaint, NothingStyle.foreground, subAlpha)
+        val clock = a.chronometerText()
+        if (a.callState != CallState.CALLING && clock != null) {
+            // App name, then a timer whose digits roll as the seconds tick.
+            val prefix = "${a.appLabel} · "
+            val prefixWidth = min(smallPaint.measureText(prefix), (buttonsLeft - tx) * .6f)
+            text(canvas, prefix, tx, cy - dp(6f), prefixWidth, smallPaint, NothingStyle.muted, alpha)
+            rolling(canvas, "call-x", clock, tx + prefixWidth, cy - dp(6f), smallPaint, NothingStyle.foreground, alpha)
+        } else {
+            val sub = if (a.callState == CallState.CALLING) "${a.appLabel} · ${callingLabel()}" else a.subtitle.ifBlank { a.appLabel }
+            val subAlpha = if (a.callState == CallState.CALLING) pulse(alpha) else alpha
+            text(canvas, sub, tx, cy - dp(6f), buttonsLeft - tx, smallPaint, NothingStyle.foreground, subAlpha)
+        }
         text(canvas, a.title, tx, cy + dp(14f), buttonsLeft - tx, titlePaint, Color.WHITE, alpha)
     }
 
@@ -1325,7 +1365,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val level = a.title.filter { it.isDigit() }.toIntOrNull()?.coerceIn(0, 100) ?: 50
         fillPaint.color = withAlpha(NothingStyle.muted, alpha)
         canvas.drawRoundRect(bl + dp(2f), cy - bh / 2 + dp(2f), bl + dp(2f) + (bw - dp(4f)) * level / 100f, cy + bh / 2 - dp(2f), dp(3.5f), dp(3.5f), fillPaint)
-        text(canvas, a.title, bl - dp(10f), cy + dp(6f), dp(80f), titlePaint, NothingStyle.muted, alpha, alignRight = true)
+        rolling(canvas, "charging", a.title, bl - dp(10f), cy + dp(6f), titlePaint, NothingStyle.muted, alpha, alignRight = true)
     }
 
     // ---------------------------------------------------------------- volume, devices, downloads, alarms
@@ -1345,21 +1385,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun drawVolumeExpanded(canvas: Canvas, a: LiveActivity, alpha: Int) {
         val level = levelS.value.coerceIn(0f, 1f)
         val rowY = rect.top + compactHeight() / 2f
-        drawSpeaker(canvas, rect.left + dp(24f), rowY, dp(16f), level, alpha)
-        text(canvas, a.title, rect.left + dp(40f), rowY + dp(4.5f), rect.width() / 2f - dp(64f), smallPaint, GREY, alpha)
-        text(canvas, "${IslandSignals.percent(level)}", rect.right - dp(18f), rowY + dp(4.5f), dp(48f),
+        drawSpeaker(canvas, rect.left + dp(24f), rowY, dp(15f), level, alpha)
+        // The shown number follows the stream's real step, so it never lags the key press.
+        rolling(canvas, "volume", "${IslandSignals.percent(a.progress ?: level)}", rect.right - dp(20f), rowY + dp(4.5f),
             smallPaint, NothingStyle.foreground, alpha, alignRight = true)
         volumeLeft = rect.left + dp(18f)
         volumeRight = rect.right - dp(18f)
-        val barY = rect.bottom - dp(13f)
-        val thick = if (volumeDragging) dp(7f) else dp(5f)
-        fillPaint.color = withAlpha(NothingStyle.foreground, alpha * 50 / 255)
-        canvas.drawRoundRect(volumeLeft, barY - thick / 2, volumeRight, barY + thick / 2, thick / 2, thick / 2, fillPaint)
-        if (level > 0.001f) {
-            fillPaint.color = withAlpha(userAccent ?: waveColor, alpha)
-            canvas.drawRoundRect(volumeLeft, barY - thick / 2, volumeLeft + (volumeRight - volumeLeft) * level,
-                barY + thick / 2, thick / 2, thick / 2, fillPaint)
-        }
+        val pulse = barPulse.value.coerceIn(0f, 1f)
+        val thick = dp(4f) + (if (volumeDragging) dp(3f) else dp(2f) * pulse)
+        drawBar(canvas, volumeLeft, volumeRight, rect.bottom - dp(14f), level, userAccent ?: waveColor, alpha, thick)
     }
 
     /** Headphones arriving, or any Bluetooth audio device dropping away. */
@@ -1377,11 +1411,137 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val battery = a.progress
         if (battery != null && !a.lost) {
             val label = "${IslandSignals.percent(battery)}%"
-            text(canvas, label, right, cy + dp(5f), dp(56f), titlePaint, tint, alpha, alignRight = true)
-            right -= titlePaint.measureText(label) + dp(10f)
+            right = rolling(canvas, "battery", label, right, cy + dp(5f), titlePaint, tint, alpha, alignRight = true) - dp(10f)
         }
         text(canvas, a.title, tx, cy - dp(2f), right - tx, titlePaint, Color.WHITE, alpha)
         text(canvas, a.subtitle, tx, cy + dp(16f), right - tx, smallPaint, if (a.lost) NothingStyle.red else GREY, alpha)
+    }
+
+    /**
+     * Soft halo: a few rings stepping outward and fading, so it costs no blur and looks the same on
+     * every Android version. It brightens for a few seconds when something new arrives.
+     */
+    private fun drawGlow(canvas: Canvas, a: LiveActivity, r: Float, alpha: Int) {
+        if (!features.edgeGlow || isAbsorbing || alpha < 8) return
+        val base = ColorUtils.blendARGB(userAccent ?: a.accent.takeIf { ColorUtils.calculateLuminance(it) > .08 } ?: Color.WHITE,
+            Color.WHITE, 0.3f)
+        val now = SystemClock.uptimeMillis()
+        val flare = if (now < eventOutlineUntil) 1f + 0.7f * ((eventOutlineUntil - now) / OUTLINE_EVENT_MS.toFloat()) else 1f
+        val step = dp(1.15f)
+        haloPaint.strokeWidth = step * 1.5f
+        for (i in 1..GLOW_STEPS) {
+            val o = i * step - step / 2f
+            val f = 1f - i / (GLOW_STEPS + 1f)
+            haloPaint.color = withAlpha(base, (alpha * 0.36f * flare * f * f).toInt())
+            canvas.drawRoundRect(rect.left - o, rect.top - o, rect.right + o, rect.bottom + o, r + o, r + o, haloPaint)
+        }
+    }
+
+    /** Ring / vibrate / silent / Do Not Disturb: a glyph that moves once, and the state's name. */
+    private fun drawRingerExpanded(canvas: Canvas, a: LiveActivity, alpha: Int) {
+        val state = a.ringer ?: return
+        val t = ((SystemClock.uptimeMillis() - ringerAnimAt) / RINGER_ANIM_MS.toFloat()).coerceIn(0f, 1f)
+        val settle = 1f - t
+        val tint = when (state) {
+            RingerState.SILENT -> SILENT_RED
+            RingerState.DND_ON -> DND_PURPLE
+            else -> Color.WHITE
+        }
+        val color = withAlpha(tint, alpha)
+        val cy = rect.centerY()
+        val icon = rect.height() - dp(14f)
+        val gx = rect.left + dp(7f) + icon / 2f
+        fillPaint.color = withAlpha(tint, alpha * 40 / 255)
+        canvas.drawCircle(gx, cy, icon / 2f, fillPaint)
+        val g = icon * 0.56f
+        when (state) {
+            RingerState.RING -> {
+                // A few swings that die away, hinged at the top of the bell.
+                canvas.save()
+                canvas.rotate(sin(t * PI.toFloat() * 6f) * 22f * settle, gx, cy - g * .5f)
+                drawBell(canvas, gx, cy, g, color)
+                canvas.restore()
+            }
+            RingerState.VIBRATE -> drawVibrate(canvas, gx + sin(t * PI.toFloat() * 14f) * dp(1.6f) * settle, cy, g, color, settle)
+            RingerState.SILENT -> {
+                drawBell(canvas, gx, cy, g, color)
+                drawSlash(canvas, gx, cy, g, color, easeOut(t * 1.6f))
+            }
+            RingerState.DND_ON, RingerState.DND_OFF -> {
+                val m = if (state == RingerState.DND_ON) 1f + 0.12f * sin(t * PI.toFloat()) else 1f
+                drawCrescent(canvas, gx, cy, g * m, color)
+                if (state == RingerState.DND_OFF) drawSlash(canvas, gx, cy, g, color, easeOut(t * 1.6f))
+            }
+        }
+        val right = rect.right - dp(18f)
+        val tx = gx + icon / 2f + dp(12f)
+        // The word slides in a touch behind the glyph.
+        val lag = easeOut(((t - 0.05f) * 2.5f).coerceIn(0f, 1f))
+        text(canvas, a.title, right + (1f - lag) * dp(6f), cy + dp(5.5f), right - tx, titlePaint, tint,
+            (alpha * lag).toInt(), alignRight = true)
+    }
+
+    private fun easeOut(x: Float): Float { val c = x.coerceIn(0f, 1f); return 1f - (1f - c) * (1f - c) * (1f - c) }
+
+    private fun drawBell(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int) {
+        val s = size / 2f
+        val top = cy - s * .95f
+        val rim = cy + s * .55f
+        iconPath.reset()
+        iconPath.moveTo(cx - s * .78f, rim)
+        iconPath.cubicTo(cx - s * .62f, rim - s * .3f, cx - s * .72f, top + s * .1f, cx, top)
+        iconPath.cubicTo(cx + s * .72f, top + s * .1f, cx + s * .62f, rim - s * .3f, cx + s * .78f, rim)
+        iconPath.close()
+        fillPaint.color = color
+        canvas.drawPath(iconPath, fillPaint)
+        canvas.drawRoundRect(cx - s * .92f, rim - dp(.6f), cx + s * .92f, rim + dp(1.6f), dp(1f), dp(1f), fillPaint)
+        canvas.drawCircle(cx, rim + s * .32f, s * .17f, fillPaint)
+    }
+
+    private fun drawVibrate(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int, energy: Float) {
+        val s = size / 2f
+        ringPaint.color = color
+        ringPaint.strokeWidth = dp(1.7f)
+        canvas.drawRoundRect(cx - s * .42f, cy - s * .78f, cx + s * .42f, cy + s * .78f, dp(2.5f), dp(2.5f), ringPaint)
+        // Buzz marks either side, stronger while it shakes.
+        ringPaint.color = withAlpha(color, (Color.alpha(color) * (0.55f + 0.45f * energy)).toInt())
+        ringPaint.strokeWidth = dp(1.4f)
+        for (side in listOf(-1f, 1f)) {
+            val x = cx + side * s * .72f
+            val w = side * s * .16f
+            iconPath.reset()
+            iconPath.moveTo(x, cy - s * .48f)
+            iconPath.lineTo(x + w, cy - s * .24f)
+            iconPath.lineTo(x, cy)
+            iconPath.lineTo(x + w, cy + s * .24f)
+            iconPath.lineTo(x, cy + s * .48f)
+            canvas.drawPath(iconPath, ringPaint)
+        }
+    }
+
+    private fun drawCrescent(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int) {
+        val s = size / 2f
+        iconPath.reset()
+        iconPath.addCircle(cx, cy, s * .82f, Path.Direction.CW)
+        moonCut.reset()
+        moonCut.addCircle(cx + s * .48f, cy - s * .36f, s * .68f, Path.Direction.CW)
+        iconPath.op(moonCut, Path.Op.DIFFERENCE)
+        fillPaint.color = color
+        canvas.drawPath(iconPath, fillPaint)
+    }
+
+    /** A diagonal strike drawn in over [progress], with a dark gap so it reads over the glyph. */
+    private fun drawSlash(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int, progress: Float) {
+        if (progress <= 0f) return
+        val s = size / 2f
+        val x0 = cx - s * .85f; val y0 = cy - s * .85f
+        val x1 = x0 + (s * 1.7f) * progress; val y1 = y0 + (s * 1.7f) * progress
+        ringPaint.strokeWidth = dp(4.2f)
+        ringPaint.color = Color.BLACK
+        canvas.drawLine(x0, y0, x1, y1, ringPaint)
+        ringPaint.strokeWidth = dp(1.8f)
+        ringPaint.color = color
+        canvas.drawLine(x0, y0, x1, y1, ringPaint)
     }
 
     private fun drawDownloadExpanded(canvas: Canvas, a: LiveActivity, alpha: Int, late: Int) {
@@ -1391,20 +1551,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val top = rect.top + dp(16f)
         val img = a.appIcon ?: a.artwork
         if (img != null) drawImage(canvas, img, l, top, s, dp(11f), alpha) else drawLetterTile(canvas, a, l, top, s, dp(11f), alpha)
-        val fraction = a.progress ?: 0f
-        val percent = "${IslandSignals.percent(fraction)}%"
-        text(canvas, percent, rr, top + dp(27f), dp(80f), bigPaint, NothingStyle.foreground, alpha, alignRight = true)
         val tx = l + s + dp(12f)
-        val textRight = rr - bigPaint.measureText(percent) - dp(12f)
+        val percentLeft = rolling(canvas, "download-x", "${IslandSignals.percent(a.progress ?: 0f)}%", rr, top + dp(16f),
+            titlePaint, NothingStyle.foreground, alpha, alignRight = true)
+        val textRight = percentLeft - dp(12f)
         text(canvas, a.title, tx, top + dp(16f), textRight - tx, titlePaint, Color.WHITE, alpha)
-        text(canvas, a.subtitle.ifBlank { a.appLabel }, tx, top + dp(35f), textRight - tx, bodyPaint, GREY, alpha)
-        val barY = rect.bottom - dp(20f)
-        val thick = dp(5f)
-        fillPaint.color = withAlpha(NothingStyle.foreground, late * 50 / 255)
-        canvas.drawRoundRect(l, barY - thick / 2, rr, barY + thick / 2, thick / 2, thick / 2, fillPaint)
-        fillPaint.color = withAlpha(userAccent ?: waveColor, late)
-        if (fraction > 0f) canvas.drawRoundRect(l, barY - thick / 2, l + (rr - l) * fraction, barY + thick / 2,
-            thick / 2, thick / 2, fillPaint)
+        text(canvas, a.subtitle.ifBlank { a.appLabel }, tx, top + dp(35f), rr - tx, bodyPaint, GREY, alpha)
+        drawBar(canvas, l, rr, rect.bottom - dp(20f), levelS.value, userAccent ?: waveColor, late)
     }
 
     /** Ringing alarm: Snooze and Dismiss come from the clock app's own notification buttons. */
@@ -1811,14 +1964,22 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         imagePaint.shader = null
     }
 
-    private fun drawWave(canvas: Canvas, left: Float, cy: Float, w: Float, maxH: Float, color: Int, active: Boolean, alpha: Int) {
+    private fun drawWave(canvas: Canvas, left: Float, cy: Float, w: Float, maxH: Float, color: Int, active: Boolean, alpha: Int) =
+        drawWave(canvas, left, cy, w, maxH, color, if (active) 1f else 0f, alpha)
+
+    /**
+     * Five bars breathing on two slow, offset sines. [energy] eases them between still dots (0)
+     * and full motion (1), so play and pause fade rather than snap.
+     */
+    private fun drawWave(canvas: Canvas, left: Float, cy: Float, w: Float, maxH: Float, color: Int, energy: Float, alpha: Int) {
         val bars = 5
         val bw = w / (bars * 2 - 1)
         fillPaint.color = withAlpha(color, alpha)
         val t = SystemClock.uptimeMillis() / 1000f
+        val e = energy.coerceIn(0f, 1f)
         for (i in 0 until bars) {
-            val phase = sin(t * (6f + i * 1.7f) + i * 1.3f) * 0.5f + 0.5f
-            val h = if (active) maxH * (0.25f + 0.75f * phase) else bw
+            val phase = .5f + .3f * sin(t * (4.2f + i * .9f) + i * 1.7f) + .2f * sin(t * (2.3f + i * .5f) + i * .6f)
+            val h = bw + (maxH * (.3f + .7f * phase) - bw) * e
             val x = left + i * bw * 2
             canvas.drawRoundRect(x, cy - h / 2, x + bw, cy + h / 2, bw / 2, bw / 2, fillPaint)
         }
@@ -1893,10 +2054,119 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         alignRight: Boolean = false, center: Boolean = false,
     ) {
         if (maxW <= 0f || s.isBlank()) return
-        val out = TextUtils.ellipsize(s.replace('\n', ' '), p, maxW, TextUtils.TruncateAt.END).toString()
+        val out = fitted(s, p, maxW)
         p.color = withAlpha(color, alpha * Color.alpha(color) / 255)
         val dx = if (alignRight && !center) x - p.measureText(out) else x
         canvas.drawText(out, dx, y, p)
+    }
+
+    // Ellipsizing allocates; the same labels are drawn every frame, so remember the last results.
+    private val fitSource = arrayOfNulls<String>(FIT_SLOTS)
+    private val fitResult = arrayOfNulls<String>(FIT_SLOTS)
+    private val fitWidth = FloatArray(FIT_SLOTS)
+    private val fitSize = FloatArray(FIT_SLOTS)
+    private val fitFace = arrayOfNulls<Typeface>(FIT_SLOTS)
+
+    private fun fitted(s: String, p: TextPaint, maxW: Float): String {
+        val width = kotlin.math.floor(maxW)
+        val slot = ((s.hashCode() * 31 + width.toInt()) and Int.MAX_VALUE) % FIT_SLOTS
+        if (fitSource[slot] === s || fitSource[slot] == s) {
+            if (fitWidth[slot] == width && fitSize[slot] == p.textSize && fitFace[slot] === p.typeface) return fitResult[slot]!!
+        }
+        val out = TextUtils.ellipsize(s.replace('\n', ' '), p, width, TextUtils.TruncateAt.END).toString()
+        fitSource[slot] = s; fitResult[slot] = out; fitWidth[slot] = width; fitSize[slot] = p.textSize; fitFace[slot] = p.typeface
+        return out
+    }
+
+    // ---------------------------------------------------------------- rolling numbers
+
+    /**
+     * Any number on the island rolls when it changes: only the digits that changed move, upward
+     * when the value grows and downward when it shrinks, with a short fade. Tabular figures keep
+     * every digit in place.
+     */
+    private class Roll {
+        var text = ""
+        var prev = ""
+        var at = 0L
+        var up = true
+    }
+    private val rolls = HashMap<String, Roll>()
+    private var rollingUntil = 0L
+
+    private fun numberOf(s: String): Long? {
+        var n = 0L; var any = false
+        for (c in s) if (c in '0'..'9') { n = n * 10 + (c - '0'); any = true }
+        return if (any) n else null
+    }
+
+    private fun rolling(
+        canvas: Canvas, slot: String, value: String, x: Float, baseline: Float, p: TextPaint, color: Int, alpha: Int,
+        alignRight: Boolean = false, travel: Float = .62f,
+    ): Float {
+        val r = rolls.getOrPut(slot) { Roll() }
+        val now = SystemClock.uptimeMillis()
+        if (value != r.text) {
+            if (r.text.isNotEmpty() && !reduceMotion) {
+                r.prev = r.text; r.at = now
+                val a = numberOf(value); val b = numberOf(r.text)
+                r.up = if (a != null && b != null) a >= b else true
+                rollingUntil = max(rollingUntil, now + NUMBER_ROLL_MS)
+                kick()
+            }
+            r.text = value
+        }
+        val width = p.measureText(value)
+        val left = if (alignRight) x - width else x
+        val t = if (r.at == 0L) 1f else ((now - r.at).toFloat() / NUMBER_ROLL_MS).coerceIn(0f, 1f)
+        val e = 1f - (1f - t) * (1f - t) * (1f - t)
+        if (t >= 1f || r.prev.isEmpty()) {
+            p.color = withAlpha(color, alpha)
+            canvas.drawText(value, left, baseline, p)
+            return left
+        }
+        val shift = p.textSize * travel
+        val dir = if (r.up) 1f else -1f
+        canvas.save()
+        canvas.clipRect(min(left, x - (if (alignRight) p.measureText(r.prev) else 0f)) - dp(2f), baseline + p.ascent() - dp(1f),
+            max(left + width, if (alignRight) x else x + p.measureText(r.prev)) + dp(2f), baseline + p.descent() + dp(1f))
+        if (r.prev.length == value.length) {
+            // Same shape: unchanged characters stay put, changed ones roll.
+            for (i in value.indices) {
+                val cx = left + p.measureText(value, 0, i)
+                if (r.prev[i] == value[i]) {
+                    p.color = withAlpha(color, alpha)
+                    canvas.drawText(value, i, i + 1, cx, baseline, p)
+                } else {
+                    p.color = withAlpha(color, (alpha * (1f - e)).toInt())
+                    canvas.drawText(r.prev, i, i + 1, cx, baseline - dir * e * shift, p)
+                    p.color = withAlpha(color, (alpha * e).toInt())
+                    canvas.drawText(value, i, i + 1, cx, baseline + dir * (1f - e) * shift, p)
+                }
+            }
+        } else {
+            // A digit was added or dropped (9 → 10): the whole number rolls.
+            val oldLeft = if (alignRight) x - p.measureText(r.prev) else x
+            p.color = withAlpha(color, (alpha * (1f - e)).toInt())
+            canvas.drawText(r.prev, oldLeft, baseline - dir * e * shift, p)
+            p.color = withAlpha(color, (alpha * e).toInt())
+            canvas.drawText(value, left, baseline + dir * (1f - e) * shift, p)
+        }
+        canvas.restore()
+        return left
+    }
+
+    /** One quiet bar style for every level and progress on the island. */
+    private fun drawBar(canvas: Canvas, left: Float, right: Float, cy: Float, fraction: Float, color: Int, alpha: Int, thick: Float = dp(4f)) {
+        if (right <= left) return
+        fillPaint.color = withAlpha(NothingStyle.foreground, alpha * 38 / 255)
+        canvas.drawRoundRect(left, cy - thick / 2, right, cy + thick / 2, thick / 2, thick / 2, fillPaint)
+        val f = fraction.coerceIn(0f, 1f)
+        if (f <= 0f) return
+        // Never shorter than its own height, so a low level still reads as a rounded dot.
+        val end = max(left + thick, left + (right - left) * f)
+        fillPaint.color = withAlpha(color, alpha)
+        canvas.drawRoundRect(left, cy - thick / 2, end, cy + thick / 2, thick / 2, thick / 2, fillPaint)
     }
 
     private fun withAlpha(color: Int, alpha: Int) = ColorUtils.setAlphaComponent(color, alpha.coerceIn(0, 255))
@@ -2047,7 +2317,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             Presentation.COMPACT -> callbacks?.onOpen(a)
             Presentation.EXPANDED -> {
                 // System islands have no app to open; a tap just tucks them away.
-                if (a.mode == IslandMode.VOLUME || a.mode == IslandMode.DEVICE) { callbacks?.onDismiss(a); return }
+                if (a.mode == IslandMode.VOLUME || a.mode == IslandMode.DEVICE || a.mode == IslandMode.RINGER) { callbacks?.onDismiss(a); return }
                 if (!replyHit.isEmpty && replyHit.contains(x, y)) {
                     haptic(HapticGesture.TAP, HapticFeedbackConstants.KEYBOARD_TAP)
                     callbacks?.onReply(a)
@@ -2129,6 +2399,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val INTRO_HOLD_MS = 190L
         private const val ROLL_MS = 240L
         private const val OUTLINE_EVENT_MS = 4_000L
+        private const val RINGER_HEIGHT_DP = 46f
+        private const val RINGER_ANIM_MS = 900L
+        private const val GLOW_STEPS = 6
+        private val SILENT_RED = Color.rgb(255, 92, 72)
+        private val DND_PURPLE = Color.rgb(150, 132, 255)
+        private const val NUMBER_ROLL_MS = 260L
+        private const val FIT_SLOTS = 48
         private const val SHORT_COMPACT_WIDTH_DP = 168f
         private const val SHORT_SPLIT_WIDTH_DP = 140f
         private const val MEDIUM_WIDTH_DP = 360f

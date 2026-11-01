@@ -17,12 +17,18 @@ data class IslandFeatureSet(
     val downloads: Boolean = true,
     val alarms: Boolean = true,
     val inlineReply: Boolean = true,
+    /** Ring / vibrate / silent and Do Not Disturb changes show on the island. */
+    val ringer: Boolean = true,
+    /** Off by default: it takes over from the phone's own pop-ups. */
+    val hidePhonePopups: Boolean = false,
     val messagesMediumFirst: Boolean = true,
     val shortCompact: Boolean = false,
     val compactHeightDp: Float = IslandMotion.COMPACT_HEIGHT_DP,
     val phoneCorners: Boolean = true,
     val colouredBubbles: Boolean = true,
     val outline: OutlineMode = OutlineMode.OFF,
+    /** A soft halo around the pill's edge so it stands out. */
+    val edgeGlow: Boolean = false,
     val burnInCare: Boolean = false,
     val lockScreen: Boolean = false,
     val hapticTap: Boolean = true,
@@ -59,6 +65,8 @@ object IslandFeatures {
             downloads = p.getBoolean("downloads", d.downloads),
             alarms = p.getBoolean("alarms", d.alarms),
             inlineReply = p.getBoolean("inline_reply", d.inlineReply),
+            ringer = p.getBoolean("ringer", d.ringer),
+            hidePhonePopups = p.getBoolean("hide_phone_popups", d.hidePhonePopups),
             messagesMediumFirst = p.getBoolean("messages_medium", d.messagesMediumFirst),
             shortCompact = p.getBoolean("short_compact", d.shortCompact),
             compactHeightDp = p.getFloat("compact_height", d.compactHeightDp),
@@ -66,6 +74,7 @@ object IslandFeatures {
             colouredBubbles = p.getBoolean("coloured_bubbles", d.colouredBubbles),
             outline = runCatching { OutlineMode.valueOf(p.getString("outline", d.outline.name) ?: d.outline.name) }
                 .getOrDefault(d.outline),
+            edgeGlow = p.getBoolean("edge_glow", d.edgeGlow),
             burnInCare = p.getBoolean("burn_in", d.burnInCare),
             lockScreen = p.getBoolean("lock_screen", d.lockScreen),
             hapticTap = p.getBoolean("haptic_tap", d.hapticTap),

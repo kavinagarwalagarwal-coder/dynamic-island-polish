@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Dynamic Droid-eiland</string>
-    <string name="accessibility_description">Plaatst het eiland boven de statusbalk, gebruikt pakketnamen om app-wissels te herkennen en laat de volumeknoppen het volume-eiland tonen. Alleen de volumeknoppen worden bekeken; alle andere toetsen gaan ongewijzigd door. Leest geen scherminhoud en maakt geen screenshots.</string>
+    <string name="accessibility_description">Plaatst het eiland boven de statusbalk, gebruikt pakketnamen van apps om appwissels te herkennen en laat de volumeknoppen het volume-eiland tonen. Alleen de volumeknoppen worden bekeken; alle andere toetsen gaan onaangeroerd door. Als je het verbergen van pop-ups van de telefoon aanzet, zoekt hij ook de systeem-pop-up van een melding die het eiland toont en veegt die naar het meldingenpaneel; daarvoor kijkt hij alleen naar System UI en verder niets op het scherm. Hij maakt nooit screenshots.</string>
     <string name="island_calling">Bellen…</string>
     <string name="island_connected">Verbonden</string>
     <string name="island_disconnected">Verbinding verbroken</string>
@@ -262,4 +262,26 @@
     <string name="onb_finish_body">Geef Dynamic Droid meldingstoegang en de camerazone-overlay, en je eiland komt tot leven.</string>
     <string name="onb_ready_title">Helemaal klaar</string>
     <string name="onb_ready_body">Je eiland is gekoppeld. Bekijk deze rondleiding altijd opnieuw via Proberen.</string>
+    <string name="feature_hide_popups">Pop-upmeldingen van de telefoon verbergen</string>
+    <string name="feature_hide_popups_note">Het eiland toont nieuwe meldingen in plaats van de banners van de telefoon en veegt elke pop-up weg zodra die verschijnt. Ze komen nog steeds binnen in het meldingenpaneel. Pop-ups blijven gewoon als het eiland niet draait, tijdens stille uren of in apps waar het eiland verborgen is.</string>
+    <string name="popups_status_active">Actief • pop-ups van de telefoon zijn verborgen zolang het eiland draait</string>
+    <string name="popups_status_waiting">Aan • pop-ups verdwijnen zodra eiland en meldingstoegang gekoppeld zijn</string>
+    <string name="popups_grant_button">Pop-ups helemaal stoppen (optioneel)</string>
+    <string name="popups_grant_title">Pop-ups helemaal stoppen</string>
+    <string name="popups_grant_body">Dit is optioneel. Zonder dit veegt het eiland elke pop-up een moment na verschijnen weg. Met een eenmalige toestemming via een computer kan Dynamic Droid de pop-ups van de telefoon uitzetten, zodat ze nooit opflitsen. Zet USB-foutopsporing aan, verbind je telefoon en voer uit:\n\n%1$s\n\nZet deze optie uit voordat je Dynamic Droid verwijdert, zodat je pop-ups terugkomen.</string>
+    <string name="popups_status_swipe">Aan • het eiland veegt pop-ups van de telefoon weg zodra ze verschijnen</string>
+    <string name="popups_status_needs_access">Zet Dynamic Droid aan bij Toegankelijkheid zodat het pop-ups kan wegvegen</string>
+    <string name="popups_copy">Opdracht kopiëren</string>
+    <string name="popups_copied">Opdracht gekopieerd</string>
+    <string name="ringer_ring">Bellen</string>
+    <string name="ringer_vibrate">Trillen</string>
+    <string name="ringer_silent">Stil</string>
+    <string name="ringer_dnd_on">Niet storen</string>
+    <string name="ringer_dnd_off">Niet storen uit</string>
+    <string name="mode_ringer">Bellen &amp; stil</string>
+    <string name="demo_ringer">Stil</string>
+    <string name="feature_ringer">Bellen, trillen &amp; stil</string>
+    <string name="feature_ringer_note">Toon het eiland wanneer de telefoon wisselt tussen bellen, trillen en stil, of Niet storen aan of uit gaat.</string>
+    <string name="feature_glow">Zachte gloed langs de rand</string>
+    <string name="feature_glow_note">Een zachte gloed rond de pil zodat die opvalt op donkere achtergronden en apps. Wordt even feller als er iets nieuws binnenkomt.</string>
 </resources>
