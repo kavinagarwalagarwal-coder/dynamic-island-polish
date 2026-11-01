@@ -1791,7 +1791,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fillPaint.color = withAlpha(NothingStyle.foreground, alpha)
         canvas.drawRoundRect(l, t, l + size, t + size, radius, radius, fillPaint)
         letterPaint.textSize = size * 0.46f
-        letterPaint.color = withAlpha(Color.WHITE, alpha)
+        // Dark letter on the light tile; white-on-white was unreadable.
+        letterPaint.color = withAlpha(NothingStyle.background, alpha)
         val letter = (a.title.firstOrNull { it.isLetterOrDigit() } ?: a.appLabel.firstOrNull() ?: '•').uppercase()
         canvas.drawText(letter, l + size / 2, t + size / 2 + size * 0.16f, letterPaint)
     }
