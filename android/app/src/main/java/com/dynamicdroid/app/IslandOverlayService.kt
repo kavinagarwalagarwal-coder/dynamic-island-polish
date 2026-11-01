@@ -19,6 +19,7 @@ import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.os.PowerManager
+import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
@@ -220,6 +221,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         reply = ReplyPanel(this, ::onReplySent) { armTransientTimeout(transient) }
         IslandAccessibilityService.onVolumeKey = ::handleVolumeKey
         IslandBus.listenerChanged = { HeadsUpControl.sync(this, island != null) }
+        IslandAccessibilityService.beforePopupSwipe = { passTouchesFor(it) }
         HeadsUpControl.sync(this, island != null)
     }
 
@@ -383,7 +385,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
         params?.let { lp ->
-            val touchable = a != null && !concealed && !swiftMorphActive && !absorb && !view.isAbsorbing
+            val touchable = a != null && !concealed && !swiftMorphActive && !absorb && !view.isAbsorbing && !passingTouches
             val isOff = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0
             if (touchable == isOff) {
                 lp.flags = if (touchable) lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
@@ -514,6 +516,22 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             watcher?.start()
         }
         render()
+    }
+
+    /** Until when the island window lets every touch through (while a pop-up is swiped away under it). */
+    private var passTouchesUntil = 0L
+    private val passingTouches get() = SystemClock.uptimeMillis() < passTouchesUntil
+
+    private fun passTouchesFor(ms: Long) {
+        passTouchesUntil = SystemClock.uptimeMillis() + ms
+        val view = island ?: return
+        params?.let { lp ->
+            if (lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
+                lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+                runCatching { windowManager?.updateViewLayout(view, lp) }
+            }
+        }
+        handler.postDelayed({ if (!passingTouches) render() }, ms + 16L)
     }
 
     /**
@@ -755,7 +773,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         val a = view.activity
         val (w, h) = view.windowSizeFor(a, view.presentation)
         var changed = false
-        if (lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0) {
+        if (lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0 && !passingTouches) {
             lp.flags = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
             changed = true
         }
@@ -832,6 +850,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         IslandAccessibilityService.onForegroundPackage = null
         if (IslandAccessibilityService.onVolumeKey != null) IslandAccessibilityService.onVolumeKey = null
         IslandBus.listenerChanged = null
+        IslandAccessibilityService.beforePopupSwipe = null
         // The island is going away: the phone's own pop-ups must come back.
         HeadsUpControl.restore(this)
         devices?.stop()

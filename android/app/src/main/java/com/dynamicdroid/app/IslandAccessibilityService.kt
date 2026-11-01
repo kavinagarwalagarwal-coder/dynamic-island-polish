@@ -130,8 +130,12 @@ class IslandAccessibilityService : AccessibilityService() {
             moveTo(x, card.exactCenterY())
             lineTo(x, 1f)
         }
-        dispatchGesture(GestureDescription.Builder()
-            .addStroke(GestureDescription.StrokeDescription(path, 0L, 120L)).build(), null, null)
+        // The island's own window spans the top of the screen; let the swipe pass through it.
+        beforePopupSwipe?.invoke(450L)
+        handler.postDelayed({
+            dispatchGesture(GestureDescription.Builder()
+                .addStroke(GestureDescription.StrokeDescription(path, 0L, 120L)).build(), null, null)
+        }, 48L)
     }
 
     /** Keys whose press we took, so their release is consumed too and never reaches the system. */
@@ -181,6 +185,8 @@ class IslandAccessibilityService : AccessibilityService() {
         var onChanged: (() -> Unit)? = null
         var onForegroundPackage: ((String) -> Unit)? = null
         /** Set by the overlay service; returns true when the island handled the key. */
+        /** Set by the overlay service: make the island window touch-through for this many ms. */
+        var beforePopupSwipe: ((Long) -> Unit)? = null
         var onVolumeKey: ((up: Boolean) -> Boolean)? = null
 
         fun isEnabled(context: Context): Boolean {
