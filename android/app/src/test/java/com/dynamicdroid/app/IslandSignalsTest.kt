@@ -56,4 +56,12 @@ class IslandSignalsTest {
         assertFalse(quietHold.haptic(HapticGesture.HOLD))
         assertTrue(quietHold.haptic(HapticGesture.TAP))
     }
+
+    @Test fun phonePopupsHideOnlyWhileTheIslandCanStandIn() {
+        assertTrue(HeadsUpControl.shouldHide(wanted = true, islandUp = true, listenerUp = true))
+        assertFalse(HeadsUpControl.shouldHide(wanted = false, islandUp = true, listenerUp = true))
+        assertFalse(HeadsUpControl.shouldHide(wanted = true, islandUp = false, listenerUp = true))
+        assertFalse(HeadsUpControl.shouldHide(wanted = true, islandUp = true, listenerUp = false))
+        assertFalse(IslandFeatureSet().hidePhonePopups)
+    }
 }

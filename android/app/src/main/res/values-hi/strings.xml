@@ -262,4 +262,14 @@
     <string name="onb_finish_body">Dynamic Droid को सूचना पहुँच और कैमरा-एरिया ओवरले दें, और आपका आइलैंड जीवंत हो उठेगा।</string>
     <string name="onb_ready_title">सब तैयार है</string>
     <string name="onb_ready_body">आपका आइलैंड जुड़ा हुआ है। यह टूर कभी भी प्लेग्राउंड से दोबारा देखें।</string>
+    <string name="feature_hide_popups">फ़ोन की पॉप-अप सूचनाएँ छिपाएँ</string>
+    <string name="feature_hide_popups_note">फ़ोन के बैनर की जगह आइलैंड नई सूचनाएँ दिखाता है। सूचनाएँ नोटिफ़िकेशन शेड में फिर भी आती हैं। आइलैंड न चलने पर, शांत समय में, या सूचना पहुँच हटने पर पॉप-अप अपने आप लौट आते हैं।</string>
+    <string name="popups_status_active">चालू • आइलैंड चलने तक फ़ोन के पॉप-अप छिपे हैं</string>
+    <string name="popups_status_waiting">चालू • आइलैंड और सूचना पहुँच जुड़ते ही पॉप-अप छिप जाएँगे</string>
+    <string name="popups_status_needs_grant">कंप्यूटर से एक बार की अनुमति चाहिए</string>
+    <string name="popups_grant_button">इसकी अनुमति कैसे दें</string>
+    <string name="popups_grant_title">पॉप-अप नियंत्रण की अनुमति दें</string>
+    <string name="popups_grant_body">Android ऐप्स को यह सेटिंग सिर्फ़ एक बार की अनुमति के बाद बदलने देता है। USB डीबगिंग चालू करें, फ़ोन को कंप्यूटर से जोड़ें और यह चलाएँ:\n\n%1$s\n\nDynamic Droid को अनइंस्टॉल करने से पहले यह विकल्प बंद करें ताकि पॉप-अप वापस आ जाएँ।</string>
+    <string name="popups_copy">कमांड कॉपी करें</string>
+    <string name="popups_copied">कमांड कॉपी हुआ</string>
 </resources>

@@ -17,6 +17,8 @@ data class IslandFeatureSet(
     val downloads: Boolean = true,
     val alarms: Boolean = true,
     val inlineReply: Boolean = true,
+    /** Off by default: it changes a system-wide setting and needs a one-time ADB grant. */
+    val hidePhonePopups: Boolean = false,
     val messagesMediumFirst: Boolean = true,
     val shortCompact: Boolean = false,
     val compactHeightDp: Float = IslandMotion.COMPACT_HEIGHT_DP,
@@ -59,6 +61,7 @@ object IslandFeatures {
             downloads = p.getBoolean("downloads", d.downloads),
             alarms = p.getBoolean("alarms", d.alarms),
             inlineReply = p.getBoolean("inline_reply", d.inlineReply),
+            hidePhonePopups = p.getBoolean("hide_phone_popups", d.hidePhonePopups),
             messagesMediumFirst = p.getBoolean("messages_medium", d.messagesMediumFirst),
             shortCompact = p.getBoolean("short_compact", d.shortCompact),
             compactHeightDp = p.getFloat("compact_height", d.compactHeightDp),

@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private var shellView: LinearLayout? = null
     private var onboarding: OnboardingOverlay? = null
     private var currentPage: String? = null
+    private var popupStatus: TextView? = null
     private lateinit var preview: IslandView
     private var demo: LiveActivity? = null
     private var demoPresentation = Presentation.EXPANDED
@@ -212,6 +213,9 @@ class MainActivity : AppCompatActivity() {
         readiness?.setTextColor(if (ready) 0xFF9BE4BE.toInt() else NothingStyle.foreground)
         placementInfo?.text = placementExplanation()
         if (overlay || a11y) startIsland()
+        // A grant over ADB may have happened while we were away: let the service apply it.
+        if (IslandFeatures.read(this).hidePhonePopups && (overlay || a11y)) refreshCustomization()
+        popupStatus?.postDelayed({ refreshPopupStatus() }, 400L)
     }
 
     // ---------------------------------------------------------------- live preview
@@ -654,6 +658,13 @@ class MainActivity : AppCompatActivity() {
         section(R.string.features_messages)
         toggle(R.string.feature_reply, "inline_reply", features.inlineReply)
         toggle(R.string.feature_medium, "messages_medium", features.messagesMediumFirst, R.string.feature_medium_note)
+        toggle(R.string.feature_hide_popups, "hide_phone_popups", features.hidePhonePopups, R.string.feature_hide_popups_note) { on ->
+            if (on && !HeadsUpControl.canControl(this)) explainPopupGrant()
+        }
+        popupStatus = label("", 13f, NothingStyle.foreground).also { column.addView(it, row(-2).apply { topMargin = dp(2) }) }
+        column.addView(action("popups-grant", getString(R.string.popups_grant_button)) { explainPopupGrant() },
+            row(-2).apply { topMargin = dp(8) })
+        refreshPopupStatus()
 
         section(R.string.features_look)
         toggle(R.string.feature_short, "short_compact", features.shortCompact, R.string.feature_short_note)
@@ -724,6 +735,33 @@ class MainActivity : AppCompatActivity() {
         7 -> R.string.accent_pink; else -> R.string.accent_default
     })
 
+    /** One line on whether the phone's own pop-ups are hidden right now, and why not if they aren't. */
+    private fun refreshPopupStatus() {
+        val status = popupStatus ?: return
+        val wanted = IslandFeatures.read(this).hidePhonePopups
+        val granted = HeadsUpControl.canControl(this)
+        status.visibility = if (wanted) View.VISIBLE else View.GONE
+        status.text = getString(when {
+            !granted -> R.string.popups_status_needs_grant
+            HeadsUpControl.hiding(this) -> R.string.popups_status_active
+            else -> R.string.popups_status_waiting
+        })
+        status.setTextColor(if (granted && HeadsUpControl.hiding(this)) 0xFF9BE4BE.toInt() else NothingStyle.muted)
+        buttons["popups-grant"]?.visibility = if (wanted && !granted) View.VISIBLE else View.GONE
+    }
+
+    private fun explainPopupGrant() {
+        android.app.AlertDialog.Builder(this, R.style.IslandDialog)
+            .setTitle(getString(R.string.popups_grant_title))
+            .setMessage(getString(R.string.popups_grant_body, HeadsUpControl.GRANT_COMMAND))
+            .setNegativeButton(getString(R.string.common_done), null)
+            .setPositiveButton(getString(R.string.popups_copy)) { _, _ ->
+                getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(
+                    android.content.ClipData.newPlainText("adb", HeadsUpControl.GRANT_COMMAND))
+                toast(getString(R.string.popups_copied))
+            }.show()
+    }
+
     private fun requestBluetoothIfNeeded() {
         val permission = DeviceMonitor.permission() ?: return
         if (!DeviceMonitor.hasPermission(this)) bluetoothPermission.launch(permission)
@@ -734,6 +772,9 @@ class MainActivity : AppCompatActivity() {
         preview.applyFeatures(features)
         wallpaperPreview?.applyFeatures(features)
         refreshCustomization()
+        // The service applies the change asynchronously; check again once it has.
+        popupStatus?.postDelayed({ refreshPopupStatus() }, 400L)
+        refreshPopupStatus()
     }
 
     private data class InstalledApp(val packageName: String, val label: String)

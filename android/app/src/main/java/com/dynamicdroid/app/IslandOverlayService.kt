@@ -83,6 +83,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private val refreshQuietRules = object : Runnable {
         override fun run() {
             render()
+            HeadsUpControl.sync(this@IslandOverlayService, island != null)
             if (IslandCustomization.quietEnabled(this@IslandOverlayService)) handler.postDelayed(this, 60_000L)
         }
     }
@@ -218,6 +219,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         devices = DeviceMonitor(this) { onActivity(it) }.also { it.start() }
         reply = ReplyPanel(this, ::onReplySent) { armTransientTimeout(transient) }
         IslandAccessibilityService.onVolumeKey = ::handleVolumeKey
+        IslandBus.listenerChanged = { HeadsUpControl.sync(this, island != null) }
+        HeadsUpControl.sync(this, island != null)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -241,6 +244,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         if (intent?.action == ACTION_CUSTOMIZATION) {
             island?.applyFeatures(IslandFeatures.read(this))
+            HeadsUpControl.sync(this, island != null)
             devices?.stop(); devices?.start()
             handler.removeCallbacks(refreshQuietRules)
             if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)
@@ -322,6 +326,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private fun reattach() {
         detachWindow()
         if (attachWindow()) render()
+        HeadsUpControl.sync(this, island != null)
     }
 
     // ---------------------------------------------------------------- state
@@ -814,6 +819,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         IslandAccessibilityService.onChanged = null
         IslandAccessibilityService.onForegroundPackage = null
         if (IslandAccessibilityService.onVolumeKey != null) IslandAccessibilityService.onVolumeKey = null
+        IslandBus.listenerChanged = null
+        // The island is going away: the phone's own pop-ups must come back.
+        HeadsUpControl.restore(this)
         devices?.stop()
         watcher?.stop()
         status?.stop()

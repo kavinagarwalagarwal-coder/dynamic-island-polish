@@ -262,4 +262,14 @@
     <string name="onb_finish_body">Gib Dynamic Droid Benachrichtigungszugriff und das Kamerabereich-Overlay, dann erwacht deine Insel zum Leben.</string>
     <string name="onb_ready_title">Alles bereit</string>
     <string name="onb_ready_body">Deine Insel ist verbunden. Du kannst diese Tour jederzeit unter Ausprobieren wiederholen.</string>
+    <string name="feature_hide_popups">Pop-up-Benachrichtigungen des Handys ausblenden</string>
+    <string name="feature_hide_popups_note">Die Insel zeigt neue Benachrichtigungen statt der Banner des Handys. Sie landen weiterhin in der Benachrichtigungsleiste. Pop-ups kehren von selbst zurück, wenn die Insel nicht läuft, während Ruhezeiten oder wenn der Benachrichtigungszugriff wegfällt.</string>
+    <string name="popups_status_active">Aktiv • Pop-ups des Handys sind ausgeblendet, solange die Insel läuft</string>
+    <string name="popups_status_waiting">An • Pop-ups verschwinden, sobald Insel und Benachrichtigungszugriff verbunden sind</string>
+    <string name="popups_status_needs_grant">Braucht eine einmalige Berechtigung über einen Computer</string>
+    <string name="popups_grant_button">So erlaubst du es</string>
+    <string name="popups_grant_title">Pop-up-Steuerung erlauben</string>
+    <string name="popups_grant_body">Android erlaubt Apps diese Einstellung nur nach einer einmaligen Berechtigung. Aktiviere USB-Debugging, verbinde das Handy mit einem Computer und führe aus:\n\n%1$s\n\nSchalte diese Option vor dem Deinstallieren von Dynamic Droid aus, damit deine Pop-ups zurückkommen.</string>
+    <string name="popups_copy">Befehl kopieren</string>
+    <string name="popups_copied">Befehl kopiert</string>
 </resources>

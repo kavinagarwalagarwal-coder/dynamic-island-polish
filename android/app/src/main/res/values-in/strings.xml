@@ -262,4 +262,14 @@
     <string name="onb_finish_body">Beri Dynamic Droid akses notifikasi dan overlay area kamera, dan pulau Anda akan hidup.</string>
     <string name="onb_ready_title">Semua siap</string>
     <string name="onb_ready_body">Pulau Anda terhubung. Ulangi tur ini kapan saja dari Coba.</string>
+    <string name="feature_hide_popups">Sembunyikan notifikasi pop-up ponsel</string>
+    <string name="feature_hide_popups_note">Pulau menampilkan notifikasi baru sebagai ganti banner ponsel. Notifikasi tetap masuk ke panel notifikasi. Pop-up kembali sendiri saat pulau tidak berjalan, selama jam tenang, atau jika akses notifikasi hilang.</string>
+    <string name="popups_status_active">Aktif • pop-up ponsel disembunyikan selama pulau berjalan</string>
+    <string name="popups_status_waiting">Nyala • pop-up akan disembunyikan setelah pulau dan akses notifikasi terhubung</string>
+    <string name="popups_status_needs_grant">Memerlukan izin satu kali dari komputer</string>
+    <string name="popups_grant_button">Cara mengizinkannya</string>
+    <string name="popups_grant_title">Izinkan kontrol pop-up</string>
+    <string name="popups_grant_body">Android hanya mengizinkan aplikasi mengubah setelan ini setelah izin satu kali. Aktifkan debugging USB, hubungkan ponsel ke komputer, lalu jalankan:\n\n%1$s\n\nMatikan opsi ini sebelum menghapus Dynamic Droid agar pop-up kembali.</string>
+    <string name="popups_copy">Salin perintah</string>
+    <string name="popups_copied">Perintah disalin</string>
 </resources>

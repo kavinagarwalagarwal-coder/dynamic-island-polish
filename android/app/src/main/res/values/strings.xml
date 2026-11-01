@@ -271,4 +271,16 @@
     <string name="onb_finish_body">Give Dynamic Droid notification access and the camera-area overlay, and your island comes to life.</string>
     <string name="onb_ready_title">You\'re all set</string>
     <string name="onb_ready_body">Your island is connected. Replay this tour any time from Playground.</string>
+
+    <!-- Phone pop-ups -->
+    <string name="feature_hide_popups">Hide the phone\'s pop-up notifications</string>
+    <string name="feature_hide_popups_note">The island shows new notifications instead of the phone\'s banners. They still arrive in the notification shade. Pop-ups come back on their own whenever the island isn\'t running, during quiet hours, or if notification access is lost.</string>
+    <string name="popups_status_active">Active • the phone\'s pop-ups are hidden while the island runs</string>
+    <string name="popups_status_waiting">On • pop-ups hide once the island and notification access are connected</string>
+    <string name="popups_status_needs_grant">Needs a one-time permission from a computer</string>
+    <string name="popups_grant_button">How to allow this</string>
+    <string name="popups_grant_title">Allow pop-up control</string>
+    <string name="popups_grant_body">Android only lets apps change this setting after a one-time permission. Turn on USB debugging, connect your phone to a computer and run:\n\n%1$s\n\nTurn this option off before uninstalling Dynamic Droid so your pop-ups come back.</string>
+    <string name="popups_copy">Copy command</string>
+    <string name="popups_copied">Command copied</string>
 </resources>

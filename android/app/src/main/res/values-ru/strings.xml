@@ -262,4 +262,14 @@
     <string name="onb_finish_body">Дайте Dynamic Droid доступ к уведомлениям и оверлей области камеры, и остров оживёт.</string>
     <string name="onb_ready_title">Всё готово</string>
     <string name="onb_ready_body">Остров подключён. Повторить этот тур можно в любой момент в разделе «Примеры».</string>
+    <string name="feature_hide_popups">Скрывать всплывающие уведомления телефона</string>
+    <string name="feature_hide_popups_note">Остров показывает новые уведомления вместо баннеров телефона. Они по-прежнему приходят в шторку уведомлений. Всплывающие окна возвращаются сами, когда остров не работает, в тихие часы или при потере доступа к уведомлениям.</string>
+    <string name="popups_status_active">Активно • всплывающие окна телефона скрыты, пока работает остров</string>
+    <string name="popups_status_waiting">Включено • окна скроются, когда остров и доступ к уведомлениям подключатся</string>
+    <string name="popups_status_needs_grant">Нужно разовое разрешение с компьютера</string>
+    <string name="popups_grant_button">Как это разрешить</string>
+    <string name="popups_grant_title">Разрешить управление всплывающими окнами</string>
+    <string name="popups_grant_body">Android позволяет приложениям менять эту настройку только после разового разрешения. Включите отладку по USB, подключите телефон к компьютеру и выполните:\n\n%1$s\n\nВыключите этот параметр перед удалением Dynamic Droid, чтобы всплывающие окна вернулись.</string>
+    <string name="popups_copy">Скопировать команду</string>
+    <string name="popups_copied">Команда скопирована</string>
 </resources>

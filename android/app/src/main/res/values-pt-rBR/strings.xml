@@ -262,4 +262,14 @@
     <string name="onb_finish_body">Dê ao Dynamic Droid acesso às notificações e a sobreposição da área da câmera, e sua ilha ganha vida.</string>
     <string name="onb_ready_title">Tudo pronto</string>
     <string name="onb_ready_body">Sua ilha está conectada. Reveja este tour quando quiser em Testar.</string>
+    <string name="feature_hide_popups">Ocultar as notificações pop-up do celular</string>
+    <string name="feature_hide_popups_note">A ilha mostra as novas notificações no lugar dos banners do celular. Elas continuam chegando na aba de notificações. Os pop-ups voltam sozinhos quando a ilha não está ativa, no horário silencioso ou se o acesso às notificações for perdido.</string>
+    <string name="popups_status_active">Ativo • os pop-ups do celular ficam ocultos enquanto a ilha funciona</string>
+    <string name="popups_status_waiting">Ligado • os pop-ups somem quando a ilha e o acesso às notificações estiverem conectados</string>
+    <string name="popups_status_needs_grant">Precisa de uma permissão única pelo computador</string>
+    <string name="popups_grant_button">Como permitir</string>
+    <string name="popups_grant_title">Permitir controle dos pop-ups</string>
+    <string name="popups_grant_body">O Android só deixa apps mudarem essa configuração após uma permissão única. Ative a depuração USB, conecte o celular a um computador e execute:\n\n%1$s\n\nDesative esta opção antes de desinstalar o Dynamic Droid para os pop-ups voltarem.</string>
+    <string name="popups_copy">Copiar comando</string>
+    <string name="popups_copied">Comando copiado</string>
 </resources>

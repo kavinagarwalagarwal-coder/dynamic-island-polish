@@ -100,6 +100,11 @@ object IslandBus {
             value?.let { l -> ongoing.values.toList().forEach(l::onActivity) }
         }
 
+    /** Set by the overlay service; told when notification access connects or drops. */
+    var listenerChanged: (() -> Unit)? = null
+
+    fun notifyListenerChanged() = main.post { listenerChanged?.invoke() }
+
     /** Set by the notification listener; returns true when a media session handled it. */
     var mediaControl: ((command: String, positionMs: Long?) -> Boolean)? = null
 

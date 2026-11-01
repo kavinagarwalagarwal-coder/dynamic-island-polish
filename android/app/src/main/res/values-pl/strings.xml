@@ -262,4 +262,14 @@
     <string name="onb_finish_body">Daj Dynamic Droid dostęp do powiadomień i nakładkę obszaru aparatu, a wyspa ożyje.</string>
     <string name="onb_ready_title">Wszystko gotowe</string>
     <string name="onb_ready_body">Twoja wyspa jest połączona. Powtórz tę prezentację w każdej chwili z karty Próba.</string>
+    <string name="feature_hide_popups">Ukryj wyskakujące powiadomienia telefonu</string>
+    <string name="feature_hide_popups_note">Wyspa pokazuje nowe powiadomienia zamiast banerów telefonu. Nadal trafiają do panelu powiadomień. Wyskakujące okienka wracają same, gdy wyspa nie działa, w godzinach ciszy lub po utracie dostępu do powiadomień.</string>
+    <string name="popups_status_active">Aktywne • wyskakujące powiadomienia są ukryte, gdy działa wyspa</string>
+    <string name="popups_status_waiting">Włączone • okienka znikną po połączeniu wyspy i dostępu do powiadomień</string>
+    <string name="popups_status_needs_grant">Wymaga jednorazowego uprawnienia z komputera</string>
+    <string name="popups_grant_button">Jak na to zezwolić</string>
+    <string name="popups_grant_title">Zezwól na sterowanie okienkami</string>
+    <string name="popups_grant_body">Android pozwala aplikacjom zmienić to ustawienie dopiero po jednorazowym uprawnieniu. Włącz debugowanie USB, podłącz telefon do komputera i uruchom:\n\n%1$s\n\nWyłącz tę opcję przed odinstalowaniem Dynamic Droid, aby okienka wróciły.</string>
+    <string name="popups_copy">Kopiuj polecenie</string>
+    <string name="popups_copied">Skopiowano polecenie</string>
 </resources>

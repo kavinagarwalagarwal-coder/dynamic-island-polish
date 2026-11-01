@@ -262,4 +262,14 @@
     <string name="onb_finish_body">Concedi a Dynamic Droid l\'accesso alle notifiche e l\'overlay dell\'area fotocamera, e la tua isola prenderà vita.</string>
     <string name="onb_ready_title">Tutto pronto</string>
     <string name="onb_ready_body">La tua isola è collegata. Rivedi questo tour quando vuoi da Prova.</string>
+    <string name="feature_hide_popups">Nascondi le notifiche pop-up del telefono</string>
+    <string name="feature_hide_popups_note">L\'isola mostra le nuove notifiche al posto dei banner del telefono. Arrivano comunque nella tendina delle notifiche. I pop-up tornano da soli quando l\'isola non è attiva, durante le ore di silenzio o se si perde l\'accesso alle notifiche.</string>
+    <string name="popups_status_active">Attivo • i pop-up del telefono sono nascosti finché l\'isola funziona</string>
+    <string name="popups_status_waiting">Attivato • i pop-up spariranno quando isola e accesso alle notifiche saranno collegati</string>
+    <string name="popups_status_needs_grant">Serve un\'autorizzazione una tantum da un computer</string>
+    <string name="popups_grant_button">Come consentirlo</string>
+    <string name="popups_grant_title">Consenti il controllo dei pop-up</string>
+    <string name="popups_grant_body">Android consente alle app di cambiare questa impostazione solo dopo un\'autorizzazione una tantum. Attiva il debug USB, collega il telefono a un computer ed esegui:\n\n%1$s\n\nDisattiva questa opzione prima di disinstallare Dynamic Droid così i pop-up tornano.</string>
+    <string name="popups_copy">Copia comando</string>
+    <string name="popups_copied">Comando copiato</string>
 </resources>

@@ -262,4 +262,14 @@
     <string name="onb_finish_body">Dynamic Droid\'e bildirim erişimi ve kamera alanı katmanı verin, adanız canlansın.</string>
     <string name="onb_ready_title">Her şey hazır</string>
     <string name="onb_ready_body">Adanız bağlı. Bu turu istediğiniz zaman Deneme\'den yeniden izleyin.</string>
+    <string name="feature_hide_popups">Telefonun açılır bildirimlerini gizle</string>
+    <string name="feature_hide_popups_note">Ada, telefonun afişleri yerine yeni bildirimleri gösterir. Bildirimler yine de bildirim panelinize gelir. Ada çalışmadığında, sessiz saatlerde veya bildirim erişimi kaybolursa açılır bildirimler kendiliğinden geri gelir.</string>
+    <string name="popups_status_active">Etkin • ada çalıştığı sürece telefonun açılır bildirimleri gizli</string>
+    <string name="popups_status_waiting">Açık • ada ve bildirim erişimi bağlanınca açılır bildirimler gizlenecek</string>
+    <string name="popups_status_needs_grant">Bilgisayardan tek seferlik izin gerekiyor</string>
+    <string name="popups_grant_button">Nasıl izin verilir</string>
+    <string name="popups_grant_title">Açılır bildirim kontrolüne izin ver</string>
+    <string name="popups_grant_body">Android, uygulamaların bu ayarı yalnızca tek seferlik bir izinden sonra değiştirmesine izin verir. USB hata ayıklamayı açın, telefonu bir bilgisayara bağlayın ve şunu çalıştırın:\n\n%1$s\n\nAçılır bildirimlerin geri gelmesi için Dynamic Droid\'i kaldırmadan önce bu seçeneği kapatın.</string>
+    <string name="popups_copy">Komutu kopyala</string>
+    <string name="popups_copied">Komut kopyalandı</string>
 </resources>

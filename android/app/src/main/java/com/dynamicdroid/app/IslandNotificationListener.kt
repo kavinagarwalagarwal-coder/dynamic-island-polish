@@ -52,6 +52,7 @@ class IslandNotificationListener : NotificationListenerService() {
         super.onListenerConnected()
         instance = this
         IslandBus.mediaControl = ::handleMedia
+        IslandBus.notifyListenerChanged()
         runCatching { activeNotifications }.getOrNull()
             ?.sortedBy { it.postTime }
             ?.filter { it.isOngoing || it.notification.extras.getBoolean(Notification.EXTRA_SHOW_CHRONOMETER) ||
@@ -62,6 +63,9 @@ class IslandNotificationListener : NotificationListenerService() {
 
     override fun onListenerDisconnected() {
         if (instance === this) instance = null
+        // Without notification access the island cannot stand in for pop-ups: bring them back.
+        HeadsUpControl.restore(this)
+        IslandBus.notifyListenerChanged()
         IslandBus.mediaControl = null
         super.onListenerDisconnected()
     }

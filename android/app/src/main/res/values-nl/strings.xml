@@ -262,4 +262,14 @@
     <string name="onb_finish_body">Geef Dynamic Droid meldingstoegang en de camerazone-overlay, en je eiland komt tot leven.</string>
     <string name="onb_ready_title">Helemaal klaar</string>
     <string name="onb_ready_body">Je eiland is gekoppeld. Bekijk deze rondleiding altijd opnieuw via Proberen.</string>
+    <string name="feature_hide_popups">Pop-upmeldingen van de telefoon verbergen</string>
+    <string name="feature_hide_popups_note">Het eiland toont nieuwe meldingen in plaats van de banners van de telefoon. Ze komen nog steeds binnen in het meldingenpaneel. Pop-ups komen vanzelf terug als het eiland niet draait, tijdens stille uren of als meldingstoegang wegvalt.</string>
+    <string name="popups_status_active">Actief • pop-ups van de telefoon zijn verborgen zolang het eiland draait</string>
+    <string name="popups_status_waiting">Aan • pop-ups verdwijnen zodra eiland en meldingstoegang gekoppeld zijn</string>
+    <string name="popups_status_needs_grant">Heeft een eenmalige toestemming via een computer nodig</string>
+    <string name="popups_grant_button">Zo sta je het toe</string>
+    <string name="popups_grant_title">Pop-upbeheer toestaan</string>
+    <string name="popups_grant_body">Android laat apps deze instelling alleen wijzigen na een eenmalige toestemming. Zet USB-foutopsporing aan, verbind je telefoon met een computer en voer uit:\n\n%1$s\n\nZet deze optie uit voordat je Dynamic Droid verwijdert, zodat je pop-ups terugkomen.</string>
+    <string name="popups_copy">Opdracht kopiëren</string>
+    <string name="popups_copied">Opdracht gekopieerd</string>
 </resources>

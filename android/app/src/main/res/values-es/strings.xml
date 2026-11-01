@@ -262,4 +262,14 @@
     <string name="onb_finish_body">Da a Dynamic Droid acceso a las notificaciones y la superposición del área de la cámara, y tu isla cobrará vida.</string>
     <string name="onb_ready_title">Todo listo</string>
     <string name="onb_ready_body">Tu isla está conectada. Repite este recorrido cuando quieras desde Prueba.</string>
+    <string name="feature_hide_popups">Ocultar las notificaciones emergentes del teléfono</string>
+    <string name="feature_hide_popups_note">La isla muestra las notificaciones nuevas en lugar de los avisos del teléfono. Siguen llegando al panel de notificaciones. Los avisos vuelven solos cuando la isla no está activa, en horas de silencio o si se pierde el acceso a notificaciones.</string>
+    <string name="popups_status_active">Activo • los avisos del teléfono se ocultan mientras la isla funciona</string>
+    <string name="popups_status_waiting">Activado • los avisos se ocultarán cuando la isla y el acceso a notificaciones estén conectados</string>
+    <string name="popups_status_needs_grant">Necesita un permiso único desde un ordenador</string>
+    <string name="popups_grant_button">Cómo permitirlo</string>
+    <string name="popups_grant_title">Permitir controlar los avisos</string>
+    <string name="popups_grant_body">Android solo deja que las apps cambien este ajuste tras un permiso único. Activa la depuración USB, conecta el teléfono a un ordenador y ejecuta:\n\n%1$s\n\nDesactiva esta opción antes de desinstalar Dynamic Droid para que vuelvan los avisos.</string>
+    <string name="popups_copy">Copiar comando</string>
+    <string name="popups_copied">Comando copiado</string>
 </resources>
