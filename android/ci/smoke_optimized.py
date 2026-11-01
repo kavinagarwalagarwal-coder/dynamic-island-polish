@@ -51,6 +51,20 @@ def click(label, scroll=False):
         time.sleep(.5)
     raise AssertionError(f"Cannot find {label!r} in optimized app UI")
 
+def click_if_present(label, wait=6.0):
+    """Tap a label if it appears within `wait` seconds (first-run tour, for example)."""
+    end = time.time() + wait
+    while time.time() < end:
+        for node in hierarchy().iter("node"):
+            if node.get("text", "").casefold() == label.casefold() or node.get("content-desc", "").casefold() == label.casefold():
+                bounds = list(map(int, re.findall(r"\d+", node.get("bounds", ""))))
+                if len(bounds) == 4 and bounds[2] > bounds[0] and bounds[3] > bounds[1]:
+                    adb("shell", "input", "tap", str((bounds[0] + bounds[2]) // 2), str((bounds[1] + bounds[3]) // 2))
+                    time.sleep(.8)
+                    return True
+        time.sleep(.5)
+    return False
+
 def check_crash():
     assert "FATAL EXCEPTION" not in adb("logcat", "-d", "-s", "AndroidRuntime:E"), "Optimized app crashed"
 
@@ -60,7 +74,10 @@ def main():
     adb("logcat", "-c")
     adb("shell", "pm", "grant", PACKAGE, "android.permission.POST_NOTIFICATIONS")
     adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.MainActivity")
-    time.sleep(1)
+    # Launch flourish, then the first-run tour on a fresh install.
+    time.sleep(2.5)
+    check_crash()
+    click_if_present("Skip")
     check_crash()
     click("Playground")
     click("Preview SwiftUI morph", scroll=True)

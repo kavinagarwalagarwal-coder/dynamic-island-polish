@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Dialogs and new windows grow out a little and settle, like the island. -->
+<set xmlns:android="http://schemas.android.com/apk/res/android"
+    android:interpolator="@android:anim/decelerate_interpolator"
+    android:shareInterpolator="false">
+    <scale android:duration="320" android:fromXScale="0.92" android:fromYScale="0.92"
+        android:toXScale="1" android:toYScale="1" android:pivotX="50%" android:pivotY="50%"
+        android:interpolator="@android:anim/overshoot_interpolator" />
+    <alpha android:duration="200" android:fromAlpha="0" android:toAlpha="1" />
+</set>

@@ -245,4 +245,30 @@
     <string name="placement_test_text">Hold to expand · swipe up to collapse</string>
     <string name="bluetooth_device">Bluetooth device</string>
     <string name="clock_none">No Clock notification received yet. Start a timer after enabling notification access.</string>
+
+    <!-- Launch and onboarding -->
+    <string name="launch_tagline">Your camera hole, alive.</string>
+    <string name="play_tour">How to use the island</string>
+    <string name="onb_skip">Skip</string>
+    <string name="onb_next">Next</string>
+    <string name="onb_back">Back</string>
+    <string name="onb_done_setup">Open Setup</string>
+    <string name="onb_step">%1$d / %2$d</string>
+    <string name="onb_try">Try it yourself on the island above.</string>
+    <string name="onb_meet_title">Meet your island</string>
+    <string name="onb_meet_body">Your camera hole becomes a live island for music, calls, timers and messages. It grows out when something happens and slips back in when nothing does.</string>
+    <string name="onb_tap_title">Tap to open</string>
+    <string name="onb_tap_body">Tap the small island to jump straight into its app.</string>
+    <string name="onb_hold_title">Hold to expand</string>
+    <string name="onb_hold_body">Press and hold, or pull down, to open the full card with its controls.</string>
+    <string name="onb_up_title">Swipe up to tuck it away</string>
+    <string name="onb_up_body">Swipe up on an open card to shrink it back. Tapping outside the card works too.</string>
+    <string name="onb_side_title">Two at once</string>
+    <string name="onb_side_body">When two things are live, the second waits in a bubble. Swipe sideways to swap them, or hold the bubble to open it.</string>
+    <string name="onb_volume_title">Volume, alarms and more</string>
+    <string name="onb_volume_body">Volume keys, headphones, downloads and alarms get islands of their own. Switch each one on or off in Features.</string>
+    <string name="onb_finish_title">Connect your island</string>
+    <string name="onb_finish_body">Give Dynamic Droid notification access and the camera-area overlay, and your island comes to life.</string>
+    <string name="onb_ready_title">You\'re all set</string>
+    <string name="onb_ready_body">Your island is connected. Replay this tour any time from Playground.</string>
 </resources>

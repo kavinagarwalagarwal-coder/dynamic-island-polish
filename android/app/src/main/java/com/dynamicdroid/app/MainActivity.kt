@@ -39,6 +39,10 @@ class MainActivity : AppCompatActivity() {
         refreshCustomization()
     }
     private var features = IslandFeatureSet()
+    private var headerLogo: LogoMarkView? = null
+    private var shellView: LinearLayout? = null
+    private var onboarding: OnboardingOverlay? = null
+    private var currentPage: String? = null
     private lateinit var preview: IslandView
     private var demo: LiveActivity? = null
     private var demoPresentation = Presentation.EXPANDED
@@ -113,9 +117,84 @@ class MainActivity : AppCompatActivity() {
         features = IslandFeatures.read(this)
         window.statusBarColor = BG
         setContentView(buildScreen())
-        if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         showDemo(demoMusic(true), Presentation.EXPANDED)
         applyThemeUpdate()
+        // Opening flourish, then the tour on first run, then the notification permission prompt,
+        // so a system dialog never lands on top of either.
+        val firstRun = !Motion.underTest && !onboardingSeen()
+        if (savedInstanceState == null) playLaunchFlourish { if (firstRun) showOnboarding() else askNotificationPermission() }
+        else if (firstRun) showOnboarding()
+    }
+
+    private fun askNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+    }
+
+    // ---------------------------------------------------------------- launch and onboarding
+
+    private fun onboardingSeen() = getSharedPreferences("onboarding", MODE_PRIVATE).getBoolean("seen", false)
+
+    /**
+     * The logo builds itself (dot, pill, droplet), the dot-matrix name sweeps in, then the sheet
+     * lifts away while the screen's parts rise into place one after another.
+     */
+    private fun playLaunchFlourish(then: () -> Unit) {
+        val shell = shellView
+        val root: FrameLayout? = findViewById(android.R.id.content)
+        if (Motion.reduced(this) || shell == null || root == null) { then(); return }
+        val logo = LogoMarkView(this)
+        val word = DotHeading(this, "DYNAMIC DROID")
+        val tagline = label(getString(R.string.launch_tagline), 14f, NothingStyle.muted).apply {
+            gravity = Gravity.CENTER; alpha = 0f
+        }
+        val sheet = FrameLayout(this).apply {
+            setBackgroundColor(BG)
+            isClickable = true
+            addView(LinearLayout(this@MainActivity).apply {
+                orientation = LinearLayout.VERTICAL
+                gravity = Gravity.CENTER_HORIZONTAL
+                addView(logo, LinearLayout.LayoutParams(dp(150), dp(150)))
+                addView(word, LinearLayout.LayoutParams(dp(280), dp(44)).apply { topMargin = dp(6) })
+                addView(tagline, LinearLayout.LayoutParams(-2, -2).apply { topMargin = dp(10) })
+            }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
+        }
+        root.addView(sheet, FrameLayout.LayoutParams(-1, -1))
+        val parts = (0 until shell.childCount).map { shell.getChildAt(it) }
+        parts.forEach { it.alpha = 0f }
+        logo.play(80L, 1_050L)
+        word.play(520L, 620L)
+        tagline.animate().alpha(1f).setStartDelay(980L).setDuration(300L).start()
+        sheet.postDelayed({
+            logo.animate().scaleX(1.18f).scaleY(1.18f).setDuration(380L).start()
+            sheet.animate().alpha(0f).setDuration(380L).withEndAction {
+                root.removeView(sheet)
+                then()
+            }.start()
+            Motion.staggerIn(parts, this, 60L, 45L, 22f)
+            headerLogo?.play(220L, 900L)
+        }, 1_650L)
+    }
+
+    private fun showOnboarding() {
+        if (onboarding != null) return
+        val root: FrameLayout = findViewById(android.R.id.content) ?: return
+        val connected = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
+        val tour = OnboardingOverlay(this, features, connected) { openSetup ->
+            onboarding = null
+            getSharedPreferences("onboarding", MODE_PRIVATE).edit().putBoolean("seen", true).apply()
+            if (openSetup) selectPage("Setup") else headerLogo?.play(0L, 800L)
+            askNotificationPermission()
+        }
+        onboarding = tour
+        root.addView(tour, FrameLayout.LayoutParams(-1, -1))
+        tour.requestApplyInsets()
+        tour.enter()
+    }
+
+    @Deprecated("Back is routed to the tour while it is showing.")
+    override fun onBackPressed() {
+        val tour = onboarding
+        if (tour != null) tour.back() else @Suppress("DEPRECATION") super.onBackPressed()
     }
 
     override fun onResume() {
@@ -176,7 +255,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun demoMusic(playing: Boolean, position: Long = 107_000L): LiveActivity {
+    internal fun demoMusic(playing: Boolean, position: Long = 107_000L): LiveActivity {
         val art = gradientArt(NothingStyle.red, NothingStyle.surface)
         return LiveActivity(
             key = "demo-music", packageName = "com.spotify.music", mode = IslandMode.MUSIC,
@@ -197,13 +276,13 @@ class MainActivity : AppCompatActivity() {
             android.app.RemoteInput.Builder("demo_reply").setLabel(getString(R.string.island_reply_hint)).build()) else null,
     )
 
-    private fun demoVolume(level: Float = .6f) = LiveActivity(
+    internal fun demoVolume(level: Float = .6f) = LiveActivity(
         key = "demo-volume", packageName = packageName, mode = IslandMode.VOLUME,
         title = getString(R.string.island_volume_media), subtitle = "", appLabel = "Volume",
         appIcon = null, artwork = null, accent = NothingStyle.foreground, progress = level,
     )
 
-    private fun demoDevice(lost: Boolean) = LiveActivity(
+    internal fun demoDevice(lost: Boolean) = LiveActivity(
         key = "demo-device", packageName = packageName, mode = IslandMode.DEVICE,
         title = "Nothing Ear (a)", subtitle = getString(if (lost) R.string.island_disconnected else R.string.island_connected),
         appLabel = "Bluetooth", appIcon = null, artwork = null, accent = AppStyle.GREEN,
@@ -217,7 +296,7 @@ class MainActivity : AppCompatActivity() {
         progress = .45f,
     )
 
-    private fun demoAlarm() = LiveActivity(
+    internal fun demoAlarm() = LiveActivity(
         key = "demo-alarm", packageName = "com.google.android.deskclock", mode = IslandMode.ALARM,
         title = "7:30 · Wake up", subtitle = "", appLabel = getString(R.string.island_alarm),
         appIcon = AppStyle.icon(this, "com.google.android.deskclock"), artwork = null,
@@ -236,7 +315,7 @@ class MainActivity : AppCompatActivity() {
         actions = listOf(IslandAction("Decline", selfIntent()), IslandAction("Answer", selfIntent())),
     )
 
-    private fun demoTimer(minutes: Int = 9) = LiveActivity(
+    internal fun demoTimer(minutes: Int = 9) = LiveActivity(
         key = "demo-timer", packageName = "com.google.android.deskclock", mode = IslandMode.TIMER,
         title = if (minutes == 9) "Pasta" else getString(R.string.demo_minutes, minutes), subtitle = "Timer", appLabel = "Clock",
         appIcon = AppStyle.icon(this, "com.google.android.deskclock"), artwork = null,
@@ -270,10 +349,17 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(BG)
             setPadding(pad, dp(12), pad, 0)
         }
-        shell.addView(label(getString(R.string.app_name), 28f, NothingStyle.foreground).apply {
-            typeface = android.graphics.Typeface.DEFAULT_BOLD
-            ViewCompat.setAccessibilityHeading(this, true)
-        }, row(-2))
+        shellView = shell
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            headerLogo = LogoMarkView(this@MainActivity).also { addView(it, LinearLayout.LayoutParams(dp(40), dp(40)).apply { marginEnd = dp(10) }) }
+            addView(label(getString(R.string.app_name), 28f, NothingStyle.foreground).apply {
+                typeface = android.graphics.Typeface.DEFAULT_BOLD
+                ViewCompat.setAccessibilityHeading(this, true)
+            })
+        }
+        shell.addView(header, row(-2))
         readiness = label(getString(R.string.status_checking), 13f, NothingStyle.muted).apply {
             setPadding(0, dp(6), 0, dp(12))
         }.also { shell.addView(it, row(-2)) }
@@ -296,6 +382,7 @@ class MainActivity : AppCompatActivity() {
         var column = page("Playground")
         column.addView(heading(getString(R.string.play_heading)), row(-2))
         column.addView(label(getString(R.string.play_hint), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
+        column.addView(action("tour", getString(R.string.play_tour)) { showOnboarding() }, row(-2).apply { topMargin = dp(12) })
         preview = IslandView(this).apply {
             anchorToCutout = false
             callbacks = previewCallbacks
@@ -498,6 +585,7 @@ class MainActivity : AppCompatActivity() {
         column.addView(heading(getString(R.string.setup_heading)), row(-2))
         column.addView(label(getString(R.string.setup_steps), 15f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
         column.addView(label(getString(R.string.setup_fallback), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
+        column.addView(action("tour-setup", getString(R.string.play_tour)) { showOnboarding() }, row(-2).apply { topMargin = dp(12) })
         column.addView(heading(getString(R.string.setup_clock_heading)), row(-2).apply { topMargin = dp(16) })
         clockDiagnostic = label(TimerDiagnostics.read(this), 13f, NothingStyle.muted)
         column.addView(clockDiagnostic, row(-2).apply { topMargin = dp(8) })
@@ -725,7 +813,7 @@ class MainActivity : AppCompatActivity() {
             addView(search, row(dp(50)))
             addView(list, LinearLayout.LayoutParams(-1, dp(280)).apply { topMargin = dp(8) })
         }
-        val dialog = android.app.AlertDialog.Builder(this)
+        val dialog = android.app.AlertDialog.Builder(this, R.style.IslandDialog)
             .setTitle(if (allowed) getString(R.string.apps_allowed_title) else getString(R.string.apps_hidden_title))
             .setView(picker)
             .setNegativeButton(getString(R.string.common_cancel), null)
@@ -752,7 +840,7 @@ class MainActivity : AppCompatActivity() {
                 IslandBus.MEDIA_NEXT to getString(R.string.media_next), IslandBus.MEDIA_SEEK to getString(R.string.media_seek))
             val current = IslandCustomization.mediaSelection(this, activity.packageName) ?: options.map { it.first }.toSet()
             val selected = current.toMutableSet()
-            android.app.AlertDialog.Builder(this).setTitle(getString(R.string.music_controls_title, activity.appLabel))
+            android.app.AlertDialog.Builder(this, R.style.IslandDialog).setTitle(getString(R.string.music_controls_title, activity.appLabel))
                 .setMultiChoiceItems(options.map { it.second }.toTypedArray(), BooleanArray(options.size) { options[it].first in selected }) { _, index, checked ->
                     if (checked) selected += options[index].first else selected -= options[index].first
                 }.setNeutralButton(getString(R.string.common_use_defaults)) { _, _ ->
@@ -766,7 +854,7 @@ class MainActivity : AppCompatActivity() {
         if (actions.isEmpty()) { toast(getString(R.string.no_quick_actions)); return }
         val current = IslandCustomization.actionSelection(this, activity.packageName)
         val selected = (current ?: actions.take(3).map { it.label }.toSet()).toMutableSet()
-        android.app.AlertDialog.Builder(this).setTitle(getString(R.string.quick_actions_title, activity.appLabel))
+        android.app.AlertDialog.Builder(this, R.style.IslandDialog).setTitle(getString(R.string.quick_actions_title, activity.appLabel))
             .setMultiChoiceItems(actions.map { it.label }.toTypedArray(), BooleanArray(actions.size) { actions[it].label in selected }) { _, index, checked ->
                 val label = actions[index].label
                 if (checked && selected.size >= 3) { toast(getString(R.string.quick_actions_max)); return@setMultiChoiceItems }
@@ -782,7 +870,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun chooseAppStyle() {
         val apps = installedApps(); if (apps.isEmpty()) return
-        android.app.AlertDialog.Builder(this).setTitle(getString(R.string.style_choose_app))
+        android.app.AlertDialog.Builder(this, R.style.IslandDialog).setTitle(getString(R.string.style_choose_app))
             .setItems(apps.map { it.label }.toTypedArray()) { _, index -> editAppStyle(apps[index]) }.show()
     }
 
@@ -812,7 +900,7 @@ class MainActivity : AppCompatActivity() {
             text = getString(R.string.style_color, accentName(IslandCustomization.accentChoice(this@MainActivity, app.packageName)))
             isAllCaps = false; background = controlBackground(); setTextColor(NothingStyle.foreground)
             setOnClickListener {
-                android.app.AlertDialog.Builder(this@MainActivity).setTitle(getString(R.string.style_color_title, app.label))
+                android.app.AlertDialog.Builder(this@MainActivity, R.style.IslandDialog).setTitle(getString(R.string.style_color_title, app.label))
                     .setSingleChoiceItems(IslandCustomization.accents.indices.map { accentName(it) }.toTypedArray(),
                         IslandCustomization.accentChoice(this@MainActivity, app.packageName)) { dialog, choice ->
                         IslandCustomization.setAccentChoice(this@MainActivity, app.packageName, choice)
@@ -821,7 +909,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         column.addView(accentButton, row(-2).apply { topMargin = dp(8) })
-        android.app.AlertDialog.Builder(this).setTitle(app.label).setView(column)
+        android.app.AlertDialog.Builder(this, R.style.IslandDialog).setTitle(app.label).setView(column)
             .setNeutralButton(getString(R.string.common_use_defaults)) { _, _ ->
                 IslandCustomization.setPreferredExpanded(this, app.packageName, null)
                 IslandCustomization.setMotionSpeed(this, app.packageName, 1f)
@@ -871,7 +959,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun saveProfile() {
         val input = android.widget.EditText(this).apply { hint = getString(R.string.profile_hint); setSingleLine() }
-        android.app.AlertDialog.Builder(this).setTitle(getString(R.string.profile_save_title)).setView(input)
+        android.app.AlertDialog.Builder(this, R.style.IslandDialog).setTitle(getString(R.string.profile_save_title)).setView(input)
             .setNegativeButton(getString(R.string.common_cancel), null).setPositiveButton(getString(R.string.common_save)) { _, _ ->
                 val name = input.text.toString().trim().ifBlank { "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}" }
                 IslandProfileStore.save(this, name, fit); refreshCustomization(); toast(getString(R.string.profile_saved))
@@ -880,7 +968,7 @@ class MainActivity : AppCompatActivity() {
     private fun loadProfile() {
         val names = IslandProfileStore.names(this).sorted()
         if (names.isEmpty()) { toast(getString(R.string.profile_need_save)); return }
-        android.app.AlertDialog.Builder(this).setTitle(getString(R.string.profile_load_title)).setItems(names.toTypedArray()) { _, index ->
+        android.app.AlertDialog.Builder(this, R.style.IslandDialog).setTitle(getString(R.string.profile_load_title)).setItems(names.toTypedArray()) { _, index ->
             IslandProfileStore.load(this, names[index])?.let { next ->
                 fit = next
                 val values = listOf((fit.scale * 100).toInt(), (fit.pillWidth * 100).toInt(), fit.offsetX.toInt(), fit.offsetY.toInt())
@@ -894,7 +982,7 @@ class MainActivity : AppCompatActivity() {
     }
     private fun manageProfiles(names: List<String>) {
         if (names.isEmpty()) return
-        android.app.AlertDialog.Builder(this).setTitle(getString(R.string.profile_remove_title)).setItems(names.toTypedArray()) { _, index ->
+        android.app.AlertDialog.Builder(this, R.style.IslandDialog).setTitle(getString(R.string.profile_remove_title)).setItems(names.toTypedArray()) { _, index ->
             IslandProfileStore.remove(this, names[index]); toast(getString(R.string.profile_removed))
         }.setNegativeButton(getString(R.string.common_done), null).show()
     }
@@ -915,7 +1003,14 @@ class MainActivity : AppCompatActivity() {
 
     private fun selectPage(name: String) {
         if (name == "Rules") refreshCustomization()
+        val changed = currentPage != null && currentPage != name
+        currentPage = name
         pages.forEach { (key, view) -> view.visibility = if (key == name) View.VISIBLE else View.GONE }
+        // A new page is a new window: the logo rebuilds and the page's parts rise in.
+        if (changed) {
+            headerLogo?.takeIf { !Motion.reduced(this) }?.play(0L, 750L)
+            pages[name]?.let { page -> Motion.staggerIn((0 until minOf(page.childCount, 10)).map { page.getChildAt(it) }, this, 0L, 28L, 12f) }
+        }
         navigation.forEach { (key, button) ->
             val selected = key == name
             button.isSelected = selected
@@ -1016,6 +1111,7 @@ class MainActivity : AppCompatActivity() {
         typeface = NothingStyle.body
         background = controlBackground()
         setOnClickListener { click() }
+        Motion.springPress(this)
         layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply {
             marginStart = dp(3); marginEnd = dp(3)
         }
@@ -1032,6 +1128,7 @@ class MainActivity : AppCompatActivity() {
         typeface = NothingStyle.body
         background = controlBackground()
         setOnClickListener { click() }
+        Motion.springPress(this, .975f)
         buttons[key] = this
     }
 

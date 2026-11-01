@@ -2091,6 +2091,17 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         kick()
     }
 
+    /** The island's current shape in view pixels (after phone-fit scaling), for guided demos. */
+    fun islandBounds(out: RectF) {
+        out.set(rect.left * fit.scale, rect.top * fit.scale, rect.right * fit.scale, rect.bottom * fit.scale)
+    }
+
+    /** The detached bubble in view pixels; empty when there is none. */
+    fun bubbleBounds(out: RectF) {
+        out.set(secondaryRect.left * fit.scale, secondaryRect.top * fit.scale,
+            secondaryRect.right * fit.scale, secondaryRect.bottom * fit.scale)
+    }
+
     /** Where the expanded card ends, in window pixels: the reply field sits just below it. */
     fun expandedBottomPx(a: LiveActivity): Int = ((baseTop + specFor(Presentation.EXPANDED, a).h) * fit.scale).toInt()
 

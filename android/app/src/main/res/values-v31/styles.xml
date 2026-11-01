@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.DynamicDroid" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:colorAccent">#EB3030</item>
+        <item name="android:navigationBarColor">#0D0D0D</item>
+        <item name="android:statusBarColor">#0D0D0D</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">@color/island_background</item>
+        <item name="android:windowAnimationStyle">@style/IslandWindowAnimation</item>
+        <!-- The system splash shows the mark on the same black, then hands over to the flourish. -->
+        <item name="android:windowSplashScreenBackground">@color/island_background</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/island_background</item>
+    </style>
+</resources>
