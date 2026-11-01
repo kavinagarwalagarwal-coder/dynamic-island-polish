@@ -128,3 +128,13 @@ Everything here can be switched on or off on the new **Features** page, and each
 - **Launch flourish.** The mark builds itself, the dot-matrix name sweeps in, then the sheet lifts away while the screen rises into place. The system splash uses the same black, so there is no white flash. It plays on a real launch, not on rotation.
 - **Guided tour.** Shown on first run and from *How to use the island* in Playground and Setup. Each page drives a real island with synthetic touches (tap, hold, swipe up, side swipe, then the volume, headphones and alarm islands), so it behaves exactly as on the phone. Touching the island pauses the demo so people can try it.
 - **Motion.** The header logo rebuilds on every page; pages stagger in; buttons spring; dialogs and new windows grow in. Everything follows the system animation scale. Instrumented tests run through `IslandTestRunner`, which skips the flourish and the tour; `TourAndLogoRenderTest` captures the logo frames and every tour page.
+
+### Hide the phone's own pop-ups
+
+Features → **Hide phone notification pop-ups** stops the system's heads-up banners so they don't cover the island. Notifications still land in the shade. Android only lets an app change this after a one-time grant from a computer (USB debugging on):
+
+```
+adb shell pm grant com.dynamicdroid.app android.permission.WRITE_SECURE_SETTINGS
+```
+
+Pop-ups come back on their own whenever the island isn't running, during quiet hours, or if notification access is lost, and your previous setting is restored when you turn the option off. Turn it off before uninstalling.
