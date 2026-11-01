@@ -273,4 +273,15 @@
     <string name="popups_status_needs_access">Nyalakan Dynamic Droid di setelan Aksesibilitas agar bisa menyingkirkan pop-up</string>
     <string name="popups_copy">Salin perintah</string>
     <string name="popups_copied">Perintah disalin</string>
+    <string name="ringer_ring">Dering</string>
+    <string name="ringer_vibrate">Getar</string>
+    <string name="ringer_silent">Senyap</string>
+    <string name="ringer_dnd_on">Jangan Ganggu</string>
+    <string name="ringer_dnd_off">Jangan Ganggu nonaktif</string>
+    <string name="mode_ringer">Dering &amp; senyap</string>
+    <string name="demo_ringer">Senyap</string>
+    <string name="feature_ringer">Dering, getar &amp; senyap</string>
+    <string name="feature_ringer_note">Tampilkan pulau saat ponsel beralih antara dering, getar, dan senyap, atau saat Jangan Ganggu aktif atau nonaktif.</string>
+    <string name="feature_glow">Cahaya lembut di tepi</string>
+    <string name="feature_glow_note">Cahaya lembut di sekitar pil agar menonjol di wallpaper dan aplikasi gelap. Menjadi lebih terang sesaat saat ada hal baru.</string>
 </resources>

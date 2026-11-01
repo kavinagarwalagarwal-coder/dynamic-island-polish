@@ -273,4 +273,15 @@
     <string name="popups_status_needs_access">Ative o Dynamic Droid em Acessibilidade para ele poder tirar os pop-ups</string>
     <string name="popups_copy">Copiar comando</string>
     <string name="popups_copied">Comando copiado</string>
+    <string name="ringer_ring">Toque</string>
+    <string name="ringer_vibrate">Vibrar</string>
+    <string name="ringer_silent">Silencioso</string>
+    <string name="ringer_dnd_on">Não perturbe</string>
+    <string name="ringer_dnd_off">Não perturbe desativado</string>
+    <string name="mode_ringer">Toque e silencioso</string>
+    <string name="demo_ringer">Silencioso</string>
+    <string name="feature_ringer">Toque, vibrar e silencioso</string>
+    <string name="feature_ringer_note">Mostra a ilha quando o celular alterna entre toque, vibrar e silencioso, ou quando o Não perturbe liga ou desliga.</string>
+    <string name="feature_glow">Brilho suave nas bordas</string>
+    <string name="feature_glow_note">Um brilho suave em volta da pílula para ela se destacar em papéis de parede e apps escuros. Fica mais forte por um instante quando algo novo chega.</string>
 </resources>

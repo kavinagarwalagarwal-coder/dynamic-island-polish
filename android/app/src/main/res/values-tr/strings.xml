@@ -273,4 +273,15 @@
     <string name="popups_status_needs_access">Açılır bildirimleri kaldırabilmesi için Erişilebilirlik ayarlarında Dynamic Droid\'i açın</string>
     <string name="popups_copy">Komutu kopyala</string>
     <string name="popups_copied">Komut kopyalandı</string>
+    <string name="ringer_ring">Zil</string>
+    <string name="ringer_vibrate">Titreşim</string>
+    <string name="ringer_silent">Sessiz</string>
+    <string name="ringer_dnd_on">Rahatsız Etmeyin</string>
+    <string name="ringer_dnd_off">Rahatsız Etmeyin kapalı</string>
+    <string name="mode_ringer">Zil ve sessiz</string>
+    <string name="demo_ringer">Sessiz</string>
+    <string name="feature_ringer">Zil, titreşim ve sessiz</string>
+    <string name="feature_ringer_note">Telefon zil, titreşim ve sessiz arasında geçtiğinde ya da Rahatsız Etmeyin açılıp kapandığında adayı göster.</string>
+    <string name="feature_glow">Kenarlarda yumuşak parıltı</string>
+    <string name="feature_glow_note">Hapın çevresinde hafif bir parıltı; koyu duvar kâğıtlarında ve uygulamalarda öne çıkar. Yeni bir şey geldiğinde bir anlığına parlar.</string>
 </resources>

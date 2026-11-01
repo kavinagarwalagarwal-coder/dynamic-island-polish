@@ -273,4 +273,15 @@
     <string name="popups_status_needs_access">Zet Dynamic Droid aan bij Toegankelijkheid zodat het pop-ups kan wegvegen</string>
     <string name="popups_copy">Opdracht kopiëren</string>
     <string name="popups_copied">Opdracht gekopieerd</string>
+    <string name="ringer_ring">Bellen</string>
+    <string name="ringer_vibrate">Trillen</string>
+    <string name="ringer_silent">Stil</string>
+    <string name="ringer_dnd_on">Niet storen</string>
+    <string name="ringer_dnd_off">Niet storen uit</string>
+    <string name="mode_ringer">Bellen &amp; stil</string>
+    <string name="demo_ringer">Stil</string>
+    <string name="feature_ringer">Bellen, trillen &amp; stil</string>
+    <string name="feature_ringer_note">Toon het eiland wanneer de telefoon wisselt tussen bellen, trillen en stil, of Niet storen aan of uit gaat.</string>
+    <string name="feature_glow">Zachte gloed langs de rand</string>
+    <string name="feature_glow_note">Een zachte gloed rond de pil zodat die opvalt op donkere achtergronden en apps. Wordt even feller als er iets nieuws binnenkomt.</string>
 </resources>

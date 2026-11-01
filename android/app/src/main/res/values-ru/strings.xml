@@ -273,4 +273,15 @@
     <string name="popups_status_needs_access">Включите Dynamic Droid в Спец. возможностях, чтобы он мог убирать всплывающие окна</string>
     <string name="popups_copy">Скопировать команду</string>
     <string name="popups_copied">Команда скопирована</string>
+    <string name="ringer_ring">Звонок</string>
+    <string name="ringer_vibrate">Вибрация</string>
+    <string name="ringer_silent">Без звука</string>
+    <string name="ringer_dnd_on">Не беспокоить</string>
+    <string name="ringer_dnd_off">Не беспокоить выкл.</string>
+    <string name="mode_ringer">Звонок и тишина</string>
+    <string name="demo_ringer">Без звука</string>
+    <string name="feature_ringer">Звонок, вибрация и без звука</string>
+    <string name="feature_ringer_note">Показывать остров, когда телефон переключается между звонком, вибрацией и режимом без звука, или когда включается либо выключается «Не беспокоить».</string>
+    <string name="feature_glow">Мягкое свечение по краю</string>
+    <string name="feature_glow_note">Лёгкое свечение вокруг таблетки, чтобы она выделялась на тёмных обоях и в приложениях. На мгновение усиливается, когда приходит что-то новое.</string>
 </resources>

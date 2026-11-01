@@ -273,4 +273,15 @@
     <string name="popups_status_needs_access">ポップアップを片付けられるよう、ユーザー補助で Dynamic Droid をオンにしてください</string>
     <string name="popups_copy">コマンドをコピー</string>
     <string name="popups_copied">コマンドをコピーしました</string>
+    <string name="ringer_ring">着信音</string>
+    <string name="ringer_vibrate">バイブ</string>
+    <string name="ringer_silent">サイレント</string>
+    <string name="ringer_dnd_on">サイレントモード</string>
+    <string name="ringer_dnd_off">サイレントモード オフ</string>
+    <string name="mode_ringer">着信音とサイレント</string>
+    <string name="demo_ringer">サイレント</string>
+    <string name="feature_ringer">着信音・バイブ・サイレント</string>
+    <string name="feature_ringer_note">端末が着信音・バイブ・サイレントを切り替えたとき、またはサイレントモードがオン・オフになったときにアイランドを表示します。</string>
+    <string name="feature_glow">縁のやわらかな光</string>
+    <string name="feature_glow_note">ピルの周りにやわらかな光を加え、暗い壁紙やアプリの上でも目立たせます。新しい通知が来ると一瞬明るくなります。</string>
 </resources>

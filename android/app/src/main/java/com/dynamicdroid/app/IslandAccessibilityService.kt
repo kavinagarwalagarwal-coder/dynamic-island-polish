@@ -141,16 +141,44 @@ class IslandAccessibilityService : AccessibilityService() {
     /** Keys whose press we took, so their release is consumed too and never reaches the system. */
     private val consumed = HashSet<Int>()
 
+    /**
+     * Holding a volume key keeps stepping. Android only generates key repeats after a key reaches
+     * the app side, and we take the press before that, so the repeat is ours to make.
+     */
+    private var repeatingUp: Boolean? = null
+    private val volumeRepeat = object : Runnable {
+        override fun run() {
+            val up = repeatingUp ?: return
+            if (onVolumeKey?.invoke(up) == true) handler.postDelayed(this, VOLUME_REPEAT_MS) else repeatingUp = null
+        }
+    }
+
+    private fun stopVolumeRepeat() {
+        repeatingUp = null
+        handler.removeCallbacks(volumeRepeat)
+    }
+
     override fun onKeyEvent(event: KeyEvent): Boolean {
         val code = event.keyCode
         if (code != KeyEvent.KEYCODE_VOLUME_UP && code != KeyEvent.KEYCODE_VOLUME_DOWN) return false
         return when (event.action) {
             KeyEvent.ACTION_DOWN -> {
-                val handled = onVolumeKey?.invoke(code == KeyEvent.KEYCODE_VOLUME_UP) == true
-                if (handled) consumed += code else consumed -= code
+                // Any system repeats are already covered by our own.
+                if (event.repeatCount > 0) return code in consumed
+                val up = code == KeyEvent.KEYCODE_VOLUME_UP
+                val handled = onVolumeKey?.invoke(up) == true
+                stopVolumeRepeat()
+                if (handled) {
+                    consumed += code
+                    repeatingUp = up
+                    handler.postDelayed(volumeRepeat, VOLUME_REPEAT_DELAY_MS)
+                } else consumed -= code
                 handled
             }
-            KeyEvent.ACTION_UP -> consumed.remove(code)
+            KeyEvent.ACTION_UP -> {
+                if (repeatingUp == (code == KeyEvent.KEYCODE_VOLUME_UP)) stopVolumeRepeat()
+                consumed.remove(code)
+            }
             else -> code in consumed
         }
     }
@@ -166,6 +194,7 @@ class IslandAccessibilityService : AccessibilityService() {
     }
 
     private fun release() {
+        stopVolumeRepeat()
         popupHunt?.let(handler::removeCallbacks)
         popupHunt = null
         if (instance === this) {
@@ -177,6 +206,9 @@ class IslandAccessibilityService : AccessibilityService() {
     companion object {
         private const val SYSTEM_UI = "com.android.systemui"
         private const val POPUP_SEARCH_MS = 1500L
+        /** Like a held key on a keyboard: a short pause, then steady steps. */
+        const val VOLUME_REPEAT_DELAY_MS = 380L
+        const val VOLUME_REPEAT_MS = 80L
 
         @Volatile var instance: IslandAccessibilityService? = null
             private set

@@ -273,4 +273,15 @@
     <string name="popups_status_needs_access">Attiva Dynamic Droid in Accessibilità così può togliere i pop-up</string>
     <string name="popups_copy">Copia comando</string>
     <string name="popups_copied">Comando copiato</string>
+    <string name="ringer_ring">Suoneria</string>
+    <string name="ringer_vibrate">Vibrazione</string>
+    <string name="ringer_silent">Silenzioso</string>
+    <string name="ringer_dnd_on">Non disturbare</string>
+    <string name="ringer_dnd_off">Non disturbare disattivato</string>
+    <string name="mode_ringer">Suoneria e silenzioso</string>
+    <string name="demo_ringer">Silenzioso</string>
+    <string name="feature_ringer">Suoneria, vibrazione e silenzioso</string>
+    <string name="feature_ringer_note">Mostra l\'isola quando il telefono passa tra suoneria, vibrazione e silenzioso, o quando Non disturbare si attiva o disattiva.</string>
+    <string name="feature_glow">Bagliore morbido sui bordi</string>
+    <string name="feature_glow_note">Un leggero bagliore attorno alla pillola per farla risaltare su sfondi e app scure. Si intensifica per un attimo quando arriva qualcosa di nuovo.</string>
 </resources>

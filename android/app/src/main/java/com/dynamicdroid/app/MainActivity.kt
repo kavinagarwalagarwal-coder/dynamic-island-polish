@@ -286,6 +286,21 @@ class MainActivity : AppCompatActivity() {
         appIcon = null, artwork = null, accent = NothingStyle.foreground, progress = level,
     )
 
+    internal fun demoRinger(state: RingerState) = LiveActivity(
+        key = "demo-ringer", packageName = packageName, mode = IslandMode.RINGER,
+        title = getString(when (state) {
+            RingerState.RING -> R.string.ringer_ring
+            RingerState.VIBRATE -> R.string.ringer_vibrate
+            RingerState.SILENT -> R.string.ringer_silent
+            RingerState.DND_ON -> R.string.ringer_dnd_on
+            RingerState.DND_OFF -> R.string.ringer_dnd_off
+        }), subtitle = "", appLabel = getString(R.string.mode_ringer),
+        appIcon = null, artwork = null, accent = Color.WHITE, ringer = state,
+    )
+
+    /** Each tap of the demo chip shows the next ringer state. */
+    private var demoRingerStep = 0
+
     internal fun demoDevice(lost: Boolean) = LiveActivity(
         key = "demo-device", packageName = packageName, mode = IslandMode.DEVICE,
         title = "Nothing Ear (a)", subtitle = getString(if (lost) R.string.island_disconnected else R.string.island_connected),
@@ -424,8 +439,15 @@ class MainActivity : AppCompatActivity() {
         eventRow.addView(chip(getString(R.string.demo_download)) { preview.setSecondary(null); showDemo(demoDownload(), Presentation.EXPANDED) })
         eventRow.addView(chip(getString(R.string.demo_alarm)) { preview.setSecondary(null); showDemo(demoAlarm(), Presentation.EXPANDED) })
         eventRow.addView(chip(getString(R.string.demo_calling)) { preview.setSecondary(null); showDemo(demoCalling(), Presentation.EXPANDED) })
+        val ringerRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        ringerRow.addView(chip(getString(R.string.demo_ringer)) {
+            val states = listOf(RingerState.SILENT, RingerState.VIBRATE, RingerState.RING, RingerState.DND_ON)
+            preview.setSecondary(null)
+            showDemo(demoRinger(states[demoRingerStep++ % states.size]), Presentation.EXPANDED)
+        })
         column.addView(systemRow, row(-2).apply { topMargin = dp(8) })
         column.addView(eventRow, row(-2).apply { topMargin = dp(8) })
+        column.addView(ringerRow, row(-2).apply { topMargin = dp(8) })
         timerLabelInput = android.widget.EditText(this).apply {
             hint = getString(R.string.timer_name_hint); setSingleLine(); textSize = 15f
             setTextColor(NothingStyle.foreground); setHintTextColor(NothingStyle.muted)
@@ -461,7 +483,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
         column.addView(timerBubbleSwitch, row(-2))
-        IslandMode.values().filter { it != IslandMode.VOLUME && it != IslandMode.DEVICE }.forEach { mode ->
+        IslandMode.values().filter { it != IslandMode.VOLUME && it != IslandMode.DEVICE && it != IslandMode.RINGER }.forEach { mode ->
             val initial = IslandCustomization.priority(this, mode)
             column.addView(priorityControl(mode, initial), row(-2))
         }
@@ -654,6 +676,7 @@ class MainActivity : AppCompatActivity() {
         toggle(R.string.feature_bluetooth_lost, "bluetooth_lost", features.bluetoothLost) { on -> if (on) requestBluetoothIfNeeded() }
         toggle(R.string.feature_downloads, "downloads", features.downloads)
         toggle(R.string.feature_alarms, "alarms", features.alarms)
+        toggle(R.string.feature_ringer, "ringer", features.ringer, R.string.feature_ringer_note)
 
         section(R.string.features_messages)
         toggle(R.string.feature_reply, "inline_reply", features.inlineReply)
@@ -678,6 +701,7 @@ class MainActivity : AppCompatActivity() {
         column.addView(height, row(-2))
         toggle(R.string.feature_corners, "phone_corners", features.phoneCorners)
         toggle(R.string.feature_bubbles, "coloured_bubbles", features.colouredBubbles, R.string.feature_bubbles_note)
+        toggle(R.string.feature_glow, "edge_glow", features.edgeGlow, R.string.feature_glow_note)
         column.addView(label(getString(R.string.feature_outline), 16f, NothingStyle.foreground).apply {
             typeface = NothingStyle.body; setPadding(0, dp(12), 0, 0)
         }, row(-2))
@@ -729,6 +753,7 @@ class MainActivity : AppCompatActivity() {
         IslandMode.DEVICE -> R.string.mode_device
         IslandMode.DOWNLOAD -> R.string.mode_download
         IslandMode.ALARM -> R.string.mode_alarm
+        IslandMode.RINGER -> R.string.mode_ringer
     })
 
     private fun accentName(index: Int) = getString(when (index) {

@@ -284,4 +284,15 @@
     <string name="popups_status_needs_access">Turn on Dynamic Droid in Accessibility settings so it can clear pop-ups</string>
     <string name="popups_copy">Copy command</string>
     <string name="popups_copied">Command copied</string>
+    <string name="ringer_ring">Ring</string>
+    <string name="ringer_vibrate">Vibrate</string>
+    <string name="ringer_silent">Silent</string>
+    <string name="ringer_dnd_on">Do Not Disturb</string>
+    <string name="ringer_dnd_off">Do Not Disturb off</string>
+    <string name="mode_ringer">Ring &amp; silent</string>
+    <string name="demo_ringer">Silent</string>
+    <string name="feature_ringer">Ring, vibrate &amp; silent</string>
+    <string name="feature_ringer_note">Show the island when the phone switches between ring, vibrate and silent, or Do Not Disturb turns on or off.</string>
+    <string name="feature_glow">Soft edge glow</string>
+    <string name="feature_glow_note">A gentle glow around the pill so it stands out on dark wallpapers and apps. It brightens for a moment when something new arrives.</string>
 </resources>

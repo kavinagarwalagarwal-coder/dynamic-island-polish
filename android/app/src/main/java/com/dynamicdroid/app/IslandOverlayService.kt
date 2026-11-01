@@ -7,6 +7,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.graphics.Color
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -115,6 +116,52 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
     }
 
+    // ---------------------------------------------------------------- ring / vibrate / silent
+
+    // Remembered so the broadcast Android sends on registration (and repeats) show nothing.
+    private var lastRingerMode = -1
+    private var lastDnd: Boolean? = null
+
+    private val ringerReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val state = when (intent?.action) {
+                AudioManager.RINGER_MODE_CHANGED_ACTION -> {
+                    val mode = audio?.ringerMode ?: return
+                    if (mode == lastRingerMode) return
+                    lastRingerMode = mode
+                    when (mode) {
+                        AudioManager.RINGER_MODE_SILENT -> RingerState.SILENT
+                        AudioManager.RINGER_MODE_VIBRATE -> RingerState.VIBRATE
+                        else -> RingerState.RING
+                    }
+                }
+                NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED -> {
+                    val on = IslandFeatures.dndActive(this@IslandOverlayService)
+                    if (on == lastDnd) return
+                    lastDnd = on
+                    if (on) RingerState.DND_ON else RingerState.DND_OFF
+                }
+                else -> return
+            }
+            if (IslandFeatures.read(this@IslandOverlayService).ringer) showRinger(state)
+        }
+    }
+
+    private fun showRinger(state: RingerState) {
+        val label = getString(when (state) {
+            RingerState.RING -> R.string.ringer_ring
+            RingerState.VIBRATE -> R.string.ringer_vibrate
+            RingerState.SILENT -> R.string.ringer_silent
+            RingerState.DND_ON -> R.string.ringer_dnd_on
+            RingerState.DND_OFF -> R.string.ringer_dnd_off
+        })
+        onActivity(LiveActivity(
+            key = "ringer", packageName = packageName, mode = IslandMode.RINGER,
+            title = label, subtitle = "", appLabel = getString(R.string.mode_ringer),
+            appIcon = null, artwork = null, accent = Color.WHITE, ringer = state,
+        ))
+    }
+
     // ---------------------------------------------------------------- wake / unlock intro
     //
     // The intro used to fire on SCREEN_ON, i.e. behind the lock screen, so it was never seen.
@@ -192,6 +239,12 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             .setCategory(Notification.CATEGORY_SERVICE)
             .setOngoing(true)
             .build())
+        lastRingerMode = audio?.ringerMode ?: -1
+        lastDnd = IslandFeatures.dndActive(this)
+        ContextCompat.registerReceiver(this, ringerReceiver, IntentFilter().apply {
+            addAction(AudioManager.RINGER_MODE_CHANGED_ACTION)
+            addAction(NotificationManager.ACTION_INTERRUPTION_FILTER_CHANGED)
+        }, ContextCompat.RECEIVER_EXPORTED)
         ContextCompat.registerReceiver(
             this, powerReceiver, IntentFilter(Intent.ACTION_POWER_CONNECTED), ContextCompat.RECEIVER_EXPORTED
         )
@@ -482,6 +535,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             IslandMode.CHARGING -> 3_000L
             IslandMode.VOLUME -> VOLUME_TIMEOUT_MS
             IslandMode.DEVICE -> DEVICE_TIMEOUT_MS
+            IslandMode.RINGER -> RINGER_TIMEOUT_MS
             else -> if (transientExpanded) MESSAGE_TIMEOUT_MS * 2 else MESSAGE_TIMEOUT_MS
         })
     }
@@ -859,6 +913,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         handler.removeCallbacksAndMessages(null)
         detachWindow()
         runCatching { unregisterReceiver(powerReceiver) }
+        runCatching { unregisterReceiver(ringerReceiver) }
         runCatching { unregisterReceiver(wakeReceiver) }
         super.onDestroy()
     }
@@ -886,6 +941,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         private const val TIMER_PEEK_MS = 2_600L
         private const val VOLUME_TIMEOUT_MS = 1_600L
         private const val DEVICE_TIMEOUT_MS = 3_600L
+        private const val RINGER_TIMEOUT_MS = 2_000L
         private const val SENT_TIMEOUT_MS = 1_400L
         private const val SWIFT_MORPH_DURATION_MS = 520L
         /** Lets the system's unlock animation finish so the intro is actually visible. */

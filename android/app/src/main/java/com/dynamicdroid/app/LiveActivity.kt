@@ -7,7 +7,10 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 
-enum class IslandMode { MUSIC, CALL, TIMER, NAVIGATION, CHARGING, MESSAGE, VOLUME, DEVICE, DOWNLOAD, ALARM }
+enum class IslandMode { MUSIC, CALL, TIMER, NAVIGATION, CHARGING, MESSAGE, VOLUME, DEVICE, DOWNLOAD, ALARM, RINGER }
+
+/** What the ringer switch or Do Not Disturb just changed to. */
+enum class RingerState { RING, VIBRATE, SILENT, DND_ON, DND_OFF }
 
 /** Incoming rings, Calling… while an outgoing call connects, Active once the call timer runs. */
 enum class CallState { INCOMING, CALLING, ACTIVE }
@@ -51,9 +54,11 @@ data class LiveActivity(
     val reply: ReplyAction? = null,
     /** Device islands: true for a disconnect ("Bluetooth lost"). */
     val lost: Boolean = false,
+    /** Ringer islands: which state the phone just switched to. */
+    val ringer: RingerState? = null,
 ) {
     val isTransient: Boolean get() = mode == IslandMode.MESSAGE || mode == IslandMode.CHARGING ||
-        mode == IslandMode.VOLUME || mode == IslandMode.DEVICE
+        mode == IslandMode.VOLUME || mode == IslandMode.DEVICE || mode == IslandMode.RINGER
 
     fun livePositionMs(now: Long = SystemClock.elapsedRealtime()): Long {
         val p = if (isPlaying) positionMs + ((now - positionUpdatedAt) * playbackSpeed).toLong() else positionMs

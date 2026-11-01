@@ -273,4 +273,15 @@
     <string name="popups_status_needs_access">Activez Dynamic Droid dans Accessibilité pour qu\'il puisse écarter les pop-ups</string>
     <string name="popups_copy">Copier la commande</string>
     <string name="popups_copied">Commande copiée</string>
+    <string name="ringer_ring">Sonnerie</string>
+    <string name="ringer_vibrate">Vibreur</string>
+    <string name="ringer_silent">Silencieux</string>
+    <string name="ringer_dnd_on">Ne pas déranger</string>
+    <string name="ringer_dnd_off">Ne pas déranger désactivé</string>
+    <string name="mode_ringer">Sonnerie et silencieux</string>
+    <string name="demo_ringer">Silencieux</string>
+    <string name="feature_ringer">Sonnerie, vibreur et silencieux</string>
+    <string name="feature_ringer_note">Affiche l\'îlot quand le téléphone passe entre sonnerie, vibreur et silencieux, ou quand Ne pas déranger s\'active ou se désactive.</string>
+    <string name="feature_glow">Halo doux sur les bords</string>
+    <string name="feature_glow_note">Un léger halo autour de la pilule pour la faire ressortir sur les fonds et apps sombres. Il s\'intensifie un instant quand quelque chose de nouveau arrive.</string>
 </resources>

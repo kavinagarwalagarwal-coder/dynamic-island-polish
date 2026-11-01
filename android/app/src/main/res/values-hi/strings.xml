@@ -273,4 +273,15 @@
     <string name="popups_status_needs_access">पॉप-अप हटाने के लिए सुलभता सेटिंग में Dynamic Droid चालू करें</string>
     <string name="popups_copy">कमांड कॉपी करें</string>
     <string name="popups_copied">कमांड कॉपी हुआ</string>
+    <string name="ringer_ring">रिंग</string>
+    <string name="ringer_vibrate">वाइब्रेट</string>
+    <string name="ringer_silent">साइलेंट</string>
+    <string name="ringer_dnd_on">परेशान न करें</string>
+    <string name="ringer_dnd_off">परेशान न करें बंद</string>
+    <string name="mode_ringer">रिंग और साइलेंट</string>
+    <string name="demo_ringer">साइलेंट</string>
+    <string name="feature_ringer">रिंग, वाइब्रेट और साइलेंट</string>
+    <string name="feature_ringer_note">फ़ोन के रिंग, वाइब्रेट और साइलेंट के बीच बदलने पर, या \'परेशान न करें\' चालू या बंद होने पर आइलैंड दिखाएँ।</string>
+    <string name="feature_glow">किनारों पर हल्की चमक</string>
+    <string name="feature_glow_note">पिल के चारों ओर हल्की चमक, ताकि वह गहरे वॉलपेपर और ऐप्स पर अलग दिखे। कुछ नया आने पर पल भर के लिए तेज़ होती है।</string>
 </resources>

@@ -273,4 +273,15 @@
     <string name="popups_status_needs_access">Schalte Dynamic Droid unter Bedienungshilfen ein, damit es Pop-ups wegwischen kann</string>
     <string name="popups_copy">Befehl kopieren</string>
     <string name="popups_copied">Befehl kopiert</string>
+    <string name="ringer_ring">Klingeln</string>
+    <string name="ringer_vibrate">Vibration</string>
+    <string name="ringer_silent">Lautlos</string>
+    <string name="ringer_dnd_on">Bitte nicht stören</string>
+    <string name="ringer_dnd_off">Bitte nicht stören aus</string>
+    <string name="mode_ringer">Klingeln &amp; lautlos</string>
+    <string name="demo_ringer">Lautlos</string>
+    <string name="feature_ringer">Klingeln, Vibration &amp; lautlos</string>
+    <string name="feature_ringer_note">Zeigt die Insel, wenn das Handy zwischen Klingeln, Vibration und Lautlos wechselt oder Bitte nicht stören an- oder ausgeht.</string>
+    <string name="feature_glow">Sanftes Leuchten am Rand</string>
+    <string name="feature_glow_note">Ein sanftes Leuchten um die Pille, damit sie sich von dunklen Hintergründen und Apps abhebt. Wird kurz heller, wenn etwas Neues kommt.</string>
 </resources>
