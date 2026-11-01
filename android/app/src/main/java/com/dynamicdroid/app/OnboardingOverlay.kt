@@ -176,15 +176,30 @@ class OnboardingOverlay(
         isClickable = true // nothing underneath reacts while the tour is up
         addView(column, LayoutParams(-1, -1))
         island.callbacks = callbacks
-        val side = dpi(22f)
-        column.setPadding(side, dpi(14f), side, dpi(18f))
-        setOnApplyWindowInsetsListener { _, insets ->
-            @Suppress("DEPRECATION")
-            column.setPadding(side + insets.systemWindowInsetLeft, dpi(14f) + insets.systemWindowInsetTop,
-                side + insets.systemWindowInsetRight, dpi(18f) + insets.systemWindowInsetBottom)
-            insets
-        }
+        padFor(null)
         bind()
+    }
+
+    /** Keep the sheet clear of the status bar, cutout and navigation bar. */
+    @Suppress("DEPRECATION")
+    private fun padFor(insets: android.view.WindowInsets?) {
+        val side = dpi(22f)
+        val l = insets?.systemWindowInsetLeft ?: 0
+        val t = maxOf(insets?.systemWindowInsetTop ?: 0, insets?.stableInsetTop ?: 0)
+        val r = insets?.systemWindowInsetRight ?: 0
+        val b = maxOf(insets?.systemWindowInsetBottom ?: 0, insets?.stableInsetBottom ?: 0)
+        column.setPadding(side + l, dpi(14f) + t, side + r, dpi(18f) + b)
+    }
+
+    override fun onApplyWindowInsets(insets: android.view.WindowInsets): android.view.WindowInsets {
+        padFor(insets)
+        return super.onApplyWindowInsets(insets)
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        // Insets may already have been dispatched before the sheet was added; read them directly.
+        padFor(rootWindowInsets)
     }
 
     /** Entrance: the sheet fades up, then its parts arrive one after another. */
