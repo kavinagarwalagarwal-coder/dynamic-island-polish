@@ -123,9 +123,9 @@ object IslandSignals {
         return (progress.toFloat() / max).coerceIn(0f, 1f)
     }
 
-    /** Coalesce progress posts: a new value only when it moves a whole percent or completes. */
+    /** Coalesce progress posts: a new value only when the shown whole percent changes or it completes. */
     fun progressWorthPosting(previous: Float?, next: Float): Boolean =
-        previous == null || next >= 1f || kotlin.math.abs(next - previous) >= 0.01f
+        previous == null || next >= 1f || percent(next) != percent(previous)
 
     /** Whole-percent label for volume and progress islands. */
     fun percent(fraction: Float): Int = (fraction.coerceIn(0f, 1f) * 100f + 0.5f).toInt()

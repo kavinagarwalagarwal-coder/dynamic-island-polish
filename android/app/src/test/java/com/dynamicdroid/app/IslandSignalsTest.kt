@@ -33,7 +33,7 @@ class IslandSignalsTest {
         assertEquals(0.25f, IslandSignals.progressFraction(25, 100, false)!!, 0.0001f)
         assertEquals(1f, IslandSignals.progressFraction(150, 100, false)!!, 0.0001f)
         assertTrue(IslandSignals.progressWorthPosting(null, 0f))
-        assertFalse(IslandSignals.progressWorthPosting(0.500f, 0.505f))
+        assertFalse(IslandSignals.progressWorthPosting(0.500f, 0.503f))
         assertTrue(IslandSignals.progressWorthPosting(0.50f, 0.51f))
         assertTrue(IslandSignals.progressWorthPosting(0.995f, 1f))
     }
