@@ -34,6 +34,11 @@ import androidx.core.view.ViewCompat
 
 class MainActivity : AppCompatActivity() {
     private val notificationPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    private val bluetoothPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (!granted) toast(getString(R.string.bluetooth_permission_denied))
+        refreshCustomization()
+    }
+    private var features = IslandFeatureSet()
     private lateinit var preview: IslandView
     private var demo: LiveActivity? = null
     private var demoPresentation = Presentation.EXPANDED
@@ -87,8 +92,8 @@ class MainActivity : AppCompatActivity() {
                             wallpaperStyle = WallpaperSkinStore.read(this)
                             wallpaperSwitch?.isChecked = true
                             applyWallpaperUpdate()
-                            toast("Wallpaper ready")
-                        } else toast("Couldn't read that image. Try a JPG or PNG.")
+                            toast(getString(R.string.ui_wallpaper_ready))
+                        } else toast(getString(R.string.ui_image_unreadable))
                     }
                 }
             }
@@ -105,6 +110,7 @@ class MainActivity : AppCompatActivity() {
         fit = IslandPreferences.read(this)
         theme = IslandPreferences.readTheme(this)
         wallpaperStyle = WallpaperSkinStore.read(this)
+        features = IslandFeatures.read(this)
         window.statusBarColor = BG
         setContentView(buildScreen())
         if (Build.VERSION.SDK_INT >= 33) notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -116,14 +122,14 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         clockDiagnostic?.text = TimerDiagnostics.read(this)
         val overlay = Settings.canDrawOverlays(this)
-        buttons["overlay"]?.text = if (overlay) "Display over other apps: allowed" else "Allow display over other apps"
-        buttons["usage"]?.text = if (ForegroundWatcher.hasPermission(this)) "Usage access: allowed" else "Allow usage access (optional)"
+        buttons["overlay"]?.text = if (overlay) getString(R.string.setup_overlay_allowed) else getString(R.string.setup_overlay_allow)
+        buttons["usage"]?.text = if (ForegroundWatcher.hasPermission(this)) getString(R.string.setup_usage_allowed) else getString(R.string.setup_usage_allow)
         val a11y = IslandAccessibilityService.isEnabled(this)
-        buttons["a11y"]?.text = if (a11y) "✓ Camera-area overlay enabled" else "Enable camera-area overlay"
+        buttons["a11y"]?.text = if (a11y) getString(R.string.setup_a11y_enabled) else getString(R.string.setup_a11y_enable)
         val notifications = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
-        buttons["notifications"]?.text = if (notifications) "✓ Notification access enabled" else "Connect notifications"
+        buttons["notifications"]?.text = if (notifications) getString(R.string.setup_notifications_enabled) else getString(R.string.setup_notifications_connect)
         val ready = notifications && (overlay || a11y)
-        readiness?.text = if (ready) "Ready • Your island is connected" else "Setup needed • Connect notifications and an overlay"
+        readiness?.text = if (ready) getString(R.string.status_ready) else getString(R.string.status_setup_needed)
         readiness?.setTextColor(if (ready) 0xFF9BE4BE.toInt() else NothingStyle.foreground)
         placementInfo?.text = placementExplanation()
         if (overlay || a11y) startIsland()
@@ -134,12 +140,12 @@ class MainActivity : AppCompatActivity() {
     private fun showDemo(a: LiveActivity, p: Presentation) {
         demo = a
         demoPresentation = p
-        preview.contentDescription = "${a.mode.name.lowercase()} preview. Hold to expand; swipe up to collapse."
+        preview.contentDescription = getString(R.string.preview_description, modeName(a.mode))
         preview.show(appTint(this, a), p)
     }
 
     private val previewCallbacks = object : IslandView.Callbacks {
-        override fun onOpen(activity: LiveActivity) = toast("Opens ${activity.appLabel}")
+        override fun onOpen(activity: LiveActivity) = toast(getString(R.string.toast_opens, activity.appLabel))
         override fun onAction(activity: LiveActivity, action: IslandAction) {
             if (activity.mode != IslandMode.TIMER) { toast(action.label); return }
             if (action.label == "Cancel") { demo = null; preview.setSecondary(null); preview.show(null, Presentation.IDLE); return }
@@ -164,6 +170,10 @@ class MainActivity : AppCompatActivity() {
         override fun onExpandRequest() { demo?.let { showDemo(it, Presentation.EXPANDED) } }
         override fun onCollapseRequest() { demo?.let { showDemo(it, Presentation.COMPACT) } }
         override fun onDismiss(activity: LiveActivity) = onCollapseRequest()
+        override fun onReply(activity: LiveActivity) = toast(getString(R.string.demo_reply_toast))
+        override fun onVolumeChange(fraction: Float) {
+            demo?.takeIf { it.mode == IslandMode.VOLUME }?.let { showDemo(it.copy(progress = fraction), Presentation.EXPANDED) }
+        }
     }
 
     private fun demoMusic(playing: Boolean, position: Long = 107_000L): LiveActivity {
@@ -183,7 +193,40 @@ class MainActivity : AppCompatActivity() {
         appIcon = AppStyle.icon(this, "com.whatsapp"), artwork = gradientArt(Color.rgb(255, 196, 120), Color.rgb(220, 90, 120)),
         accent = AppStyle.accent(this, "com.whatsapp"),
         actions = listOf(IslandAction("Mark as read", selfIntent())),
+        reply = if (features.inlineReply) ReplyAction(getString(R.string.island_reply), selfIntent(),
+            android.app.RemoteInput.Builder("demo_reply").setLabel(getString(R.string.island_reply_hint)).build()) else null,
     )
+
+    private fun demoVolume(level: Float = .6f) = LiveActivity(
+        key = "demo-volume", packageName = packageName, mode = IslandMode.VOLUME,
+        title = getString(R.string.island_volume_media), subtitle = "", appLabel = "Volume",
+        appIcon = null, artwork = null, accent = NothingStyle.foreground, progress = level,
+    )
+
+    private fun demoDevice(lost: Boolean) = LiveActivity(
+        key = "demo-device", packageName = packageName, mode = IslandMode.DEVICE,
+        title = "Nothing Ear (a)", subtitle = getString(if (lost) R.string.island_disconnected else R.string.island_connected),
+        appLabel = "Bluetooth", appIcon = null, artwork = null, accent = AppStyle.GREEN,
+        progress = if (lost) null else .73f, lost = lost,
+    )
+
+    private fun demoDownload() = LiveActivity(
+        key = "demo-download", packageName = "com.android.chrome", mode = IslandMode.DOWNLOAD,
+        title = "holiday-photos.zip", subtitle = "48 MB of 106 MB", appLabel = "Chrome",
+        appIcon = AppStyle.icon(this, "com.android.chrome"), artwork = null, accent = NothingStyle.foreground,
+        progress = .45f,
+    )
+
+    private fun demoAlarm() = LiveActivity(
+        key = "demo-alarm", packageName = "com.google.android.deskclock", mode = IslandMode.ALARM,
+        title = "7:30 · Wake up", subtitle = "", appLabel = getString(R.string.island_alarm),
+        appIcon = AppStyle.icon(this, "com.google.android.deskclock"), artwork = null,
+        accent = AppStyle.accent(this, "com.google.android.deskclock"),
+        actions = listOf(IslandAction("Snooze", selfIntent()), IslandAction("Dismiss", selfIntent())),
+    )
+
+    private fun demoCalling() = demoCall().copy(key = "demo-calling", title = "Mom", subtitle = "",
+        actions = listOf(IslandAction("Hang up", selfIntent())), callState = CallState.CALLING)
 
     private fun demoCall() = LiveActivity(
         key = "demo-call", packageName = "com.whatsapp", mode = IslandMode.CALL,
@@ -195,7 +238,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun demoTimer(minutes: Int = 9) = LiveActivity(
         key = "demo-timer", packageName = "com.google.android.deskclock", mode = IslandMode.TIMER,
-        title = if (minutes == 9) "Pasta" else "$minutes min", subtitle = "Timer", appLabel = "Clock",
+        title = if (minutes == 9) "Pasta" else getString(R.string.demo_minutes, minutes), subtitle = "Timer", appLabel = "Clock",
         appIcon = AppStyle.icon(this, "com.google.android.deskclock"), artwork = null,
         accent = AppStyle.accent(this, "com.google.android.deskclock"),
         actions = listOf(IslandAction("Pause", selfIntent()), IslandAction("Cancel", selfIntent())),
@@ -227,19 +270,19 @@ class MainActivity : AppCompatActivity() {
             setBackgroundColor(BG)
             setPadding(pad, dp(12), pad, 0)
         }
-        shell.addView(label("Dynamic Droid", 28f, NothingStyle.foreground).apply {
+        shell.addView(label(getString(R.string.app_name), 28f, NothingStyle.foreground).apply {
             typeface = android.graphics.Typeface.DEFAULT_BOLD
             ViewCompat.setAccessibilityHeading(this, true)
         }, row(-2))
-        readiness = label("Checking your connections…", 13f, NothingStyle.muted).apply {
+        readiness = label(getString(R.string.status_checking), 13f, NothingStyle.muted).apply {
             setPadding(0, dp(6), 0, dp(12))
         }.also { shell.addView(it, row(-2)) }
-        val navRows = listOf(listOf("Playground", "Setup"), listOf("Appearance", "Rules"), listOf("Phone fit"))
+        val navRows = listOf(listOf("Playground", "Setup"), listOf("Appearance", "Rules"), listOf("Phone fit", "Features"))
         navRows.forEach { names ->
             val strip = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
             names.forEach { name ->
-                val button = chip(name) { selectPage(name) }
-                button.contentDescription = name
+                val button = chip(navLabel(name)) { selectPage(name) }
+                button.contentDescription = navLabel(name)
                 navigation[name] = button; strip.addView(button)
             }
             shell.addView(strip, row(-2).apply { bottomMargin = dp(6) })
@@ -251,14 +294,15 @@ class MainActivity : AppCompatActivity() {
             pages[name] = this; content.addView(this, row(-2))
         }
         var column = page("Playground")
-        column.addView(heading("TRY YOUR ISLAND"), row(-2))
-        column.addView(label("Tap a scene. Hold the island to expand it, or swipe up to collapse.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
+        column.addView(heading(getString(R.string.play_heading)), row(-2))
+        column.addView(label(getString(R.string.play_hint), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
         preview = IslandView(this).apply {
             anchorToCutout = false
             callbacks = previewCallbacks
             applyFit(fit.copy(offsetY = 0f))
             applyTheme(theme)
             applyWallpaper(wallpaperStyle, WallpaperSkinStore.image(this@MainActivity))
+            applyFeatures(features)
         }
         column.addView(FrameLayout(this).apply {
             background = GradientDrawable().apply { cornerRadius = dp(24).toFloat(); setColor(NothingStyle.surface) }
@@ -266,90 +310,103 @@ class MainActivity : AppCompatActivity() {
             addView(preview, FrameLayout.LayoutParams(-1, -1))
         }, row(dp(280)).apply { topMargin = dp(16) })
         val musicRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        musicRow.addView(chip("Music") { showDemo(demoMusic(true), Presentation.EXPANDED) })
-        musicRow.addView(chip("Idle") { demo = null; preview.setSecondary(null); preview.show(null, Presentation.IDLE) })
-        musicRow.addView(chip("Chat") { showDemo(demoMessage(), Presentation.EXPANDED) })
+        musicRow.addView(chip(getString(R.string.demo_music)) { showDemo(demoMusic(true), Presentation.EXPANDED) })
+        musicRow.addView(chip(getString(R.string.demo_idle)) { demo = null; preview.setSecondary(null); preview.show(null, Presentation.IDLE) })
+        musicRow.addView(chip(getString(R.string.demo_chat)) {
+            preview.setSecondary(null)
+            showDemo(demoMessage(), if (features.messagesMediumFirst) Presentation.COMPACT else Presentation.EXPANDED)
+        })
         val activityRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        activityRow.addView(chip("Call") { showDemo(demoCall(), Presentation.EXPANDED) })
-        activityRow.addView(chip("Timer") { preview.setSecondary(null); showDemo(demoTimer(), Presentation.EXPANDED) })
-        activityRow.addView(chip("Two live") {
+        activityRow.addView(chip(getString(R.string.demo_call)) { showDemo(demoCall(), Presentation.EXPANDED) })
+        activityRow.addView(chip(getString(R.string.mode_timer)) { preview.setSecondary(null); showDemo(demoTimer(), Presentation.EXPANDED) })
+        activityRow.addView(chip(getString(R.string.demo_two_live)) {
             preview.setSecondary(demoTimer())
             showDemo(demoMusic(true), Presentation.COMPACT)
         })
         column.addView(musicRow, row(-2).apply { topMargin = dp(14) })
         column.addView(activityRow, row(-2).apply { topMargin = dp(8) })
+        val systemRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        systemRow.addView(chip(getString(R.string.demo_volume)) { preview.setSecondary(null); showDemo(demoVolume(), Presentation.EXPANDED) })
+        systemRow.addView(chip(getString(R.string.demo_headphones)) { preview.setSecondary(null); showDemo(demoDevice(false), Presentation.EXPANDED) })
+        systemRow.addView(chip(getString(R.string.demo_bt_lost)) { preview.setSecondary(null); showDemo(demoDevice(true), Presentation.EXPANDED) })
+        val eventRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        eventRow.addView(chip(getString(R.string.demo_download)) { preview.setSecondary(null); showDemo(demoDownload(), Presentation.EXPANDED) })
+        eventRow.addView(chip(getString(R.string.demo_alarm)) { preview.setSecondary(null); showDemo(demoAlarm(), Presentation.EXPANDED) })
+        eventRow.addView(chip(getString(R.string.demo_calling)) { preview.setSecondary(null); showDemo(demoCalling(), Presentation.EXPANDED) })
+        column.addView(systemRow, row(-2).apply { topMargin = dp(8) })
+        column.addView(eventRow, row(-2).apply { topMargin = dp(8) })
         timerLabelInput = android.widget.EditText(this).apply {
-            hint = "Timer name (optional)"; setSingleLine(); textSize = 15f
+            hint = getString(R.string.timer_name_hint); setSingleLine(); textSize = 15f
             setTextColor(NothingStyle.foreground); setHintTextColor(NothingStyle.muted)
             background = controlBackground(); setPadding(dp(14), dp(4), dp(14), dp(4))
         }
         column.addView(timerLabelInput, row(dp(52)).apply { topMargin = dp(10) })
         val presets = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        listOf(5, 10, 15, 25).forEach { mins -> presets.addView(chip("${mins}m") { startTimerPreset(mins) }) }
-        column.addView(label("Timer presets", 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
+        listOf(5, 10, 15, 25).forEach { mins -> presets.addView(chip(getString(R.string.timer_preset_minutes, mins)) { startTimerPreset(mins) }) }
+        column.addView(label(getString(R.string.timer_presets), 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
         column.addView(presets, row(-2))
-        column.addView(chip("App → island") {
+        column.addView(chip(getString(R.string.demo_app_to_island)) {
             val a = demo?.takeIf { it.mode == IslandMode.MUSIC || it.mode == IslandMode.CALL } ?: demoMusic(true)
             demo = a; demoPresentation = Presentation.COMPACT
             preview.setSecondary(null); preview.show(a, Presentation.COMPACT, absorb = true)
         }, row(-2).apply { topMargin = dp(8) })
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            column.addView(chip("Preview SwiftUI morph") {
+            column.addView(chip(getString(R.string.demo_swiftui)) {
                 startActivity(Intent(this, SwiftIslandMorphPreviewActivity::class.java))
             }, row(-2).apply { topMargin = dp(8) })
         } else {
-            column.addView(label("SwiftUI morph preview requires Android 9 or newer.", 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
+            column.addView(label(getString(R.string.swiftui_requires), 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
         }
 
-        column.addView(label("Previews use sample content. Your real activities appear after Setup.", 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(16) })
+        column.addView(label(getString(R.string.play_footer), 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(16) })
         column = page("Rules")
-        column.addView(heading("ACTIVITY PRIORITY"), row(-2))
-        column.addView(label("When several activities are live, higher scores stay in the main pill.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
+        column.addView(heading(getString(R.string.rules_priority)), row(-2))
+        column.addView(label(getString(R.string.rules_priority_hint), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
         timerBubbleSwitch = SwitchCompat(this).apply {
-            text = "Keep timers in the separate bubble"; minHeight = dp(56)
+            text = getString(R.string.rules_timer_bubble); minHeight = dp(56)
             setTextColor(NothingStyle.foreground); isChecked = IslandCustomization.timerAsBubble(this@MainActivity)
             setOnCheckedChangeListener { _, checked ->
                 IslandCustomization.setTimerAsBubble(this@MainActivity, checked); refreshCustomization()
             }
         }
         column.addView(timerBubbleSwitch, row(-2))
-        IslandMode.values().forEach { mode ->
+        IslandMode.values().filter { it != IslandMode.VOLUME && it != IslandMode.DEVICE }.forEach { mode ->
             val initial = IslandCustomization.priority(this, mode)
             column.addView(priorityControl(mode, initial), row(-2))
         }
-        column.addView(heading("APP FILTERS & RULES"), row(-2).apply { topMargin = dp(22) })
-        allowedAppsInfo = label("All supported apps are currently allowed", 14f, NothingStyle.muted)
+        column.addView(heading(getString(R.string.rules_filters)), row(-2).apply { topMargin = dp(22) })
+        allowedAppsInfo = label(getString(R.string.rules_all_allowed), 14f, NothingStyle.muted)
         column.addView(allowedAppsInfo, row(-2).apply { topMargin = dp(8) })
-        column.addView(action("allowed-apps", "Choose apps allowed in the island") { chooseApps(allowed = true) }, row(-2).apply { topMargin = dp(8) })
-        hiddenAppsInfo = label("No apps are hidden while open", 14f, NothingStyle.muted)
+        column.addView(action("allowed-apps", getString(R.string.rules_choose_allowed)) { chooseApps(allowed = true) }, row(-2).apply { topMargin = dp(8) })
+        hiddenAppsInfo = label(getString(R.string.rules_none_hidden), 14f, NothingStyle.muted)
         column.addView(hiddenAppsInfo, row(-2).apply { topMargin = dp(8) })
-        column.addView(action("hidden-apps", "Hide island while apps are open") { chooseApps(allowed = false) }, row(-2).apply { topMargin = dp(8) })
-        column.addView(action("quick-actions", "Choose quick actions") { chooseQuickActions() }, row(-2).apply { topMargin = dp(8) })
-        column.addView(action("colors", "Set per-app island styles") { chooseAppStyle() }, row(-2).apply { topMargin = dp(8) })
-        column.addView(heading("QUIET HOURS"), row(-2).apply { topMargin = dp(22) })
+        column.addView(action("hidden-apps", getString(R.string.rules_hide_open)) { chooseApps(allowed = false) }, row(-2).apply { topMargin = dp(8) })
+        column.addView(action("quick-actions", getString(R.string.rules_quick_actions)) { chooseQuickActions() }, row(-2).apply { topMargin = dp(8) })
+        column.addView(action("colors", getString(R.string.rules_app_styles)) { chooseAppStyle() }, row(-2).apply { topMargin = dp(8) })
+        column.addView(heading(getString(R.string.rules_quiet)), row(-2).apply { topMargin = dp(22) })
         quietSwitch = SwitchCompat(this).apply {
-            text = "Hide the island on a schedule"; textSize = 16f; minHeight = dp(56)
+            text = getString(R.string.rules_quiet_switch); textSize = 16f; minHeight = dp(56)
             setTextColor(NothingStyle.foreground); isChecked = IslandCustomization.quietEnabled(this@MainActivity)
             setOnCheckedChangeListener { _, enabled -> saveQuiet(enabled) }
         }
         column.addView(quietSwitch, row(-2))
         val quietTimes = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        quietStartButton = chip("From ${minuteLabel(IslandCustomization.quietStart(this))}") { chooseTime(true) }
-        quietEndButton = chip("Until ${minuteLabel(IslandCustomization.quietEnd(this))}") { chooseTime(false) }
+        quietStartButton = chip(getString(R.string.rules_quiet_from, minuteLabel(IslandCustomization.quietStart(this)))) { chooseTime(true) }
+        quietEndButton = chip(getString(R.string.rules_quiet_until, minuteLabel(IslandCustomization.quietEnd(this)))) { chooseTime(false) }
         quietTimes.addView(quietStartButton); quietTimes.addView(quietEndButton)
         column.addView(quietTimes, row(-2))
-        column.addView(label("Quiet hours use your phone’s local time. Timer notifications remain available when quiet hours end.", 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(6) })
+        column.addView(label(getString(R.string.rules_quiet_note), 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(6) })
 
         column = page("Phone fit")
-        column.addView(heading("FIT YOUR PHONE"), row(-2))
-        column.addView(label("Choose where the island lives. Automatic adapts to the overlay connection, cutout and screen orientation.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(10) })
+        column.addView(heading(getString(R.string.fit_heading)), row(-2))
+        column.addView(label(getString(R.string.fit_hint), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(10) })
         placementInfo = label(placementExplanation(), 13f, NothingStyle.muted)
         column.addView(placementInfo, row(-2).apply { topMargin = dp(12) })
         placementChoices = android.widget.RadioGroup(this).apply {
             orientation = android.widget.RadioGroup.VERTICAL
-            listOf(IslandPlacement.AUTO to "Automatic (recommended)",
-                IslandPlacement.CAMERA to "Around camera cutout",
-                IslandPlacement.BELOW_STATUS_BAR to "Below status bar").forEach { (mode, title) ->
+            listOf(IslandPlacement.AUTO to getString(R.string.fit_auto),
+                IslandPlacement.CAMERA to getString(R.string.fit_camera),
+                IslandPlacement.BELOW_STATUS_BAR to getString(R.string.fit_below)).forEach { (mode, title) ->
                 addView(android.widget.RadioButton(this@MainActivity).apply {
                     id = View.generateViewId(); tag = mode
                     text = title; textSize = 16f; minHeight = dp(52)
@@ -364,21 +421,21 @@ class MainActivity : AppCompatActivity() {
             }
         }
         column.addView(placementChoices, row(-2))
-        column.addView(action("test-fit", "Test on my home screen · 12 seconds") {
+        column.addView(action("test-fit", getString(R.string.fit_test)) {
             if (Settings.canDrawOverlays(this) || IslandAccessibilityService.isEnabled(this)) {
                 ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_TEST))
                 startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
-            } else { selectPage("Setup"); toast("Enable an overlay connection first") }
+            } else { selectPage("Setup"); toast(getString(R.string.fit_need_overlay)) }
         }, row(-2).apply { topMargin = dp(10) })
-        column.addView(action("save-profile", "Save this placement profile") { saveProfile() }, row(-2).apply { topMargin = dp(10) })
-        column.addView(action("load-profile", "Load a saved placement profile") { loadProfile() }, row(-2).apply { topMargin = dp(8) })
-        column.addView(label("If Samsung or another phone covers the island, select Below status bar, then test again. Adjust the sliders only if needed.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(14) })
-        column.addView(fitControl("Size", 70, 130, (fit.scale * 100).toInt(), "%") { fit = fit.copy(scale = it / 100f); updateFit() }, row(-2))
-        column.addView(fitControl("Pill width", 70, 150, (fit.pillWidth * 100).toInt(), "%") { fit = fit.copy(pillWidth = it / 100f); updateFit() }, row(-2))
-        column.addView(fitControl("Left / right", -180, 180, fit.offsetX.toInt(), "dp") { fit = fit.copy(offsetX = it.toFloat()); updateFit() }, row(-2))
-        column.addView(fitControl("Up / down", -24, 160, fit.offsetY.toInt(), "dp") { fit = fit.copy(offsetY = it.toFloat()); updateFit() }, row(-2))
+        column.addView(action("save-profile", getString(R.string.fit_save_profile)) { saveProfile() }, row(-2).apply { topMargin = dp(10) })
+        column.addView(action("load-profile", getString(R.string.fit_load_profile)) { loadProfile() }, row(-2).apply { topMargin = dp(8) })
+        column.addView(label(getString(R.string.fit_samsung_note), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(14) })
+        column.addView(fitControl(getString(R.string.fit_size), 70, 130, (fit.scale * 100).toInt(), "%") { fit = fit.copy(scale = it / 100f); updateFit() }, row(-2))
+        column.addView(fitControl(getString(R.string.fit_width), 70, 150, (fit.pillWidth * 100).toInt(), "%") { fit = fit.copy(pillWidth = it / 100f); updateFit() }, row(-2))
+        column.addView(fitControl(getString(R.string.fit_left_right), -180, 180, fit.offsetX.toInt(), "dp") { fit = fit.copy(offsetX = it.toFloat()); updateFit() }, row(-2))
+        column.addView(fitControl(getString(R.string.fit_up_down), -24, 160, fit.offsetY.toInt(), "dp") { fit = fit.copy(offsetY = it.toFloat()); updateFit() }, row(-2))
         cameraSwitch = SwitchCompat(this).apply {
-            text = "Align with camera"
+            text = getString(R.string.fit_align_camera)
             textSize = 16f
             minHeight = dp(56)
             setPadding(0, dp(12), 0, dp(12))
@@ -389,7 +446,7 @@ class MainActivity : AppCompatActivity() {
             setOnCheckedChangeListener { _, checked -> fit = fit.copy(alignCamera = checked); updateFit() }
         }
         column.addView(cameraSwitch, row(-2))
-        column.addView(action("reset", "Reset phone fit") {
+        column.addView(action("reset", getString(R.string.fit_reset)) {
             fit = IslandFit()
             val defaults = listOf(30, 30, 180, 24)
             fitSliders.forEachIndexed { index, slider -> slider.progress = defaults[index] }
@@ -402,10 +459,10 @@ class MainActivity : AppCompatActivity() {
         }, row(-2))
 
         column = page("Appearance")
-        column.addView(heading("MAKE IT YOURS"), row(-2))
-        column.addView(label("Choose wallpaper accents or a refracted wallpaper background. Changes apply immediately.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(10) })
+        column.addView(heading(getString(R.string.look_heading)), row(-2))
+        column.addView(label(getString(R.string.look_hint), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(10) })
         themeSwitch = SwitchCompat(this).apply {
-            text = "Match island to wallpaper"
+            text = getString(R.string.look_match)
             textSize = 16f
             minHeight = dp(56)
             setPadding(0, dp(12), 0, dp(12))
@@ -423,40 +480,42 @@ class MainActivity : AppCompatActivity() {
         }
         swatchA = swatch().also { swatches.addView(it) }
         swatchB = swatch().also { swatches.addView(it) }
-        swatches.addView(label("Island accent colours", 13f, NothingStyle.muted))
+        swatches.addView(label(getString(R.string.look_swatches), 13f, NothingStyle.muted))
         column.addView(swatches, row(-2))
-        column.addView(action("wallpaper", "Use my current wallpaper") {
+        column.addView(action("wallpaper", getString(R.string.look_use_wallpaper)) {
             applyWallpaperTheme(WallpaperTheme.fromSystem(this))
         }, row(-2).apply { topMargin = dp(8) })
-        column.addView(action("app-colors", "Customize each app’s island style") { chooseAppStyle() }, row(-2).apply { topMargin = dp(10) })
-        column.addView(action("pick", "Pick an image instead") {
+        column.addView(action("app-colors", getString(R.string.look_app_styles)) { chooseAppStyle() }, row(-2).apply { topMargin = dp(10) })
+        column.addView(action("pick", getString(R.string.look_pick)) {
             pickImage.launch("image/*")
         }, row(-2).apply { topMargin = dp(10) })
 
         addWallpaperControls(column)
 
+        addFeaturesPage(page("Features"))
+
         column = page("Setup")
-        column.addView(heading("CONNECT YOUR ISLAND"), row(-2))
-        column.addView(label("1. Connect notifications for music, timers and calls.\n2. Enable the camera-area overlay for top-edge placement and taps.\n3. Add usage access for more reliable app-to-island transitions.", 15f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
-        column.addView(label("Display over other apps is a fallback when the camera-area overlay is unavailable. It uses a position below the status bar.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
-        column.addView(heading("CLOCK NOTIFICATION STATUS"), row(-2).apply { topMargin = dp(16) })
+        column.addView(heading(getString(R.string.setup_heading)), row(-2))
+        column.addView(label(getString(R.string.setup_steps), 15f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
+        column.addView(label(getString(R.string.setup_fallback), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
+        column.addView(heading(getString(R.string.setup_clock_heading)), row(-2).apply { topMargin = dp(16) })
         clockDiagnostic = label(TimerDiagnostics.read(this), 13f, NothingStyle.muted)
         column.addView(clockDiagnostic, row(-2).apply { topMargin = dp(8) })
 
 
-        column.addView(action("overlay", "Allow display over other apps") {
+        column.addView(action("overlay", getString(R.string.setup_overlay_allow)) {
             if (!Settings.canDrawOverlays(this)) {
                 startActivity(Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:$packageName")))
             } else startIsland()
         }, row(-2).apply { topMargin = dp(16) })
-        column.addView(action("notifications", "Allow notification access") {
+        column.addView(action("notifications", getString(R.string.setup_notifications_allow)) {
             startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
         }, row(-2).apply { topMargin = dp(10) })
-        column.addView(action("a11y", "Allow tapping over the status bar") {
-            toast("Find Dynamic Droid under Installed apps. If it's greyed out: App info → ⋮ → Allow restricted settings.")
+        column.addView(action("a11y", getString(R.string.setup_a11y_allow)) {
+            toast(getString(R.string.setup_a11y_toast))
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
         }, row(-2).apply { topMargin = dp(10) })
-        column.addView(action("usage", "Allow usage access (optional)") {
+        column.addView(action("usage", getString(R.string.setup_usage_allow)) {
             startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
         }, row(-2).apply { topMargin = dp(10) })
 
@@ -475,19 +534,133 @@ class MainActivity : AppCompatActivity() {
         return shell
     }
 
+    // ---------------------------------------------------------------- features
+
+    private fun addFeaturesPage(column: LinearLayout) {
+        fun toggle(textId: Int, key: String, checked: Boolean, note: Int? = null, onChange: (Boolean) -> Unit = {}) {
+            column.addView(SwitchCompat(this).apply {
+                text = getString(textId); textSize = 16f; minHeight = dp(56)
+                setTextColor(NothingStyle.foreground); typeface = NothingStyle.body
+                isChecked = checked
+                setOnCheckedChangeListener { _, value ->
+                    IslandFeatures.setBoolean(this@MainActivity, key, value)
+                    onChange(value)
+                    applyFeaturesUpdate()
+                }
+            }, row(-2))
+            note?.let { column.addView(label(getString(it), 13f, NothingStyle.muted), row(-2).apply { bottomMargin = dp(6) }) }
+        }
+        fun section(textId: Int, first: Boolean = false) =
+            column.addView(heading(getString(textId)), row(-2).apply { topMargin = if (first) 0 else dp(22) })
+
+        section(R.string.features_islands, first = true)
+        column.addView(label(getString(R.string.features_islands_note), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
+        toggle(R.string.feature_volume, "volume", features.volume, R.string.feature_volume_note)
+        toggle(R.string.feature_headphones, "headphones", features.headphones, R.string.feature_headphones_note) { on ->
+            if (on) requestBluetoothIfNeeded()
+        }
+        toggle(R.string.feature_bluetooth_lost, "bluetooth_lost", features.bluetoothLost) { on -> if (on) requestBluetoothIfNeeded() }
+        toggle(R.string.feature_downloads, "downloads", features.downloads)
+        toggle(R.string.feature_alarms, "alarms", features.alarms)
+
+        section(R.string.features_messages)
+        toggle(R.string.feature_reply, "inline_reply", features.inlineReply)
+        toggle(R.string.feature_medium, "messages_medium", features.messagesMediumFirst, R.string.feature_medium_note)
+
+        section(R.string.features_look)
+        toggle(R.string.feature_short, "short_compact", features.shortCompact, R.string.feature_short_note)
+        val height = fitControl(getString(R.string.feature_height), IslandFeatureSet.MIN_COMPACT_DP.toInt(),
+            IslandFeatureSet.MAX_COMPACT_DP.toInt(), features.compactHeightDp.toInt(), "dp") {
+            IslandFeatures.setCompactHeight(this, it.toFloat()); applyFeaturesUpdate()
+        }
+        fitSliders.removeAt(fitSliders.lastIndex)
+        column.addView(height, row(-2))
+        toggle(R.string.feature_corners, "phone_corners", features.phoneCorners)
+        toggle(R.string.feature_bubbles, "coloured_bubbles", features.colouredBubbles, R.string.feature_bubbles_note)
+        column.addView(label(getString(R.string.feature_outline), 16f, NothingStyle.foreground).apply {
+            typeface = NothingStyle.body; setPadding(0, dp(12), 0, 0)
+        }, row(-2))
+        column.addView(android.widget.RadioGroup(this).apply {
+            orientation = android.widget.RadioGroup.HORIZONTAL
+            listOf(OutlineMode.OFF to R.string.outline_off, OutlineMode.EVENTS to R.string.outline_events,
+                OutlineMode.ALWAYS to R.string.outline_always).forEach { (mode, name) ->
+                addView(android.widget.RadioButton(this@MainActivity).apply {
+                    id = View.generateViewId(); tag = mode; text = getString(name); minHeight = dp(48)
+                    setTextColor(NothingStyle.foreground)
+                    buttonTintList = ColorStateList.valueOf(NothingStyle.foreground)
+                    isChecked = features.outline == mode
+                })
+            }
+            setOnCheckedChangeListener { group, id ->
+                (group.findViewById<android.widget.RadioButton>(id)?.tag as? OutlineMode)?.let {
+                    IslandFeatures.setOutline(this@MainActivity, it); applyFeaturesUpdate()
+                }
+            }
+        }, row(-2))
+        toggle(R.string.feature_burn_in, "burn_in", features.burnInCare, R.string.feature_burn_in_note)
+        toggle(R.string.feature_lock, "lock_screen", features.lockScreen, R.string.feature_lock_note)
+
+        section(R.string.features_touch)
+        toggle(R.string.haptic_tap, "haptic_tap", features.hapticTap)
+        toggle(R.string.haptic_hold, "haptic_hold", features.hapticHold)
+        toggle(R.string.haptic_swipe, "haptic_swipe", features.hapticSwipe)
+        toggle(R.string.haptic_up, "haptic_up", features.hapticUp)
+        toggle(R.string.haptic_dnd, "haptic_dnd_quiet", features.quietHapticsInDnd)
+    }
+
+    private fun navLabel(key: String) = getString(when (key) {
+        "Playground" -> R.string.nav_playground
+        "Setup" -> R.string.nav_setup
+        "Appearance" -> R.string.nav_appearance
+        "Rules" -> R.string.nav_rules
+        "Phone fit" -> R.string.nav_phone_fit
+        else -> R.string.nav_features
+    })
+
+    private fun modeName(mode: IslandMode) = getString(when (mode) {
+        IslandMode.MUSIC -> R.string.mode_music
+        IslandMode.CALL -> R.string.mode_call
+        IslandMode.TIMER -> R.string.mode_timer
+        IslandMode.NAVIGATION -> R.string.mode_navigation
+        IslandMode.CHARGING -> R.string.mode_charging
+        IslandMode.MESSAGE -> R.string.mode_message
+        IslandMode.VOLUME -> R.string.mode_volume
+        IslandMode.DEVICE -> R.string.mode_device
+        IslandMode.DOWNLOAD -> R.string.mode_download
+        IslandMode.ALARM -> R.string.mode_alarm
+    })
+
+    private fun accentName(index: Int) = getString(when (index) {
+        1 -> R.string.accent_red; 2 -> R.string.accent_orange; 3 -> R.string.accent_yellow
+        4 -> R.string.accent_green; 5 -> R.string.accent_blue; 6 -> R.string.accent_purple
+        7 -> R.string.accent_pink; else -> R.string.accent_default
+    })
+
+    private fun requestBluetoothIfNeeded() {
+        val permission = DeviceMonitor.permission() ?: return
+        if (!DeviceMonitor.hasPermission(this)) bluetoothPermission.launch(permission)
+    }
+
+    private fun applyFeaturesUpdate() {
+        features = IslandFeatures.read(this)
+        preview.applyFeatures(features)
+        wallpaperPreview?.applyFeatures(features)
+        refreshCustomization()
+    }
+
     private data class InstalledApp(val packageName: String, val label: String)
 
     private fun priorityControl(mode: IslandMode, initial: Int): LinearLayout {
-        val title = label("${mode.name.lowercase().replaceFirstChar { it.uppercase() }} · $initial", 16f, NothingStyle.foreground).apply {
+        val title = label(getString(R.string.priority_label, modeName(mode), initial), 16f, NothingStyle.foreground).apply {
             typeface = NothingStyle.body
         }
         val slider = SeekBar(this).apply {
-            max = 100; progress = initial; contentDescription = "${mode.name.lowercase()} priority"
+            max = 100; progress = initial; contentDescription = getString(R.string.priority_description, modeName(mode))
             progressTintList = ColorStateList.valueOf(NothingStyle.red)
             thumbTintList = ColorStateList.valueOf(NothingStyle.foreground)
         }
         slider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
-            override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) { title.text = "${mode.name.lowercase().replaceFirstChar { it.uppercase() }} · $value" }
+            override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) { title.text = getString(R.string.priority_label, modeName(mode), value) }
             override fun onStartTrackingTouch(bar: SeekBar?) = Unit
             override fun onStopTrackingTouch(bar: SeekBar?) {
                 IslandCustomization.setPriority(this@MainActivity, mode, slider.progress); refreshCustomization()
@@ -509,7 +682,7 @@ class MainActivity : AppCompatActivity() {
         val selected = if (allowed && !IslandCustomization.allowedFilterEnabled(this))
             apps.map { it.packageName }.toMutableSet() else stored.toMutableSet()
         val search = android.widget.EditText(this).apply {
-            hint = "Search installed apps"; setSingleLine(); textSize = 15f
+            hint = getString(R.string.search_apps); setSingleLine(); textSize = 15f
             setTextColor(NothingStyle.foreground); setHintTextColor(NothingStyle.muted)
             background = controlBackground(); setPadding(dp(14), dp(4), dp(14), dp(4))
         }
@@ -553,15 +726,15 @@ class MainActivity : AppCompatActivity() {
             addView(list, LinearLayout.LayoutParams(-1, dp(280)).apply { topMargin = dp(8) })
         }
         val dialog = android.app.AlertDialog.Builder(this)
-            .setTitle(if (allowed) "Apps allowed in the island" else "Hide while these apps are open")
+            .setTitle(if (allowed) getString(R.string.apps_allowed_title) else getString(R.string.apps_hidden_title))
             .setView(picker)
-            .setNegativeButton("Cancel", null)
-            .setNeutralButton(if (allowed) "Allow all" else "Clear rules") { _, _ ->
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .setNeutralButton(if (allowed) getString(R.string.apps_allow_all) else getString(R.string.apps_clear_rules)) { _, _ ->
                 if (allowed) IslandCustomization.setAllowedApps(this, emptySet(), filterEnabled = false)
                 else IslandCustomization.setHiddenWhenOpen(this, emptySet())
                 refreshCustomization()
             }
-            .setPositiveButton("Save") { _, _ ->
+            .setPositiveButton(getString(R.string.common_save)) { _, _ ->
                 if (allowed) IslandCustomization.setAllowedApps(this,
                     if (selected.size == apps.size) emptySet() else selected,
                     filterEnabled = selected.size != apps.size)
@@ -575,108 +748,108 @@ class MainActivity : AppCompatActivity() {
         val activity = IslandBus.allOngoing().lastOrNull { it.mode == IslandMode.MUSIC || it.actions.isNotEmpty() }
             ?: demo?.takeIf { it.mode == IslandMode.MUSIC || it.actions.isNotEmpty() } ?: demoMusic(false)
         if (activity.mode == IslandMode.MUSIC) {
-            val options = listOf(IslandBus.MEDIA_PREVIOUS to "Previous track", IslandBus.MEDIA_TOGGLE to "Play / pause",
-                IslandBus.MEDIA_NEXT to "Next track", IslandBus.MEDIA_SEEK to "Seek bar")
+            val options = listOf(IslandBus.MEDIA_PREVIOUS to getString(R.string.media_previous), IslandBus.MEDIA_TOGGLE to getString(R.string.media_toggle),
+                IslandBus.MEDIA_NEXT to getString(R.string.media_next), IslandBus.MEDIA_SEEK to getString(R.string.media_seek))
             val current = IslandCustomization.mediaSelection(this, activity.packageName) ?: options.map { it.first }.toSet()
             val selected = current.toMutableSet()
-            android.app.AlertDialog.Builder(this).setTitle("Music controls · ${activity.appLabel}")
+            android.app.AlertDialog.Builder(this).setTitle(getString(R.string.music_controls_title, activity.appLabel))
                 .setMultiChoiceItems(options.map { it.second }.toTypedArray(), BooleanArray(options.size) { options[it].first in selected }) { _, index, checked ->
                     if (checked) selected += options[index].first else selected -= options[index].first
-                }.setNeutralButton("Use defaults") { _, _ ->
+                }.setNeutralButton(getString(R.string.common_use_defaults)) { _, _ ->
                     IslandCustomization.setMediaSelection(this, activity.packageName, null); refreshCustomization()
-                }.setNegativeButton("Cancel", null)
-                .setPositiveButton("Save") { _, _ -> IslandCustomization.setMediaSelection(this, activity.packageName, selected); refreshCustomization() }
+                }.setNegativeButton(getString(R.string.common_cancel), null)
+                .setPositiveButton(getString(R.string.common_save)) { _, _ -> IslandCustomization.setMediaSelection(this, activity.packageName, selected); refreshCustomization() }
                 .show()
             return
         }
         val actions = activity.actions
-        if (actions.isEmpty()) { toast("This app has not provided any quick actions yet"); return }
+        if (actions.isEmpty()) { toast(getString(R.string.no_quick_actions)); return }
         val current = IslandCustomization.actionSelection(this, activity.packageName)
         val selected = (current ?: actions.take(3).map { it.label }.toSet()).toMutableSet()
-        android.app.AlertDialog.Builder(this).setTitle("Quick actions · ${activity.appLabel}")
+        android.app.AlertDialog.Builder(this).setTitle(getString(R.string.quick_actions_title, activity.appLabel))
             .setMultiChoiceItems(actions.map { it.label }.toTypedArray(), BooleanArray(actions.size) { actions[it].label in selected }) { _, index, checked ->
                 val label = actions[index].label
-                if (checked && selected.size >= 3) { toast("Choose up to three actions"); return@setMultiChoiceItems }
+                if (checked && selected.size >= 3) { toast(getString(R.string.quick_actions_max)); return@setMultiChoiceItems }
                 if (checked) selected += label else selected -= label
             }
-            .setNeutralButton("Use app defaults") { _, _ ->
+            .setNeutralButton(getString(R.string.use_app_defaults)) { _, _ ->
                 IslandCustomization.setActionSelection(this, activity.packageName, null); refreshCustomization()
             }
-            .setNegativeButton("Cancel", null)
-            .setPositiveButton("Save") { _, _ -> IslandCustomization.setActionSelection(this, activity.packageName, selected); refreshCustomization() }
+            .setNegativeButton(getString(R.string.common_cancel), null)
+            .setPositiveButton(getString(R.string.common_save)) { _, _ -> IslandCustomization.setActionSelection(this, activity.packageName, selected); refreshCustomization() }
             .show()
     }
 
     private fun chooseAppStyle() {
         val apps = installedApps(); if (apps.isEmpty()) return
-        android.app.AlertDialog.Builder(this).setTitle("Choose an app to style")
+        android.app.AlertDialog.Builder(this).setTitle(getString(R.string.style_choose_app))
             .setItems(apps.map { it.label }.toTypedArray()) { _, index -> editAppStyle(apps[index]) }.show()
     }
 
     private fun editAppStyle(app: InstalledApp) {
         val column = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), dp(8), dp(20), dp(4)) }
-        column.addView(label("How it opens", 14f, NothingStyle.muted), row(-2))
+        column.addView(label(getString(R.string.style_how_opens), 14f, NothingStyle.muted), row(-2))
         val layout = android.widget.RadioGroup(this).apply { orientation = android.widget.RadioGroup.VERTICAL }
-        val modes = listOf("Use activity default", "Open compact", "Open expanded")
+        val modes = listOf(getString(R.string.style_default), getString(R.string.style_compact), getString(R.string.style_expanded))
         val selectedMode = when (IslandCustomization.preferredExpanded(this, app.packageName)) { true -> 2; false -> 1; null -> 0 }
         modes.forEachIndexed { index, mode -> layout.addView(android.widget.RadioButton(this).apply {
             id = View.generateViewId(); text = mode; isChecked = index == selectedMode
             setTextColor(NothingStyle.foreground)
         }) }
         column.addView(layout, row(-2))
-        column.addView(label("Animation speed", 14f, NothingStyle.muted).apply { setPadding(0, dp(8), 0, 0) }, row(-2))
-        val speedLabel = label("${(IslandCustomization.motionSpeed(this, app.packageName) * 100).toInt()}%", 13f, NothingStyle.muted)
+        column.addView(label(getString(R.string.style_speed), 14f, NothingStyle.muted).apply { setPadding(0, dp(8), 0, 0) }, row(-2))
+        val speedLabel = label(getString(R.string.percent_value, (IslandCustomization.motionSpeed(this, app.packageName) * 100).toInt()), 13f, NothingStyle.muted)
         val speed = SeekBar(this).apply { max = 85; progress = ((IslandCustomization.motionSpeed(this@MainActivity, app.packageName) - .65f) * 100).toInt() }
         speed.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(bar: SeekBar?, value: Int, fromUser: Boolean) {
-                speedLabel.text = "${value + 65}%"
+                speedLabel.text = getString(R.string.percent_value, value + 65)
             }
             override fun onStartTrackingTouch(bar: SeekBar?) = Unit
             override fun onStopTrackingTouch(bar: SeekBar?) = Unit
         })
         column.addView(speedLabel, row(-2)); column.addView(speed, row(dp(48)))
         val accentButton = Button(this).apply {
-            text = "Island color: ${IslandCustomization.accents[IslandCustomization.accentChoice(this@MainActivity, app.packageName)].first}"
+            text = getString(R.string.style_color, accentName(IslandCustomization.accentChoice(this@MainActivity, app.packageName)))
             isAllCaps = false; background = controlBackground(); setTextColor(NothingStyle.foreground)
             setOnClickListener {
-                android.app.AlertDialog.Builder(this@MainActivity).setTitle("${app.label} island color")
-                    .setSingleChoiceItems(IslandCustomization.accents.map { it.first }.toTypedArray(),
+                android.app.AlertDialog.Builder(this@MainActivity).setTitle(getString(R.string.style_color_title, app.label))
+                    .setSingleChoiceItems(IslandCustomization.accents.indices.map { accentName(it) }.toTypedArray(),
                         IslandCustomization.accentChoice(this@MainActivity, app.packageName)) { dialog, choice ->
                         IslandCustomization.setAccentChoice(this@MainActivity, app.packageName, choice)
-                        text = "Island color: ${IslandCustomization.accents[choice].first}"; dialog.dismiss()
+                        text = getString(R.string.style_color, accentName(choice)); dialog.dismiss()
                     }.show()
             }
         }
         column.addView(accentButton, row(-2).apply { topMargin = dp(8) })
         android.app.AlertDialog.Builder(this).setTitle(app.label).setView(column)
-            .setNeutralButton("Use defaults") { _, _ ->
+            .setNeutralButton(getString(R.string.common_use_defaults)) { _, _ ->
                 IslandCustomization.setPreferredExpanded(this, app.packageName, null)
                 IslandCustomization.setMotionSpeed(this, app.packageName, 1f)
                 IslandCustomization.setAccentChoice(this, app.packageName, 0)
                 refreshCustomization()
-            }.setNegativeButton("Cancel", null)
-            .setPositiveButton("Save") { _, _ ->
+            }.setNegativeButton(getString(R.string.common_cancel), null)
+            .setPositiveButton(getString(R.string.common_save)) { _, _ ->
                 val checked = layout.checkedRadioButtonId
                 val mode = (0 until layout.childCount).firstOrNull { layout.getChildAt(it).id == checked } ?: 0
                 IslandCustomization.setPreferredExpanded(this, app.packageName, when (mode) { 1 -> false; 2 -> true; else -> null })
                 IslandCustomization.setMotionSpeed(this, app.packageName, (speed.progress + 65) / 100f)
                 IslandCustomization.saveStyledApps(this, IslandCustomization.savedApps(this) + app.packageName)
-                refreshCustomization(); toast("${app.label} style saved")
+                refreshCustomization(); toast(getString(R.string.style_saved, app.label))
             }.show()
     }
 
     private fun startTimerPreset(minutes: Int) {
         val intent = Intent(android.provider.AlarmClock.ACTION_SET_TIMER).apply {
             putExtra(android.provider.AlarmClock.EXTRA_LENGTH, minutes * 60)
-            val name = timerLabelInput?.text?.toString()?.trim().orEmpty().ifBlank { "Timer" }
+            val name = timerLabelInput?.text?.toString()?.trim().orEmpty().ifBlank { getString(R.string.timer_label) }
             putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, name)
             putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
         if (intent.resolveActivity(packageManager) != null) runCatching { startActivity(intent) }
-            .onFailure { toast("Couldn’t start that timer") }
+            .onFailure { toast(getString(R.string.timer_failed)) }
         else {
-            val label = timerLabelInput?.text?.toString()?.trim().orEmpty().ifBlank { "$minutes min" }
+            val label = timerLabelInput?.text?.toString()?.trim().orEmpty().ifBlank { getString(R.string.demo_minutes, minutes) }
             preview.setSecondary(null); showDemo(demoTimer(minutes).copy(title = label), Presentation.EXPANDED)
         }
     }
@@ -697,17 +870,17 @@ class MainActivity : AppCompatActivity() {
     private fun minuteLabel(value: Int) = "%02d:%02d".format(value / 60, value % 60)
 
     private fun saveProfile() {
-        val input = android.widget.EditText(this).apply { hint = "e.g. Samsung"; setSingleLine() }
-        android.app.AlertDialog.Builder(this).setTitle("Save phone placement").setView(input)
-            .setNegativeButton("Cancel", null).setPositiveButton("Save") { _, _ ->
+        val input = android.widget.EditText(this).apply { hint = getString(R.string.profile_hint); setSingleLine() }
+        android.app.AlertDialog.Builder(this).setTitle(getString(R.string.profile_save_title)).setView(input)
+            .setNegativeButton(getString(R.string.common_cancel), null).setPositiveButton(getString(R.string.common_save)) { _, _ ->
                 val name = input.text.toString().trim().ifBlank { "${android.os.Build.MANUFACTURER} ${android.os.Build.MODEL}" }
-                IslandProfileStore.save(this, name, fit); refreshCustomization(); toast("Profile saved")
+                IslandProfileStore.save(this, name, fit); refreshCustomization(); toast(getString(R.string.profile_saved))
             }.show()
     }
     private fun loadProfile() {
         val names = IslandProfileStore.names(this).sorted()
-        if (names.isEmpty()) { toast("Save a placement profile first"); return }
-        android.app.AlertDialog.Builder(this).setTitle("Load placement profile").setItems(names.toTypedArray()) { _, index ->
+        if (names.isEmpty()) { toast(getString(R.string.profile_need_save)); return }
+        android.app.AlertDialog.Builder(this).setTitle(getString(R.string.profile_load_title)).setItems(names.toTypedArray()) { _, index ->
             IslandProfileStore.load(this, names[index])?.let { next ->
                 fit = next
                 val values = listOf((fit.scale * 100).toInt(), (fit.pillWidth * 100).toInt(), fit.offsetX.toInt(), fit.offsetY.toInt())
@@ -715,26 +888,26 @@ class MainActivity : AppCompatActivity() {
                 cameraSwitch?.isChecked = fit.alignCamera
                 placementChoices?.let { group -> (0 until group.childCount).map { group.getChildAt(it) }
                     .firstOrNull { it.tag == fit.placement }?.let { group.check(it.id) } }
-                updateFit(); toast("${names[index]} profile loaded")
+                updateFit(); toast(getString(R.string.profile_loaded, names[index]))
             }
-        }.setNegativeButton("Cancel", null).setNeutralButton("Manage") { _, _ -> manageProfiles(names) }.show()
+        }.setNegativeButton(getString(R.string.common_cancel), null).setNeutralButton(getString(R.string.common_manage)) { _, _ -> manageProfiles(names) }.show()
     }
     private fun manageProfiles(names: List<String>) {
         if (names.isEmpty()) return
-        android.app.AlertDialog.Builder(this).setTitle("Remove a placement profile").setItems(names.toTypedArray()) { _, index ->
-            IslandProfileStore.remove(this, names[index]); toast("Profile removed")
-        }.setNegativeButton("Done", null).show()
+        android.app.AlertDialog.Builder(this).setTitle(getString(R.string.profile_remove_title)).setItems(names.toTypedArray()) { _, index ->
+            IslandProfileStore.remove(this, names[index]); toast(getString(R.string.profile_removed))
+        }.setNegativeButton(getString(R.string.common_done), null).show()
     }
     private fun refreshCustomization() {
         allowedAppsInfo?.text = when {
-            !IslandCustomization.allowedFilterEnabled(this) -> "All supported apps are currently allowed"
-            IslandCustomization.allowedApps(this).isEmpty() -> "No apps are currently allowed"
-            else -> "${IslandCustomization.allowedApps(this).size} selected apps are allowed"
+            !IslandCustomization.allowedFilterEnabled(this) -> getString(R.string.rules_all_allowed)
+            IslandCustomization.allowedApps(this).isEmpty() -> getString(R.string.rules_none_allowed)
+            else -> getString(R.string.rules_some_allowed, IslandCustomization.allowedApps(this).size)
         }
-        hiddenAppsInfo?.text = IslandCustomization.hiddenWhenOpen(this).let { if (it.isEmpty()) "No apps are hidden while open" else "${it.size} apps hide the island while open" }
+        hiddenAppsInfo?.text = IslandCustomization.hiddenWhenOpen(this).let { if (it.isEmpty()) getString(R.string.rules_none_hidden) else getString(R.string.rules_some_hidden, it.size) }
         quietSwitch?.isChecked = IslandCustomization.quietEnabled(this)
-        quietStartButton?.text = "From ${minuteLabel(IslandCustomization.quietStart(this))}"
-        quietEndButton?.text = "Until ${minuteLabel(IslandCustomization.quietEnd(this))}"
+        quietStartButton?.text = getString(R.string.rules_quiet_from, minuteLabel(IslandCustomization.quietStart(this)))
+        quietEndButton?.text = getString(R.string.rules_quiet_until, minuteLabel(IslandCustomization.quietEnd(this)))
         timerBubbleSwitch?.isChecked = IslandCustomization.timerAsBubble(this)
         if (Settings.canDrawOverlays(this) || IslandAccessibilityService.isEnabled(this))
             ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_CUSTOMIZATION))
@@ -748,23 +921,23 @@ class MainActivity : AppCompatActivity() {
             button.isSelected = selected
             button.setTextColor(if (selected) Color.BLACK else NothingStyle.foreground)
             button.background = controlBackground(if (selected) NothingStyle.foreground else NothingStyle.surface)
-            ViewCompat.setStateDescription(button, if (selected) "Selected" else "")
+            ViewCompat.setStateDescription(button, if (selected) getString(R.string.state_selected) else "")
         }
         pages[name]?.parent?.let { (it as? View)?.parent as? ScrollView }?.scrollTo(0, 0)
     }
 
     private fun placementExplanation(): String = when {
-        fit.placement == IslandPlacement.BELOW_STATUS_BAR -> "Below status bar • avoids system clock and icon overlap"
-        IslandAccessibilityService.instance != null -> "Camera-area overlay connected • Automatic follows the camera in portrait"
-        else -> "Standard overlay • Automatic keeps the island below the status bar"
+        fit.placement == IslandPlacement.BELOW_STATUS_BAR -> getString(R.string.placement_below)
+        IslandAccessibilityService.instance != null -> getString(R.string.placement_camera)
+        else -> getString(R.string.placement_standard)
     }
 
     private fun addWallpaperControls(column: LinearLayout) {
-        column.addView(heading("WALLPAPER GLASS"), row(-2).apply { topMargin = dp(28) })
-        column.addView(label("Choose your wallpaper image. It stays still beneath the refracted glass.", 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
-        column.addView(action("wallpaper-pick", "Choose wallpaper image") { pickWallpaper.launch("image/*") }, row(-2).apply { topMargin = dp(12) })
+        column.addView(heading(getString(R.string.glass_heading)), row(-2).apply { topMargin = dp(28) })
+        column.addView(label(getString(R.string.glass_hint), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(12) })
+        column.addView(action("wallpaper-pick", getString(R.string.glass_choose)) { pickWallpaper.launch("image/*") }, row(-2).apply { topMargin = dp(12) })
         wallpaperSwitch = SwitchCompat(this).apply {
-            text = "Wallpaper inside pill"; textSize = 16f; minHeight = dp(56)
+            text = getString(R.string.glass_inside); textSize = 16f; minHeight = dp(56)
             setTextColor(NothingStyle.foreground)
             isChecked = wallpaperStyle.enabled && WallpaperSkinStore.image(this@MainActivity) != null
             setOnCheckedChangeListener { _, checked ->
@@ -776,7 +949,7 @@ class MainActivity : AppCompatActivity() {
         column.addView(wallpaperSwitch, row(-2))
         val status = label(WallpaperRecovery.status(this), 14f, NothingStyle.muted)
         column.addView(SwitchCompat(this).apply {
-            text = "Liquid Glass refraction"; minHeight = dp(56)
+            text = getString(R.string.glass_refraction); minHeight = dp(56)
             setTextColor(NothingStyle.foreground); isChecked = wallpaperStyle.glass
             isEnabled = Build.VERSION.SDK_INT >= 33
             setOnCheckedChangeListener { _, checked ->
@@ -805,16 +978,16 @@ class MainActivity : AppCompatActivity() {
             fitSliders.removeAt(fitSliders.lastIndex)
             column.addView(container, row(-2))
         }
-        control("Wallpaper horizontal position", (wallpaperStyle.x * 100).toInt()) {
+        control(getString(R.string.glass_x), (wallpaperStyle.x * 100).toInt()) {
             wallpaperStyle = wallpaperStyle.copy(x = it / 100f); applyWallpaperUpdate()
         }
-        control("Wallpaper vertical position", (wallpaperStyle.y * 100).toInt()) {
+        control(getString(R.string.glass_y), (wallpaperStyle.y * 100).toInt()) {
             wallpaperStyle = wallpaperStyle.copy(y = it / 100f); applyWallpaperUpdate()
         }
-        control("Wallpaper strength", (wallpaperStyle.strength * 100).toInt(), 15, 65) {
+        control(getString(R.string.glass_strength), (wallpaperStyle.strength * 100).toInt(), 15, 65) {
             wallpaperStyle = wallpaperStyle.copy(strength = it / 100f); applyWallpaperUpdate()
         }
-        column.addView(action("wallpaper-remove", "Remove wallpaper image") {
+        column.addView(action("wallpaper-remove", getString(R.string.glass_remove)) {
             WallpaperSkinStore.remove(this)
             wallpaperStyle = WallpaperSkinStore.read(this); wallpaperSwitch?.isChecked = false
             applyWallpaperUpdate()
@@ -838,7 +1011,7 @@ class MainActivity : AppCompatActivity() {
         textSize = 16f
         minHeight = dp(56)
         setPadding(dp(12), dp(14), dp(12), dp(14))
-        contentDescription = "$text preview"
+        contentDescription = getString(R.string.chip_preview, text)
         setTextColor(NothingStyle.foreground)
         typeface = NothingStyle.body
         background = controlBackground()
@@ -884,8 +1057,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun fitControl(name: String, min: Int, max: Int, value: Int, unit: String, change: (Int) -> Unit): LinearLayout {
-        val spokenUnit = if (unit == "%") "percent" else "density-independent pixels"
-        val title = label("$name  ·  $value$unit", 16f, NothingStyle.foreground).apply {
+        val spokenUnit = if (unit == "%") getString(R.string.unit_percent) else getString(R.string.unit_dp)
+        val title = label(getString(R.string.slider_title, name, value, unit), 16f, NothingStyle.foreground).apply {
             typeface = NothingStyle.body
             importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
         }
@@ -894,13 +1067,13 @@ class MainActivity : AppCompatActivity() {
             this.max = max - min
             progress = value - min
             contentDescription = name
-            ViewCompat.setStateDescription(this, "$value $spokenUnit")
+            ViewCompat.setStateDescription(this, getString(R.string.slider_state, value, spokenUnit))
             progressTintList = ColorStateList.valueOf(NothingStyle.red)
             thumbTintList = ColorStateList.valueOf(NothingStyle.foreground)
             setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
                 override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
-                    title.text = "$name  ·  ${progress + min}$unit"
-                    seekBar?.let { ViewCompat.setStateDescription(it, "${progress + min} $spokenUnit") }
+                    title.text = getString(R.string.slider_title, name, progress + min, unit)
+                    seekBar?.let { ViewCompat.setStateDescription(it, getString(R.string.slider_state, progress + min, spokenUnit)) }
                     if (fromUser) change(progress + min)
                 }
                 override fun onStartTrackingTouch(seekBar: SeekBar?) {}
@@ -929,18 +1102,18 @@ class MainActivity : AppCompatActivity() {
 
     private fun swatch() = View(this).apply {
         layoutParams = LinearLayout.LayoutParams(dp(28), dp(28)).apply { marginEnd = dp(10) }
-        contentDescription = "Theme colour"
+        contentDescription = getString(R.string.theme_colour)
     }
 
     private fun applyWallpaperTheme(next: IslandTheme?) {
         if (next == null) {
-            toast("Couldn't read colours from that")
+            toast(getString(R.string.theme_failed))
             return
         }
         theme = next.copy(enabled = true).safe()
         themeSwitch?.isChecked = true
         applyThemeUpdate()
-        toast("Island now matches your wallpaper")
+        toast(getString(R.string.theme_applied))
     }
 
     private fun applyThemeUpdate() {

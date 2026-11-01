@@ -12,6 +12,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.PixelFormat
+import android.media.AudioManager
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Handler
@@ -52,6 +53,12 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         IslandCustomization.priority(this, it.mode)
     }, { it.mode == IslandMode.TIMER && IslandCustomization.timerAsBubble(this) })
     private var transient: LiveActivity? = null
+    /** A medium message island the user held open into its full card. */
+    private var transientExpanded = false
+    private var devices: DeviceMonitor? = null
+    private var reply: ReplyPanel? = null
+    private var lockShown = false
+    private val audio by lazy { getSystemService(AudioManager::class.java) }
     private var placementTest: LiveActivity? = null
     private val clearPlacementTest = Runnable { placementTest = null; render() }
     private var presentation = Presentation.COMPACT
@@ -80,7 +87,10 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
     }
 
-    private val clearTransient = Runnable { transient = null; render() }
+    private val clearTransient = Runnable {
+        if (reply?.isShowing == true) return@Runnable
+        transient = null; transientExpanded = false; render()
+    }
     private val autoCollapse = Runnable {
         timerPeek = false
         if (transient == null && presentation == Presentation.EXPANDED) {
@@ -97,7 +107,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 ?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: return
             onActivity(LiveActivity(
                 key = "charging", packageName = packageName, mode = IslandMode.CHARGING,
-                title = "$level%", subtitle = "Charging", appLabel = "Battery",
+                title = "$level%", subtitle = getString(R.string.island_charging), appLabel = getString(R.string.battery_label),
                 appIcon = null, artwork = null, accent = AppStyle.GREEN,
             ))
         }
@@ -120,7 +130,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 !screenOn -> Unit
                 !locked -> {
                     introArmed = false
-                    handler.postDelayed(playIntro, UNLOCK_SETTLE_MS)
+                    if (lockShown) { lockShown = false; island?.setLockDim(false) }
+                    else handler.postDelayed(playIntro, UNLOCK_SETTLE_MS)
                 }
                 else -> handler.postDelayed(this, 200L)
             }
@@ -135,6 +146,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                     handler.removeCallbacks(playIntro)
                     introArmed = true
                     fullscreen = false
+                    lockShown = false
+                    reply?.dismiss()
                     island?.hideForIntro()
                 }
                 Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> {
@@ -143,6 +156,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                         island?.applyWallpaper(WallpaperSkinStore.read(this@IslandOverlayService),
                             WallpaperSkinStore.image(this@IslandOverlayService))
                     }
+                    if (intent.action == Intent.ACTION_SCREEN_ON) showOnLockScreen()
                     handler.removeCallbacks(waitForUnlock)
                     handler.post(waitForUnlock)
                 }
@@ -150,13 +164,28 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
     }
 
+    /**
+     * Lock screen (optional): the island grows out as soon as the screen wakes, in grey, and
+     * takes its colours back on unlock instead of replaying the intro. Accessibility overlays only;
+     * app overlays are not drawn over the lock screen.
+     */
+    private fun showOnLockScreen() {
+        val view = island ?: return
+        if (!IslandFeatures.read(this).lockScreen || !view.accessibilityHost) return
+        if (getSystemService(KeyguardManager::class.java)?.isKeyguardLocked != true) return
+        lockShown = true
+        view.setLockDim(true)
+        handler.removeCallbacks(playIntro)
+        view.playIntro()
+    }
+
     override fun onCreate() {
         super.onCreate()
         createChannel()
         startForeground(NOTIFICATION_ID, NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle("Dynamic Island is on")
-            .setContentText("Music, calls and messages appear at the top of your screen")
+            .setContentTitle(getString(R.string.service_title))
+            .setContentText(getString(R.string.service_text))
             .setPriority(NotificationCompat.PRIORITY_MIN)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setOngoing(true)
@@ -186,6 +215,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         attachWindow()
         IslandBus.listener = this
         if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)
+        devices = DeviceMonitor(this) { onActivity(it) }.also { it.start() }
+        reply = ReplyPanel(this, ::onReplySent) { armTransientTimeout(transient) }
+        IslandAccessibilityService.onVolumeKey = ::handleVolumeKey
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -201,13 +233,15 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         if (intent?.action == ACTION_TEST) {
             presentation = Presentation.COMPACT
             placementTest = LiveActivity("placement-test", packageName, IslandMode.MUSIC,
-                "Placement test", "Hold to expand · swipe up to collapse", "Dynamic Droid", null, null,
+                getString(R.string.placement_test_title), getString(R.string.placement_test_text), getString(R.string.app_name), null, null,
                 0xFFFFFFFF.toInt(), isPlaying = true)
             handler.removeCallbacks(clearPlacementTest)
             handler.postDelayed(clearPlacementTest, 12_000L)
             render()
         }
         if (intent?.action == ACTION_CUSTOMIZATION) {
+            island?.applyFeatures(IslandFeatures.read(this))
+            devices?.stop(); devices?.start()
             handler.removeCallbacks(refreshQuietRules)
             if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)
             IslandNotificationListener.instance?.refreshAllowedApps()
@@ -239,6 +273,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             it.applyFit(IslandPreferences.read(this))
             it.applyTheme(IslandPreferences.readTheme(this))
             it.applyWallpaper(WallpaperSkinStore.read(this), WallpaperSkinStore.image(this))
+            it.applyFeatures(IslandFeatures.read(this))
             status?.let { m -> it.applyStatus(m.current) }
         }
         island = view
@@ -277,6 +312,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     private fun detachWindow() {
+        reply?.dismiss(notify = false)
         removeSwiftMorph()
         island?.let { v -> runCatching { windowManager?.removeView(v) } }
         island = null
@@ -305,7 +341,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                     timerPeek = false
                     view.timerDidComplete()
                     transient = LiveActivity("timer-complete-${candidate.key}", candidate.packageName,
-                        IslandMode.MESSAGE, candidate.title.ifBlank { "Timer" }, "Timer complete",
+                        IslandMode.MESSAGE, candidate.title.ifBlank { getString(R.string.timer_label) }, getString(R.string.timer_complete),
                         candidate.appLabel, candidate.appIcon, candidate.artwork, candidate.accent)
                     handler.removeCallbacks(clearTransient)
                     handler.postDelayed(clearTransient, 4_000L)
@@ -327,16 +363,18 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         view.setSecondary(if (t == null && placementTest == null && !quiet &&
             !IslandCustomization.isHiddenForForeground(this, foregroundPkg)) secondary?.let { appTint(this, it) } else null)
         val (a, p) = when {
+            // Volume answers a key the user just pressed, so it ignores quiet hours and app rules.
+            t?.mode == IslandMode.VOLUME -> t to Presentation.EXPANDED
             quiet || IslandCustomization.isHiddenForForeground(this, foregroundPkg) -> null to Presentation.IDLE
             placementTest != null -> placementTest to presentation
-            t != null -> t to Presentation.EXPANDED
+            t != null -> t to transientPresentation(t)
             o != null -> o to presentation
             else -> null to Presentation.IDLE
         }
         // Calls stay visible even over fullscreen video; everything else steps aside.
         val swiftMorphStarted = absorb && t == null && p == Presentation.COMPACT &&
             a != null && startSwiftMorph(a)
-        val concealed = fullscreen && a?.mode != IslandMode.CALL
+        val concealed = fullscreen && a?.mode != IslandMode.CALL && a?.mode != IslandMode.ALARM && a?.mode != IslandMode.VOLUME
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
         params?.let { lp ->
@@ -352,7 +390,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // Per-second notification updates must not keep restarting the timer's peek.
         if (changedPresentation) {
             handler.removeCallbacks(autoCollapse)
-            if (t == null && p == Presentation.EXPANDED && a?.mode != IslandMode.CALL) {
+            if (t == null && p == Presentation.EXPANDED && a?.mode != IslandMode.CALL && a?.mode != IslandMode.ALARM) {
                 val delay = if (timerPeek && a?.mode == IslandMode.TIMER) TIMER_PEEK_MS else EXPANDED_TIMEOUT_MS
                 handler.postDelayed(autoCollapse, delay)
             }
@@ -425,11 +463,33 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         if (wasActive) island?.finishReturnHandoff()
     }
 
+    /** Messages can start as a medium island; everything else transient opens fully. */
+    private fun transientPresentation(t: LiveActivity): Presentation =
+        if (t.mode == IslandMode.MESSAGE && !transientExpanded && IslandFeatures.read(this).messagesMediumFirst)
+            Presentation.COMPACT else Presentation.EXPANDED
+
+    private fun armTransientTimeout(activity: LiveActivity?) {
+        handler.removeCallbacks(clearTransient)
+        activity ?: return
+        handler.postDelayed(clearTransient, when (activity.mode) {
+            IslandMode.CHARGING -> 3_000L
+            IslandMode.VOLUME -> VOLUME_TIMEOUT_MS
+            IslandMode.DEVICE -> DEVICE_TIMEOUT_MS
+            else -> if (transientExpanded) MESSAGE_TIMEOUT_MS * 2 else MESSAGE_TIMEOUT_MS
+        })
+    }
+
     override fun onActivity(activity: LiveActivity) {
         if (activity.isTransient) {
+            // A different message (or system island) replaces the current one at medium size.
+            if (activity.key != transient?.key) transientExpanded = false
+            if (reply?.isShowing == true && activity.key != transient?.key) {
+                // Never swap the card out from under someone who is typing a reply.
+                if (activity.mode != IslandMode.VOLUME) return
+                reply?.dismiss(notify = false)
+            }
             transient = activity
-            handler.removeCallbacks(clearTransient)
-            handler.postDelayed(clearTransient, if (activity.mode == IslandMode.CHARGING) 3_000L else MESSAGE_TIMEOUT_MS)
+            armTransientTimeout(activity)
         } else {
             val isNew = activities.put(activity)
             ongoing = activities.pair { it.mode == IslandMode.TIMER || it.packageName != foregroundPkg }.first
@@ -440,7 +500,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             if (isNew && ongoing?.key == activity.key) {
                 timerPeek = activity.mode == IslandMode.TIMER
                 presentation = when (activity.mode) {
-                    IslandMode.CALL, IslandMode.TIMER -> Presentation.EXPANDED
+                    IslandMode.CALL, IslandMode.TIMER, IslandMode.ALARM -> Presentation.EXPANDED
                     else -> if (IslandCustomization.preferredExpanded(this, activity.packageName) == true)
                         Presentation.EXPANDED else Presentation.COMPACT
                 }
@@ -452,7 +512,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     override fun onRemoved(key: String) {
         if (transient?.key == key) {
+            reply?.dismiss(notify = false)
             transient = null
+            transientExpanded = false
             handler.removeCallbacks(clearTransient)
         }
         activities.remove(key)
@@ -490,7 +552,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     override fun onOpen(activity: LiveActivity) {
         launch(activity.contentIntent, activity.packageName)
         if (activity === transient || activity.key == transient?.key) {
+            reply?.dismiss(notify = false)
             transient = null
+            transientExpanded = false
             handler.removeCallbacks(clearTransient)
         } else {
             presentation = Presentation.COMPACT
@@ -542,7 +606,16 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     override fun onExpandRequest() {
-        if (placementTest == null && (transient != null || ongoing == null)) return
+        // Holding a medium message grows it into the full card with Reply.
+        transient?.let { t ->
+            if (t.mode == IslandMode.MESSAGE && !transientExpanded) {
+                transientExpanded = true
+                armTransientTimeout(t)
+                render()
+            }
+            return
+        }
+        if (placementTest == null && ongoing == null) return
         timerPeek = false
         presentation = Presentation.EXPANDED
         render()
@@ -551,7 +624,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     override fun onCollapseRequest() {
         activities.restoreAutomaticSelection()
         if (transient != null) {
+            reply?.dismiss(notify = false)
             transient = null
+            transientExpanded = false
             handler.removeCallbacks(clearTransient)
         } else {
             presentation = Presentation.COMPACT
@@ -575,8 +650,76 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         if (presentation == Presentation.EXPANDED && transient == null) {
             handler.removeCallbacks(autoCollapse)
-            if (ongoing?.mode != IslandMode.CALL) handler.postDelayed(autoCollapse, EXPANDED_TIMEOUT_MS)
+            if (ongoing?.mode != IslandMode.CALL && ongoing?.mode != IslandMode.ALARM) handler.postDelayed(autoCollapse, EXPANDED_TIMEOUT_MS)
         }
+    }
+
+    // ---------------------------------------------------------------- reply
+
+    override fun onReply(activity: LiveActivity) {
+        val target = activity.reply ?: return
+        val view = island ?: return
+        val host: Context = IslandAccessibilityService.instance ?: this
+        handler.removeCallbacks(clearTransient)
+        reply?.show(host, view.accessibilityHost, view.expandedBottomPx(activity), target)
+    }
+
+    private fun onReplySent(text: String) {
+        val t = transient ?: return
+        // Confirm in place, then let the card go.
+        transient = t.copy(subtitle = getString(R.string.island_sent) + " · " + text, reply = null, actions = emptyList())
+        handler.removeCallbacks(clearTransient)
+        handler.postDelayed(clearTransient, SENT_TIMEOUT_MS)
+        render()
+    }
+
+    // ---------------------------------------------------------------- volume
+
+    private fun volumeStream(am: AudioManager): Int =
+        if (am.mode == AudioManager.MODE_IN_CALL || am.mode == AudioManager.MODE_IN_COMMUNICATION)
+            AudioManager.STREAM_VOICE_CALL else AudioManager.STREAM_MUSIC
+
+    /**
+     * Called by the accessibility service for each volume key press. Returns false to leave the
+     * key to the system: screen off, locked (unless the island shows on the lock screen), a
+     * ringing phone (volume silences the ringer), or no island window.
+     */
+    private fun handleVolumeKey(up: Boolean): Boolean {
+        val view = island ?: return false
+        val features = IslandFeatures.read(this)
+        if (!features.volume) return false
+        if (getSystemService(PowerManager::class.java)?.isInteractive != true) return false
+        val locked = getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
+        if (locked && !(features.lockScreen && view.accessibilityHost && lockShown)) return false
+        val am = audio ?: return false
+        if (am.mode == AudioManager.MODE_RINGTONE) return false
+        val stream = volumeStream(am)
+        val ok = runCatching {
+            am.adjustStreamVolume(stream, if (up) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER, 0)
+        }.isSuccess
+        if (!ok) return false
+        showVolume(am, stream)
+        return true
+    }
+
+    override fun onVolumeChange(fraction: Float) {
+        val am = audio ?: return
+        val stream = volumeStream(am)
+        val max = am.getStreamMaxVolume(stream)
+        val index = (fraction * max + 0.5f).toInt().coerceIn(0, max)
+        if (index != am.getStreamVolume(stream)) runCatching { am.setStreamVolume(stream, index, 0) }
+        showVolume(am, stream)
+    }
+
+    private fun showVolume(am: AudioManager, stream: Int) {
+        val max = am.getStreamMaxVolume(stream).coerceAtLeast(1)
+        val level = am.getStreamVolume(stream).toFloat() / max
+        onActivity(LiveActivity(
+            key = "volume", packageName = packageName, mode = IslandMode.VOLUME,
+            title = getString(if (stream == AudioManager.STREAM_VOICE_CALL) R.string.island_volume_call else R.string.island_volume_media),
+            subtitle = "", appLabel = getString(R.string.mode_volume), appIcon = null, artwork = null, accent = NothingStyle.foreground,
+            progress = level,
+        ))
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
@@ -670,6 +813,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         if (IslandBus.listener === this) IslandBus.listener = null
         IslandAccessibilityService.onChanged = null
         IslandAccessibilityService.onForegroundPackage = null
+        if (IslandAccessibilityService.onVolumeKey != null) IslandAccessibilityService.onVolumeKey = null
+        devices?.stop()
         watcher?.stop()
         status?.stop()
         handler.removeCallbacksAndMessages(null)
@@ -684,7 +829,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private fun createChannel() {
         if (Build.VERSION.SDK_INT >= 26) {
             getSystemService(NotificationManager::class.java).createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Dynamic Island service", NotificationManager.IMPORTANCE_MIN)
+                NotificationChannel(CHANNEL_ID, getString(R.string.service_channel), NotificationManager.IMPORTANCE_MIN)
             )
         }
     }
@@ -700,6 +845,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         private const val EXPANDED_TIMEOUT_MS = 6_000L
         private const val MESSAGE_TIMEOUT_MS = 5_000L
         private const val TIMER_PEEK_MS = 2_600L
+        private const val VOLUME_TIMEOUT_MS = 1_600L
+        private const val DEVICE_TIMEOUT_MS = 3_600L
+        private const val SENT_TIMEOUT_MS = 1_400L
         private const val SWIFT_MORPH_DURATION_MS = 520L
         /** Lets the system's unlock animation finish so the intro is actually visible. */
         private const val UNLOCK_SETTLE_MS = 320L
