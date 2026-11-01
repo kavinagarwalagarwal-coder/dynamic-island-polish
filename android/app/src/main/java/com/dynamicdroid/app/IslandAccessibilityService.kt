@@ -82,9 +82,9 @@ class IslandAccessibilityService : AccessibilityService() {
         for (window in windows) {
             val root = window.root ?: continue
             if (root.packageName?.toString() != SYSTEM_UI) continue
-            val hits = sequenceOf(title, text.take(40)).filter { it.length >= 2 }
-                .flatMap { root.findAccessibilityNodeInfosByText(it).asSequence() }
-            for (hit in hits) {
+            // findAccessibilityNodeInfosByText misses Compose-drawn System UI, so walk the tree.
+            val needles = listOf(title, text.take(40)).filter { it.length >= 2 }
+            for (hit in nodesWithText(root, needles)) {
                 val bounds = Rect().also(hit::getBoundsInScreen)
                 if (bounds.isEmpty || bounds.top > maxTop) continue
                 val card = cardBounds(hit, metrics.heightPixels * 0.35f)
@@ -95,6 +95,19 @@ class IslandAccessibilityService : AccessibilityService() {
             }
         }
         return false
+    }
+
+    private fun nodesWithText(root: AccessibilityNodeInfo, needles: List<String>): List<AccessibilityNodeInfo> {
+        val found = ArrayList<AccessibilityNodeInfo>()
+        val queue = ArrayDeque<AccessibilityNodeInfo>().apply { add(root) }
+        var visited = 0
+        while (queue.isNotEmpty() && visited++ < 600) {
+            val node = queue.removeFirst()
+            val label = (node.text ?: node.contentDescription)?.toString()
+            if (label != null && needles.any { label.contains(it, ignoreCase = true) }) found += node
+            for (i in 0 until node.childCount) node.getChild(i)?.let(queue::add)
+        }
+        return found
     }
 
     /** The largest ancestor that still looks like one notification card, not the whole panel. */

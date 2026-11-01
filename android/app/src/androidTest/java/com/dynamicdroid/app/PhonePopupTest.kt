@@ -43,11 +43,17 @@ class PhonePopupTest {
         val maxTop = context.resources.displayMetrics.heightPixels * 0.3f
         return automation.windows.any { window ->
             val root = window.root ?: return@any false
-            root.packageName == "com.android.systemui" &&
-                root.findAccessibilityNodeInfosByText(title).any { node ->
-                    val r = Rect().also(node::getBoundsInScreen)
-                    !r.isEmpty && r.top < maxTop
-                }
+            if (root.packageName?.toString() != "com.android.systemui") return@any false
+            val queue = ArrayDeque<android.view.accessibility.AccessibilityNodeInfo>().apply { add(root) }
+            var visited = 0
+            while (queue.isNotEmpty() && visited++ < 600) {
+                val node = queue.removeFirst()
+                val label = (node.text ?: node.contentDescription)?.toString()
+                val r = Rect().also(node::getBoundsInScreen)
+                if (label != null && title in label && !r.isEmpty && r.top < maxTop) return@any true
+                for (i in 0 until node.childCount) node.getChild(i)?.let(queue::add)
+            }
+            false
         }
     }
 
