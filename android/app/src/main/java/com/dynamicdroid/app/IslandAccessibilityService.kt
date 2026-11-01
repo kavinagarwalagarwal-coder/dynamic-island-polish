@@ -183,6 +183,9 @@ class IslandAccessibilityService : AccessibilityService() {
         }
     }
 
+    /** Same path as a real volume button; Android only lets the system call [onKeyEvent]. */
+    internal fun deliverKey(event: KeyEvent): Boolean = onKeyEvent(event)
+
     override fun onUnbind(intent: Intent?): Boolean {
         release()
         return super.onUnbind(intent)

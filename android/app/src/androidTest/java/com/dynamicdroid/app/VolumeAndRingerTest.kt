@@ -49,7 +49,7 @@ class VolumeAndRingerTest {
     private fun key(action: Int) {
         var taken = false
         instrumentation.runOnMainSync {
-            taken = IslandAccessibilityService.instance!!.onKeyEvent(KeyEvent(action, KeyEvent.KEYCODE_VOLUME_UP))
+            taken = IslandAccessibilityService.instance!!.deliverKey(KeyEvent(action, KeyEvent.KEYCODE_VOLUME_UP))
         }
         assertTrue("The island should take the volume key: " + state(), taken)
     }
