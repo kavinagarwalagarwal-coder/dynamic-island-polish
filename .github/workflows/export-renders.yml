@@ -17,8 +17,8 @@ jobs:
           github-token: ${{ github.token }}
           path: renders
       - run: |
-          mkdir out && find renders -type f \( -name 'feature-*.png' -o -name 'live-overlay-*.png' \) -exec cp {} out/ \;
-          ls out
+          echo "::warning::files $(find renders -type f | wc -l) $(find renders -type f -name '*ringer*' | head -3 | tr '\n' ' ')"
+          mkdir out && find renders -type f \( -name 'feature-*.png' -o -name 'live-overlay-*.png' \) -exec cp -f {} out/ \; || echo "::error::copy failed"
           cd out && git init -q -b tmp/island-renders && git add . \
-            && git -c user.name=ci -c user.email=ci@example.com commit -qm "Tour renders" \
-            && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" tmp/island-renders
+            && git -c user.name=ci -c user.email=ci@example.com commit -qm "Renders" \
+            && git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}" tmp/island-renders || echo "::error::push failed"
