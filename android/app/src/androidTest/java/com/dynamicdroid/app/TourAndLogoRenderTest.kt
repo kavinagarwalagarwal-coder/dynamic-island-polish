@@ -61,9 +61,9 @@ class TourAndLogoRenderTest {
             }
         }
         // The final frame must contain the white pill and the red camera dot.
-        val pill = strip.getPixel(size * 7 + size * 30 / 100, size / 2)
+        val pill = strip.getPixel(size * 7 + size * 20 / 100, size / 2)
         assertTrue("Logo pill missing", android.graphics.Color.red(pill) > 200)
-        val dot = strip.getPixel(size * 7 + size * 42 / 100, size / 2)
+        val dot = strip.getPixel(size * 7 + size * 38 / 100, size / 2)
         assertTrue("Logo camera dot missing", android.graphics.Color.red(dot) > 200 && android.graphics.Color.green(dot) < 120)
         save("tour-logo-frames", strip)
     }

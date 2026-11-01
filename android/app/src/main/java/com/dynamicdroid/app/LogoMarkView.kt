@@ -69,8 +69,8 @@ class LogoMarkView(context: Context) : View(context) {
 
     private fun drawMark(canvas: Canvas, p: Float) {
         val cy = 50f
-        val pillCx = 42f
-        val fullW = 70f
+        val pillCx = 38f
+        val fullW = 62f
         val fullH = 30f
         // 1. Camera dot pops in.
         val dotT = seg(p, 0f, .2f)
@@ -89,8 +89,8 @@ class LogoMarkView(context: Context) : View(context) {
         }
         if (dropT > 0f) {
             val pillRight = pillCx + pillW / 2f
-            val r = 11f * spring(dropT).coerceAtLeast(.2f)
-            val travel = lerp(pillRight - r * .8f, 89f, easeOut(dropT))
+            val r = 10f * spring(dropT).coerceAtLeast(.2f)
+            val travel = lerp(pillRight - r * .8f, 84f, easeOut(dropT))
             fill.color = pillColor
             fill.alpha = 255
             // Neck: a pinched bridge that thins out and snaps as the droplet leaves.
