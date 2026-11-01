@@ -51,6 +51,24 @@ class PhonePopupTest {
         }
     }
 
+    /** What the screen and the notification system looked like, for a failure message. */
+    private fun diagnose(title: String): String {
+        val windows = automation.windows.joinToString(" ; ") { w ->
+            val root = w.root
+            val texts = ArrayList<String>()
+            fun walk(n: android.view.accessibility.AccessibilityNodeInfo?, depth: Int) {
+                if (n == null || depth > 40 || texts.size > 30) return
+                val t = (n.text ?: n.contentDescription)?.toString()
+                if (!t.isNullOrBlank()) texts += t.take(24) + "@" + Rect().also(n::getBoundsInScreen).top
+                for (i in 0 until n.childCount) walk(n.getChild(i), depth + 1)
+            }
+            if (root?.packageName == "com.android.systemui") walk(root, 0)
+            "${root?.packageName}/t${w.type}/${Rect().also(w::getBoundsInScreen)} $texts"
+        }
+        val posted = shell("dumpsys notification").lines().filter { title in it || "alerts" in it }.take(6)
+        return "headsUp=${shell("settings get global heads_up_notifications_enabled").trim()} posted=$posted windows=$windows"
+    }
+
     private fun stillInShade(title: String) =
         IslandNotificationListener.instance?.activeNotifications.orEmpty().any {
             it.notification.extras.getCharSequence(android.app.Notification.EXTRA_TITLE)?.toString() == title
@@ -78,8 +96,8 @@ class PhonePopupTest {
 
                 // Control: with the option off, the phone shows its own pop-up.
                 shell("am broadcast -f 32 -n com.dynamicdroid.fixture/.FixtureReceiver --es kind message")
-                assertTrue("The phone never showed its own pop-up, so there is nothing to test",
-                    waitFor(5_000) { phonePopupShowing("Popup first") })
+                if (!waitFor(5_000) { phonePopupShowing("Popup first") })
+                    fail("The phone never showed its own pop-up: " + diagnose("Popup first"))
                 waitFor(10_000) { !phonePopupShowing("Popup first") }
                 shell("am broadcast -f 32 -n com.dynamicdroid.fixture/.FixtureReceiver --es kind clear")
                 Thread.sleep(800)
@@ -96,7 +114,8 @@ class PhonePopupTest {
                     transient?.title == "Popup second"
                 })
                 Thread.sleep(600)
-                assertTrue("The phone's pop-up was not swiped away", waitFor(2_500) { !phonePopupShowing("Popup second") })
+                if (!waitFor(2_500) { !phonePopupShowing("Popup second") })
+                    fail("The phone's pop-up was not swiped away: " + diagnose("Popup second"))
                 assertTrue("Pop-up lingered too long", SystemClock.uptimeMillis() - posted < 3_800)
                 assertTrue("Notification should still be in the shade", stillInShade("Popup second"))
             } finally {
