@@ -53,7 +53,7 @@ class LiveOverlayTest {
                 shell("settings put secure enabled_accessibility_services com.dynamicdroid.app/com.dynamicdroid.app.IslandAccessibilityService")
                 shell("settings put secure accessibility_enabled 1")
                 await("Overlay service not attached") { IslandBus.listener is IslandOverlayService && IslandAccessibilityService.instance != null }
-                shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind custom")
+                shell("am broadcast -f 32 -n com.dynamicdroid.fixture/.FixtureReceiver --es kind custom")
                 fun visible(paused: Boolean): Boolean {
                     val service = IslandBus.listener as? IslandOverlayService ?: return false
                     val view = field<IslandView?>(service, "island") ?: return false
@@ -65,13 +65,13 @@ class LiveOverlayTest {
                 }
                 await("Custom Clock notification did not reach the detached overlay bubble") { visible(false) }
                 capture("live-overlay-custom-clock")
-                shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind paused")
+                shell("am broadcast -f 32 -n com.dynamicdroid.fixture/.FixtureReceiver --es kind paused")
                 await("Paused custom timer lost its detached bubble") { visible(true) }
                 capture("live-overlay-paused-clock")
-                shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind custom")
+                shell("am broadcast -f 32 -n com.dynamicdroid.fixture/.FixtureReceiver --es kind custom")
                 await("Resumed custom timer lost its detached bubble") { visible(false) }
                 capture("live-overlay-resumed-clock")
-                shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind chip")
+                shell("am broadcast -f 32 -n com.dynamicdroid.fixture/.FixtureReceiver --es kind chip")
                 await("Android 16 timer chip text was not recognised") {
                     visible(false) && TimerDiagnostics.read(instrumentation.targetContext).contains("notification timer text")
                 }
@@ -110,7 +110,7 @@ class LiveOverlayTest {
                         window.flags and android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0
                 }
             } finally {
-                shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind clear")
+                shell("am broadcast -f 32 -n com.dynamicdroid.fixture/.FixtureReceiver --es kind clear")
                 shell("cmd notification disallow_listener com.dynamicdroid.app/com.dynamicdroid.app.IslandNotificationListener")
                 shell("settings delete secure enabled_accessibility_services")
                 shell("settings put secure accessibility_enabled 0")
