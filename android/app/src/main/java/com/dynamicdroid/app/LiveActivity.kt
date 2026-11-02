@@ -56,6 +56,8 @@ data class LiveActivity(
     val lost: Boolean = false,
     /** Ringer islands: which state the phone just switched to. */
     val ringer: RingerState? = null,
+    /** Volume island: Do Not Disturb is on (shown on its button). */
+    val dndOn: Boolean = false,
 ) {
     val isTransient: Boolean get() = mode == IslandMode.MESSAGE || mode == IslandMode.CHARGING ||
         mode == IslandMode.VOLUME || mode == IslandMode.DEVICE || mode == IslandMode.RINGER

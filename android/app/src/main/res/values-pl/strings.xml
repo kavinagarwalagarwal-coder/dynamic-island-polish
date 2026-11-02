@@ -284,4 +284,9 @@
     <string name="feature_ringer_note">Pokazuj wyspę, gdy telefon przełącza się między dzwonkiem, wibracjami i ciszą albo gdy tryb Nie przeszkadzać włącza się lub wyłącza.</string>
     <string name="feature_glow">Delikatna poświata krawędzi</string>
     <string name="feature_glow_note">Delikatna poświata wokół pigułki, by wyróżniała się na ciemnych tapetach i w aplikacjach. Na chwilę jaśnieje, gdy przychodzi coś nowego.</string>
+    <string name="feature_ringer_controls">Przyciski dzwonka i ciszy</string>
+    <string name="feature_ringer_controls_note">Przyciski Dzwonek, Wibracje, Cichy i Nie przeszkadzać pod suwakiem głośności. Dotknięcie wyspy dzwonka/ciszy też przełącza na następny tryb.</string>
+    <string name="feature_full_width">Otwarte wyspy na całą szerokość</string>
+    <string name="feature_full_width_note">Wiadomości, głośność i inne otwarte wyspy rozciągają się na cały ekran, zamiast wyrastać z aparatu.</string>
+    <string name="ringer_needs_access">Zezwól Dynamic Droid na dostęp do Nie przeszkadzać, aby mógł włączać tryb Cichy lub Nie przeszkadzać</string>
 </resources>

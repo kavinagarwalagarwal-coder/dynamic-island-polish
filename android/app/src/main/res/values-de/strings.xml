@@ -284,4 +284,9 @@
     <string name="feature_ringer_note">Zeigt die Insel, wenn das Handy zwischen Klingeln, Vibration und Lautlos wechselt oder Bitte nicht stören an- oder ausgeht.</string>
     <string name="feature_glow">Sanftes Leuchten am Rand</string>
     <string name="feature_glow_note">Ein sanftes Leuchten um die Pille, damit sie sich von dunklen Hintergründen und Apps abhebt. Wird kurz heller, wenn etwas Neues kommt.</string>
+    <string name="feature_ringer_controls">Klingeln- &amp; Lautlos-Tasten</string>
+    <string name="feature_ringer_controls_note">Tasten für Klingeln, Vibration, Lautlos und Bitte nicht stören unter dem Lautstärkeregler. Ein Tippen auf die Klingeln/Lautlos-Insel schaltet ebenfalls zum nächsten Modus.</string>
+    <string name="feature_full_width">Geöffnete Inseln in voller Breite</string>
+    <string name="feature_full_width_note">Nachrichten, Lautstärke und andere geöffnete Inseln ziehen sich über den Bildschirm, statt aus der Kamera zu wachsen.</string>
+    <string name="ringer_needs_access">Erlaube Dynamic Droid den Zugriff auf Bitte nicht stören, um auf Lautlos oder Bitte nicht stören zu schalten</string>
 </resources>

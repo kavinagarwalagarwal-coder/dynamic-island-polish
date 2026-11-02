@@ -284,4 +284,9 @@
     <string name="feature_ringer_note">Muestra la isla cuando el teléfono cambia entre sonido, vibración y silencio, o cuando se activa o desactiva No molestar.</string>
     <string name="feature_glow">Brillo suave en los bordes</string>
     <string name="feature_glow_note">Un brillo suave alrededor de la píldora para que destaque sobre fondos y apps oscuros. Se intensifica un momento cuando llega algo nuevo.</string>
+    <string name="feature_ringer_controls">Botones de sonido y silencio</string>
+    <string name="feature_ringer_controls_note">Botones de Sonido, Vibración, Silencio y No molestar bajo el control de volumen. Tocar la isla de sonido/silencio también pasa al siguiente modo.</string>
+    <string name="feature_full_width">Islas abiertas a todo el ancho</string>
+    <string name="feature_full_width_note">Los mensajes, el volumen y otras islas abiertas ocupan todo el ancho de la pantalla en lugar de crecer desde la cámara.</string>
+    <string name="ringer_needs_access">Permite el acceso a No molestar para que Dynamic Droid pueda cambiar a Silencio o No molestar</string>
 </resources>

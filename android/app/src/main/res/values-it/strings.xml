@@ -284,4 +284,9 @@
     <string name="feature_ringer_note">Mostra l\'isola quando il telefono passa tra suoneria, vibrazione e silenzioso, o quando Non disturbare si attiva o disattiva.</string>
     <string name="feature_glow">Bagliore morbido sui bordi</string>
     <string name="feature_glow_note">Un leggero bagliore attorno alla pillola per farla risaltare su sfondi e app scure. Si intensifica per un attimo quando arriva qualcosa di nuovo.</string>
+    <string name="feature_ringer_controls">Pulsanti suoneria e silenzioso</string>
+    <string name="feature_ringer_controls_note">Pulsanti Suoneria, Vibrazione, Silenzioso e Non disturbare sotto il cursore del volume. Toccare l\'isola suoneria/silenzioso passa anche alla modalità successiva.</string>
+    <string name="feature_full_width">Isole aperte a tutta larghezza</string>
+    <string name="feature_full_width_note">Messaggi, volume e altre isole aperte si estendono su tutto lo schermo invece di crescere dalla fotocamera.</string>
+    <string name="ringer_needs_access">Consenti l\'accesso a Non disturbare perché Dynamic Droid possa passare a Silenzioso o Non disturbare</string>
 </resources>

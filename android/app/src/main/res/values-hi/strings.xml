@@ -284,4 +284,9 @@
     <string name="feature_ringer_note">फ़ोन के रिंग, वाइब्रेट और साइलेंट के बीच बदलने पर, या \'परेशान न करें\' चालू या बंद होने पर आइलैंड दिखाएँ।</string>
     <string name="feature_glow">किनारों पर हल्की चमक</string>
     <string name="feature_glow_note">पिल के चारों ओर हल्की चमक, ताकि वह गहरे वॉलपेपर और ऐप्स पर अलग दिखे। कुछ नया आने पर पल भर के लिए तेज़ होती है।</string>
+    <string name="feature_ringer_controls">रिंग और साइलेंट बटन</string>
+    <string name="feature_ringer_controls_note">वॉल्यूम स्लाइडर के नीचे रिंग, वाइब्रेट, साइलेंट और \'परेशान न करें\' बटन। रिंग/साइलेंट आइलैंड पर टैप करने से भी अगला मोड चुना जाता है।</string>
+    <string name="feature_full_width">खुले आइलैंड पूरी चौड़ाई लें</string>
+    <string name="feature_full_width_note">मैसेज, वॉल्यूम और दूसरे खुले आइलैंड कैमरे से बढ़ने की जगह पूरी स्क्रीन पर फैलते हैं।</string>
+    <string name="ringer_needs_access">साइलेंट या \'परेशान न करें\' पर जाने के लिए Dynamic Droid को \'परेशान न करें\' की पहुँच दें</string>
 </resources>

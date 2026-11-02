@@ -143,6 +143,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 }
                 else -> return
             }
+            // With the volume island open, its buttons show the change; no second island on top.
+            if (transient?.mode == IslandMode.VOLUME) { audio?.let { showVolume(it, volumeStream(it)) }; return }
             if (IslandFeatures.read(this@IslandOverlayService).ringer) showRinger(state)
         }
     }
@@ -803,12 +805,58 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private fun showVolume(am: AudioManager, stream: Int) {
         val max = am.getStreamMaxVolume(stream).coerceAtLeast(1)
         val level = am.getStreamVolume(stream).toFloat() / max
+        val features = IslandFeatures.read(this)
         onActivity(LiveActivity(
             key = "volume", packageName = packageName, mode = IslandMode.VOLUME,
             title = getString(if (stream == AudioManager.STREAM_VOICE_CALL) R.string.island_volume_call else R.string.island_volume_media),
             subtitle = "", appLabel = getString(R.string.mode_volume), appIcon = null, artwork = null, accent = NothingStyle.foreground,
             progress = level,
+            ringer = if (features.ringer && features.ringerControls) currentRinger(am) else null,
+            dndOn = IslandFeatures.dndActive(this),
         ))
+    }
+
+    private fun currentRinger(am: AudioManager) = when (am.ringerMode) {
+        AudioManager.RINGER_MODE_SILENT -> RingerState.SILENT
+        AudioManager.RINGER_MODE_VIBRATE -> RingerState.VIBRATE
+        else -> RingerState.RING
+    }
+
+    /**
+     * Ring and vibrate need nothing special. Silent and Do Not Disturb need Do Not Disturb access,
+     * which Android already gives apps with notification access; without it, open that setting.
+     */
+    override fun onRingerMode(state: RingerState) {
+        val am = audio ?: return
+        val nm = getSystemService(NotificationManager::class.java) ?: return
+        val needsPolicy = state == RingerState.SILENT || state == RingerState.DND_ON || state == RingerState.DND_OFF ||
+            am.ringerMode == AudioManager.RINGER_MODE_SILENT
+        if (needsPolicy && !nm.isNotificationPolicyAccessGranted) {
+            android.widget.Toast.makeText(this, R.string.ringer_needs_access, android.widget.Toast.LENGTH_LONG).show()
+            runCatching {
+                startActivity(Intent(android.provider.Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }
+            return
+        }
+        runCatching {
+            when (state) {
+                RingerState.RING -> am.ringerMode = AudioManager.RINGER_MODE_NORMAL
+                RingerState.VIBRATE -> am.ringerMode = AudioManager.RINGER_MODE_VIBRATE
+                RingerState.SILENT -> am.ringerMode = AudioManager.RINGER_MODE_SILENT
+                RingerState.DND_ON -> nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
+                RingerState.DND_OFF -> nm.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
+            }
+        }
+        // Keep whichever island was tapped open and showing the new state.
+        if (transient?.mode == IslandMode.VOLUME) {
+            showVolume(am, volumeStream(am))
+        } else {
+            showRinger(when (state) {
+                RingerState.DND_ON, RingerState.DND_OFF -> state
+                else -> currentRinger(am)
+            })
+        }
     }
 
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {

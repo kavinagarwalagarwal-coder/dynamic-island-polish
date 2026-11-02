@@ -110,6 +110,22 @@ class VolumeAndRingerTest {
                 assertTrue("Ringer island did not show ring", waitFor(3_000) {
                     transient()?.let { it.mode == IslandMode.RINGER && it.ringer == RingerState.RING } == true
                 })
+                Thread.sleep(2_500)
+
+                // From the island: the volume island carries the mode buttons; tapping one switches it.
+                key(KeyEvent.ACTION_DOWN); key(KeyEvent.ACTION_UP)
+                assertTrue("Volume island has no ring/silent buttons: " + state(), waitFor(2_000) {
+                    transient()?.let { it.mode == IslandMode.VOLUME && it.ringer == RingerState.RING } == true
+                })
+                instrumentation.runOnMainSync { (IslandBus.listener as IslandOverlayService).onRingerMode(RingerState.VIBRATE) }
+                assertTrue("Island did not switch the phone to vibrate", waitFor(2_000) {
+                    audio.ringerMode == AudioManager.RINGER_MODE_VIBRATE &&
+                        transient()?.let { it.mode == IslandMode.VOLUME && it.ringer == RingerState.VIBRATE } == true
+                })
+                instrumentation.runOnMainSync { (IslandBus.listener as IslandOverlayService).onRingerMode(RingerState.RING) }
+                assertTrue("Island did not switch the phone back to ring", waitFor(2_000) {
+                    audio.ringerMode == AudioManager.RINGER_MODE_NORMAL
+                })
             } finally {
                 runCatching { audio.setStreamVolume(AudioManager.STREAM_MUSIC, startVolume, 0) }
                 runCatching { audio.ringerMode = startRinger }

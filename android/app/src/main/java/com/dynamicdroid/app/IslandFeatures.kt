@@ -19,6 +19,10 @@ data class IslandFeatureSet(
     val inlineReply: Boolean = true,
     /** Ring / vibrate / silent and Do Not Disturb changes show on the island. */
     val ringer: Boolean = true,
+    /** Ring / vibrate / silent / Do Not Disturb buttons under the volume slider. */
+    val ringerControls: Boolean = true,
+    /** Opened islands (messages, volume, devices) span the screen instead of sitting at the camera. */
+    val fullWidthOpen: Boolean = true,
     /** Off by default: it takes over from the phone's own pop-ups. */
     val hidePhonePopups: Boolean = false,
     val messagesMediumFirst: Boolean = true,
@@ -66,6 +70,8 @@ object IslandFeatures {
             alarms = p.getBoolean("alarms", d.alarms),
             inlineReply = p.getBoolean("inline_reply", d.inlineReply),
             ringer = p.getBoolean("ringer", d.ringer),
+            ringerControls = p.getBoolean("ringer_controls", d.ringerControls),
+            fullWidthOpen = p.getBoolean("full_width_open", d.fullWidthOpen),
             hidePhonePopups = p.getBoolean("hide_phone_popups", d.hidePhonePopups),
             messagesMediumFirst = p.getBoolean("messages_medium", d.messagesMediumFirst),
             shortCompact = p.getBoolean("short_compact", d.shortCompact),
