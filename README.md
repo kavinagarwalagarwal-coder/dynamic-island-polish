@@ -99,7 +99,7 @@ Available in English, Hindi, Spanish, Portuguese (Brazil), French, German, Itali
 Scan results for the v2 APK (`app-performance.apk` inside the release zip) from two independent malware scanners:
 
 - [**VirusTotal report**](https://www.virustotal.com/gui/file/c50be41732d9fc2e0f18ace848ac84a409a7076c78df656a861284666c909476)
-- [**Koodous report**](https://koodous.com/apks/c50be41732d9fc2e0f18ace848ac84a409a7076c78df656a861284666c909476)
+- [**Koodous report**](https://koodous.com/apks/c50be41732d9fc2e0f18ace848ac84a409a7076c78df656a861284666c909476/general-information)
 
 You can check you have the same file. Its SHA-256 is:
 
