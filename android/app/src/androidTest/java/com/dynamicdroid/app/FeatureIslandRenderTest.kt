@@ -69,6 +69,7 @@ class FeatureIslandRenderTest {
             Triple("feature-calling-compact", activity("calling", IslandMode.CALL, "Mom", "", "Phone", callState = CallState.CALLING), Presentation.COMPACT),
             Triple("feature-message-medium", activity("msg", IslandMode.MESSAGE, "Maya", "Liked your photo and left a comment", "Instagram", withReply = true), Presentation.COMPACT),
             Triple("feature-message-reply", activity("msg", IslandMode.MESSAGE, "Maya", "Liked your photo and left a comment", "Instagram", actions = listOf("Like"), withReply = true), Presentation.EXPANDED),
+            Triple("feature-volume-controls", activity("volume2", IslandMode.VOLUME, "Media", "", progress = .45f).copy(ringer = RingerState.VIBRATE, dndOn = true), Presentation.EXPANDED),
             Triple("feature-ringer-silent", activity("ringer", IslandMode.RINGER, "Silent", "").copy(ringer = RingerState.SILENT), Presentation.EXPANDED),
             Triple("feature-ringer-vibrate", activity("ringer2", IslandMode.RINGER, "Vibrate", "").copy(ringer = RingerState.VIBRATE), Presentation.EXPANDED),
             Triple("feature-ringer-ring", activity("ringer3", IslandMode.RINGER, "Ring", "").copy(ringer = RingerState.RING), Presentation.EXPANDED),

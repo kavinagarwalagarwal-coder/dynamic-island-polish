@@ -257,6 +257,18 @@ class MainActivity : AppCompatActivity() {
         override fun onVolumeChange(fraction: Float) {
             demo?.takeIf { it.mode == IslandMode.VOLUME }?.let { showDemo(it.copy(progress = fraction), Presentation.EXPANDED) }
         }
+        // The preview only acts out the change; it never touches the phone's real ringer.
+        override fun onRingerMode(state: RingerState) {
+            val d = demo ?: return
+            when {
+                d.mode == IslandMode.VOLUME -> showDemo(when (state) {
+                    RingerState.DND_ON -> d.copy(dndOn = true)
+                    RingerState.DND_OFF -> d.copy(dndOn = false)
+                    else -> d.copy(ringer = state)
+                }, Presentation.EXPANDED)
+                d.mode == IslandMode.RINGER -> showDemo(demoRinger(state), Presentation.EXPANDED)
+            }
+        }
     }
 
     internal fun demoMusic(playing: Boolean, position: Long = 107_000L): LiveActivity {
@@ -284,6 +296,7 @@ class MainActivity : AppCompatActivity() {
         key = "demo-volume", packageName = packageName, mode = IslandMode.VOLUME,
         title = getString(R.string.island_volume_media), subtitle = "", appLabel = "Volume",
         appIcon = null, artwork = null, accent = NothingStyle.foreground, progress = level,
+        ringer = IslandFeatures.read(this).let { if (it.ringer && it.ringerControls) RingerState.RING else null },
     )
 
     internal fun demoRinger(state: RingerState) = LiveActivity(
@@ -677,6 +690,7 @@ class MainActivity : AppCompatActivity() {
         toggle(R.string.feature_downloads, "downloads", features.downloads)
         toggle(R.string.feature_alarms, "alarms", features.alarms)
         toggle(R.string.feature_ringer, "ringer", features.ringer, R.string.feature_ringer_note)
+        toggle(R.string.feature_ringer_controls, "ringer_controls", features.ringerControls, R.string.feature_ringer_controls_note)
 
         section(R.string.features_messages)
         toggle(R.string.feature_reply, "inline_reply", features.inlineReply)
@@ -702,6 +716,7 @@ class MainActivity : AppCompatActivity() {
         toggle(R.string.feature_corners, "phone_corners", features.phoneCorners)
         toggle(R.string.feature_bubbles, "coloured_bubbles", features.colouredBubbles, R.string.feature_bubbles_note)
         toggle(R.string.feature_glow, "edge_glow", features.edgeGlow, R.string.feature_glow_note)
+        toggle(R.string.feature_full_width, "full_width_open", features.fullWidthOpen, R.string.feature_full_width_note)
         column.addView(label(getString(R.string.feature_outline), 16f, NothingStyle.foreground).apply {
             typeface = NothingStyle.body; setPadding(0, dp(12), 0, 0)
         }, row(-2))

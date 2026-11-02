@@ -284,4 +284,9 @@
     <string name="feature_ringer_note">Mostra a ilha quando o celular alterna entre toque, vibrar e silencioso, ou quando o Não perturbe liga ou desliga.</string>
     <string name="feature_glow">Brilho suave nas bordas</string>
     <string name="feature_glow_note">Um brilho suave em volta da pílula para ela se destacar em papéis de parede e apps escuros. Fica mais forte por um instante quando algo novo chega.</string>
+    <string name="feature_ringer_controls">Botões de toque e silencioso</string>
+    <string name="feature_ringer_controls_note">Botões de Toque, Vibrar, Silencioso e Não perturbe abaixo do controle de volume. Tocar na ilha de toque/silencioso também passa para o próximo modo.</string>
+    <string name="feature_full_width">Ilhas abertas na largura toda</string>
+    <string name="feature_full_width_note">Mensagens, volume e outras ilhas abertas ocupam a largura da tela em vez de crescer a partir da câmera.</string>
+    <string name="ringer_needs_access">Permita o acesso ao Não perturbe para o Dynamic Droid poder mudar para Silencioso ou Não perturbe</string>
 </resources>

@@ -30,6 +30,8 @@ import androidx.core.graphics.ColorUtils
 import java.util.WeakHashMap
 import kotlin.math.PI
 import kotlin.math.abs
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
@@ -65,6 +67,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fun onReply(activity: LiveActivity) {}
         /** The volume island's bar was dragged to [fraction] of the stream's range. */
         fun onVolumeChange(fraction: Float) {}
+        /** A ring / vibrate / silent / Do Not Disturb button, or the ringer island, was tapped. */
+        fun onRingerMode(state: RingerState) {}
     }
 
     var callbacks: Callbacks? = null
@@ -119,6 +123,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val dimPaint = Paint().apply { colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) }) }
     // Levels glide to new values: critically damped, so they settle without wobbling.
     private val levelS = Spring(0f, 340f, 1f, 0.0015f)
+    /** Where the ringer highlight sits: 0 ring, 1 vibrate, 2 silent. It slides between buttons. */
+    private val modeS = Spring(0f, 420f, 0.86f, 0.002f)
+    private val modeHits = ArrayList<Pair<RectF, RingerState>>()
     private val bubbleLevelS = Spring(0f, 300f, 1f, 0.0015f)
     private val musicBarS = Spring(0f, 420f, 1f, 0.0008f)
     // A brief thickening of the volume bar on each key press.
@@ -298,7 +305,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
     private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -416,6 +423,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             eventOutlineUntil = SystemClock.uptimeMillis() + OUTLINE_EVENT_MS
             removeCallbacks(outlineTick); postDelayed(outlineTick, OUTLINE_EVENT_MS + 32L)
             next.progress?.let { levelS.snap(it) }
+            ringerIndex(next.ringer)?.let { modeS.snap(it) }
         }
         next?.progress?.let { level ->
             if (!volumeDragging) levelS.target = level
@@ -620,6 +628,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun screenCenter() = layoutWidth() / 2f / fit.scale
 
+    /**
+     * Opened islands span the screen, edge to edge with a small margin, so they never look
+     * lopsided when the small pill has been nudged to sit on an off-centre camera.
+     */
+    private fun openWidth(small: Float) = if (features.fullWidthOpen) expandedWidth() else min(expandedWidth(), small)
+    private fun openCenter() = if (features.fullWidthOpen) screenCenter() else cameraCenter()
+
     private fun cameraCenter(): Float {
         val viewX = if (anchorToCutout && fit.alignCamera) cameraX ?: (resources.displayMetrics.widthPixels / 2f)
         else layoutWidth() / 2f
@@ -654,7 +669,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             // A new message first arrives as a medium island; holding it grows the full card.
             if (a.mode == IslandMode.MESSAGE) {
                 val h = dp(MEDIUM_HEIGHT_DP)
-                return Spec(min(expandedWidth(), dp(MEDIUM_WIDTH_DP)), h, h / 2f, cameraCenter())
+                return Spec(openWidth(dp(MEDIUM_WIDTH_DP)), h, h / 2f, openCenter())
             }
             val h = compactHeight()
             val cluster = compactCluster()
@@ -669,13 +684,17 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             IslandMode.TIMER -> Spec(w, dp(if (visibleActions(a).isEmpty()) 88f else 138f), cardRadius(dp(44f)), screenCenter())
             IslandMode.ALARM -> Spec(w, dp(88f), cardRadius(dp(44f)), screenCenter())
             IslandMode.DOWNLOAD -> Spec(w, dp(100f), cardRadius(dp(40f)), screenCenter())
-            IslandMode.VOLUME -> Spec(min(w, dp(VOLUME_WIDTH_DP)), dp(VOLUME_HEIGHT_DP), dp(VOLUME_HEIGHT_DP) / 2f, cameraCenter())
-            IslandMode.DEVICE -> Spec(min(w, dp(MEDIUM_WIDTH_DP)), dp(MEDIUM_HEIGHT_DP), dp(MEDIUM_HEIGHT_DP) / 2f, cameraCenter())
+            IslandMode.VOLUME -> {
+                val h = dp(VOLUME_HEIGHT_DP) + if (a.ringer != null) dp(RINGER_ROW_DP) else 0f
+                Spec(openWidth(dp(VOLUME_WIDTH_DP)), h, min(h / 2f, dp(VOLUME_HEIGHT_DP) / 2f), openCenter())
+            }
+            IslandMode.DEVICE -> Spec(openWidth(dp(MEDIUM_WIDTH_DP)), dp(MEDIUM_HEIGHT_DP), dp(MEDIUM_HEIGHT_DP) / 2f, openCenter())
             IslandMode.RINGER -> {
                 // Just wide enough for the glyph and its word, like a small switch label.
                 val h = dp(RINGER_HEIGHT_DP)
                 val want = h + dp(14f) + titlePaint.measureText(a.title) + dp(22f)
-                Spec(want.coerceIn(dp(136f), w), h, h / 2f, cameraCenter())
+                if (features.fullWidthOpen) Spec(w, h, h / 2f, screenCenter())
+                else Spec(want.coerceIn(dp(136f), w), h, h / 2f, cameraCenter())
             }
             else -> Spec(w, dp(84f), cardRadius(dp(42f)), screenCenter())
         }
@@ -896,6 +915,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val ca = compactA.value.coerceIn(0f, 1f) * reveal
         val liveTimer = isLiveTimer(a)
         actionHits.clear()
+        modeHits.clear()
         if (ea > 0.01f) {
             // Nothing-inspired island stays monochrome; no coloured content glow.
             val alpha = (((ea - 0.45f) / 0.55f).coerceIn(0f, 1f) * 255 * intro).toInt()
@@ -1393,7 +1413,75 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         volumeRight = rect.right - dp(18f)
         val pulse = barPulse.value.coerceIn(0f, 1f)
         val thick = dp(4f) + (if (volumeDragging) dp(3f) else dp(2f) * pulse)
-        drawBar(canvas, volumeLeft, volumeRight, rect.bottom - dp(14f), level, userAccent ?: waveColor, alpha, thick)
+        drawBar(canvas, volumeLeft, volumeRight, rect.top + dp(VOLUME_HEIGHT_DP) - dp(14f), level, userAccent ?: waveColor, alpha, thick)
+        if (a.ringer != null) drawRingerControls(canvas, a, alpha)
+    }
+
+    private fun ringerIndex(state: RingerState?) = when (state) {
+        RingerState.RING -> 0f; RingerState.VIBRATE -> 1f; RingerState.SILENT -> 2f; else -> null
+    }
+
+    private fun ringerTint(state: RingerState) = when (state) {
+        RingerState.SILENT -> SILENT_RED
+        RingerState.DND_ON, RingerState.DND_OFF -> DND_PURPLE
+        else -> Color.WHITE
+    }
+
+    /**
+     * Ring / Vibrate / Silent share one highlight that slides between them; Do Not Disturb is its
+     * own switch at the end, since it can be on with any ringer mode.
+     */
+    private fun drawRingerControls(canvas: Canvas, a: LiveActivity, alpha: Int) {
+        val current = a.ringer ?: return
+        val top = rect.top + dp(VOLUME_HEIGHT_DP) + dp(2f)
+        val h = dp(40f)
+        val gap = dp(8f)
+        val l = rect.left + dp(14f)
+        val r = rect.right - dp(14f)
+        val bw = (r - l - gap * 3) / 4f
+        if (bw <= h * 0.8f || rect.bottom < top + h) return
+        val cy = top + h / 2f
+        val off = Color.rgb(30, 30, 30)
+        ringerIndex(current)?.let { modeS.target = it }
+        val pos = modeS.value.coerceIn(0f, 2f)
+        val hx = l + pos * (bw + gap)
+        val from = floor(pos).toInt().coerceIn(0, 2)
+        val to = ceil(pos).toInt().coerceIn(0, 2)
+        val states = listOf(RingerState.RING, RingerState.VIBRATE, RingerState.SILENT)
+        val highlight = ColorUtils.blendARGB(ringerTint(states[from]), ringerTint(states[to]), pos - from)
+        for (i in 0 until 4) {
+            val x = l + i * (bw + gap)
+            fillPaint.color = withAlpha(off, alpha)
+            canvas.drawRoundRect(x, top, x + bw, top + h, h / 2f, h / 2f, fillPaint)
+        }
+        // One highlight slides between ring, vibrate and silent.
+        fillPaint.color = withAlpha(highlight, alpha)
+        canvas.drawRoundRect(hx, top, hx + bw, top + h, h / 2f, h / 2f, fillPaint)
+        if (a.dndOn) {
+            val x = l + 3 * (bw + gap)
+            fillPaint.color = withAlpha(DND_PURPLE, alpha)
+            canvas.drawRoundRect(x, top, x + bw, top + h, h / 2f, h / 2f, fillPaint)
+        }
+        val g = dp(20f)
+        for (i in 0 until 4) {
+            val x = l + i * (bw + gap)
+            val gx = x + bw / 2f
+            // A glyph turns dark as the highlight slides under it.
+            val covered = if (i < 3) 1f - abs(pos - i).coerceIn(0f, 1f) else if (a.dndOn) 1f else 0f
+            val glyph = withAlpha(ColorUtils.blendARGB(Color.rgb(150, 150, 150), Color.BLACK, covered), alpha)
+            val under = if (covered > 0.5f) (if (i < 3) highlight else DND_PURPLE) else off
+            when (i) {
+                0 -> drawBell(canvas, gx, cy, g, glyph)
+                1 -> drawVibrate(canvas, gx, cy, g, glyph, 0f)
+                2 -> { drawBell(canvas, gx, cy, g, glyph); drawSlash(canvas, gx, cy, g, glyph, 1f, under) }
+                else -> drawCrescent(canvas, gx, cy, g, glyph)
+            }
+            val state = when (i) {
+                0 -> RingerState.RING; 1 -> RingerState.VIBRATE; 2 -> RingerState.SILENT
+                else -> if (a.dndOn) RingerState.DND_OFF else RingerState.DND_ON
+            }
+            modeHits.add(RectF(x, top - gap / 2f, x + bw, top + h + gap / 2f) to state)
+        }
     }
 
     /** Headphones arriving, or any Bluetooth audio device dropping away. */
@@ -1536,13 +1624,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     /** A diagonal strike drawn in over [progress], with a dark gap so it reads over the glyph. */
-    private fun drawSlash(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int, progress: Float) {
+    private fun drawSlash(canvas: Canvas, cx: Float, cy: Float, size: Float, color: Int, progress: Float, gap: Int = Color.BLACK) {
         if (progress <= 0f) return
         val s = size / 2f
         val x0 = cx - s * .85f; val y0 = cy - s * .85f
         val x1 = x0 + (s * 1.7f) * progress; val y1 = y0 + (s * 1.7f) * progress
         ringPaint.strokeWidth = dp(4.2f)
-        ringPaint.color = Color.BLACK
+        ringPaint.color = withAlpha(gap, Color.alpha(color))
         canvas.drawLine(x0, y0, x1, y1, ringPaint)
         ringPaint.strokeWidth = dp(1.8f)
         ringPaint.color = color
@@ -2213,7 +2301,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     a.durationMs > 0L && abs(e.y - barY) < dp(16f) &&
                     e.x >= barLeft - dp(12f) && e.x <= barRight + dp(12f)
                 if (seeking) seekFraction = fractionAt(e.x)
-                volumeDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.VOLUME
+                // Only the slider row drags; the ringer buttons below it are taps.
+                volumeDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.VOLUME &&
+                    e.y / fit.scale < rect.top + dp(VOLUME_HEIGHT_DP) + dp(2f)
                 if (volumeDragging) setVolumeFromTouch(e.x)
                 if (touchingSecondary) bubblePress.target = if (reduceMotion) 1f else 0.94f
                 else pressS.target = if (reduceMotion) 1f else if (presentation == Presentation.EXPANDED) 0.985f else 0.96f
@@ -2322,6 +2412,23 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             Presentation.COMPACT -> callbacks?.onOpen(a)
             Presentation.EXPANDED -> {
                 // System islands have no app to open; a tap just tucks them away.
+                modeHits.firstOrNull { it.first.contains(x / fit.scale, y / fit.scale) }?.let {
+                    haptic(HapticGesture.TAP, HapticFeedbackConstants.KEYBOARD_TAP)
+                    callbacks?.onRingerMode(it.second)
+                    return
+                }
+                // The ringer island steps to the next mode: ring → vibrate → silent → ring.
+                if (a.mode == IslandMode.RINGER && features.ringerControls) a.ringer?.let { state ->
+                    haptic(HapticGesture.TAP, HapticFeedbackConstants.KEYBOARD_TAP)
+                    callbacks?.onRingerMode(when (state) {
+                        RingerState.RING -> RingerState.VIBRATE
+                        RingerState.VIBRATE -> RingerState.SILENT
+                        RingerState.SILENT -> RingerState.RING
+                        RingerState.DND_ON -> RingerState.DND_OFF
+                        RingerState.DND_OFF -> RingerState.DND_ON
+                    })
+                    return
+                }
                 if (a.mode == IslandMode.VOLUME || a.mode == IslandMode.DEVICE || a.mode == IslandMode.RINGER) { callbacks?.onDismiss(a); return }
                 if (!replyHit.isEmpty && replyHit.contains(x, y)) {
                     haptic(HapticGesture.TAP, HapticFeedbackConstants.KEYBOARD_TAP)
@@ -2405,6 +2512,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val ROLL_MS = 240L
         private const val OUTLINE_EVENT_MS = 4_000L
         private const val RINGER_HEIGHT_DP = 46f
+        private const val RINGER_ROW_DP = 52f
         private const val RINGER_ANIM_MS = 900L
         private const val GLOW_STEPS = 16
         private const val GLOW_REACH_DP = 10f

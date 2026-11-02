@@ -284,4 +284,9 @@
     <string name="feature_ringer_note">Toon het eiland wanneer de telefoon wisselt tussen bellen, trillen en stil, of Niet storen aan of uit gaat.</string>
     <string name="feature_glow">Zachte gloed langs de rand</string>
     <string name="feature_glow_note">Een zachte gloed rond de pil zodat die opvalt op donkere achtergronden en apps. Wordt even feller als er iets nieuws binnenkomt.</string>
+    <string name="feature_ringer_controls">Knoppen voor bellen &amp; stil</string>
+    <string name="feature_ringer_controls_note">Knoppen voor Bellen, Trillen, Stil en Niet storen onder de volumeschuif. Tikken op het bel/stil-eiland gaat ook naar de volgende modus.</string>
+    <string name="feature_full_width">Geopende eilanden over de volle breedte</string>
+    <string name="feature_full_width_note">Berichten, volume en andere geopende eilanden lopen over het hele scherm in plaats van uit de camera te groeien.</string>
+    <string name="ringer_needs_access">Geef Dynamic Droid toegang tot Niet storen om naar Stil of Niet storen te schakelen</string>
 </resources>

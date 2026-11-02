@@ -284,4 +284,9 @@
     <string name="feature_ringer_note">端末が着信音・バイブ・サイレントを切り替えたとき、またはサイレントモードがオン・オフになったときにアイランドを表示します。</string>
     <string name="feature_glow">縁のやわらかな光</string>
     <string name="feature_glow_note">ピルの周りにやわらかな光を加え、暗い壁紙やアプリの上でも目立たせます。新しい通知が来ると一瞬明るくなります。</string>
+    <string name="feature_ringer_controls">着信音・サイレントのボタン</string>
+    <string name="feature_ringer_controls_note">音量スライダーの下に着信音・バイブ・サイレント・サイレントモードのボタンを表示します。着信音/サイレントのアイランドをタップしても次のモードに切り替わります。</string>
+    <string name="feature_full_width">開いたアイランドを画面幅いっぱいに</string>
+    <string name="feature_full_width_note">メッセージや音量などの開いたアイランドを、カメラから広げる代わりに画面の横幅いっぱいに表示します。</string>
+    <string name="ringer_needs_access">サイレントやサイレントモードに切り替えるには、Dynamic Droid にサイレントモードへのアクセスを許可してください</string>
 </resources>

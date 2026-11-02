@@ -284,4 +284,9 @@
     <string name="feature_ringer_note">Affiche l\'îlot quand le téléphone passe entre sonnerie, vibreur et silencieux, ou quand Ne pas déranger s\'active ou se désactive.</string>
     <string name="feature_glow">Halo doux sur les bords</string>
     <string name="feature_glow_note">Un léger halo autour de la pilule pour la faire ressortir sur les fonds et apps sombres. Il s\'intensifie un instant quand quelque chose de nouveau arrive.</string>
+    <string name="feature_ringer_controls">Boutons sonnerie et silencieux</string>
+    <string name="feature_ringer_controls_note">Boutons Sonnerie, Vibreur, Silencieux et Ne pas déranger sous le curseur de volume. Toucher l\'îlot sonnerie/silencieux passe aussi au mode suivant.</string>
+    <string name="feature_full_width">Îlots ouverts sur toute la largeur</string>
+    <string name="feature_full_width_note">Les messages, le volume et les autres îlots ouverts s\'étendent sur tout l\'écran au lieu de grandir depuis la caméra.</string>
+    <string name="ringer_needs_access">Autorisez l\'accès à Ne pas déranger pour que Dynamic Droid puisse passer en Silencieux ou Ne pas déranger</string>
 </resources>

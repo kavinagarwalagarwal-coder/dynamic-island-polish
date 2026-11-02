@@ -284,4 +284,9 @@
     <string name="feature_ringer_note">Telefon zil, titreşim ve sessiz arasında geçtiğinde ya da Rahatsız Etmeyin açılıp kapandığında adayı göster.</string>
     <string name="feature_glow">Kenarlarda yumuşak parıltı</string>
     <string name="feature_glow_note">Hapın çevresinde hafif bir parıltı; koyu duvar kâğıtlarında ve uygulamalarda öne çıkar. Yeni bir şey geldiğinde bir anlığına parlar.</string>
+    <string name="feature_ringer_controls">Zil ve sessiz düğmeleri</string>
+    <string name="feature_ringer_controls_note">Ses kaydırıcısının altında Zil, Titreşim, Sessiz ve Rahatsız Etmeyin düğmeleri. Zil/sessiz adasına dokunmak da sonraki moda geçer.</string>
+    <string name="feature_full_width">Açılan adalar tam genişlikte</string>
+    <string name="feature_full_width_note">Mesajlar, ses ve diğer açılan adalar kameradan büyümek yerine ekran boyunca uzanır.</string>
+    <string name="ringer_needs_access">Sessiz veya Rahatsız Etmeyin moduna geçebilmesi için Dynamic Droid\'e Rahatsız Etmeyin erişimi verin</string>
 </resources>

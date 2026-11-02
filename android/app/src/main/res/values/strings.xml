@@ -295,4 +295,9 @@
     <string name="feature_ringer_note">Show the island when the phone switches between ring, vibrate and silent, or Do Not Disturb turns on or off.</string>
     <string name="feature_glow">Soft edge glow</string>
     <string name="feature_glow_note">A gentle glow around the pill so it stands out on dark wallpapers and apps. It brightens for a moment when something new arrives.</string>
+    <string name="feature_ringer_controls">Ring &amp; silent buttons</string>
+    <string name="feature_ringer_controls_note">Ring, Vibrate, Silent and Do Not Disturb buttons under the volume slider. Tapping the ring/silent island also switches to the next mode.</string>
+    <string name="feature_full_width">Open islands fill the width</string>
+    <string name="feature_full_width_note">Messages, volume and other opened islands stretch across the screen instead of growing from the camera.</string>
+    <string name="ringer_needs_access">Allow Do Not Disturb access for Dynamic Droid to switch to Silent or Do Not Disturb</string>
 </resources>

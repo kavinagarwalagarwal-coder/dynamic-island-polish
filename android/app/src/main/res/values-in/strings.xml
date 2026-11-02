@@ -284,4 +284,9 @@
     <string name="feature_ringer_note">Tampilkan pulau saat ponsel beralih antara dering, getar, dan senyap, atau saat Jangan Ganggu aktif atau nonaktif.</string>
     <string name="feature_glow">Cahaya lembut di tepi</string>
     <string name="feature_glow_note">Cahaya lembut di sekitar pil agar menonjol di wallpaper dan aplikasi gelap. Menjadi lebih terang sesaat saat ada hal baru.</string>
+    <string name="feature_ringer_controls">Tombol dering &amp; senyap</string>
+    <string name="feature_ringer_controls_note">Tombol Dering, Getar, Senyap, dan Jangan Ganggu di bawah penggeser volume. Mengetuk pulau dering/senyap juga beralih ke mode berikutnya.</string>
+    <string name="feature_full_width">Pulau terbuka selebar layar</string>
+    <string name="feature_full_width_note">Pesan, volume, dan pulau terbuka lainnya membentang di layar alih-alih tumbuh dari kamera.</string>
+    <string name="ringer_needs_access">Izinkan akses Jangan Ganggu agar Dynamic Droid bisa beralih ke Senyap atau Jangan Ganggu</string>
 </resources>
