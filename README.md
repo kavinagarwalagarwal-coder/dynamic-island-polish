@@ -8,7 +8,7 @@
 
 A Dynamic Island for Android that grows out of your punch-hole camera: music, calls, messages, timers, volume and more, with smooth spring animations.
 
-[**⬇ Download the latest APK**](https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases) · Android 8.0+ · No internet permission · 13 languages
+[**⬇ Download the latest APK**](https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases) · Android 8.0+ · No internet permission · 13 languages · [Scanned on VirusTotal](https://www.virustotal.com/gui/file/c50be41732d9fc2e0f18ace848ac84a409a7076c78df656a861284666c909476)
 
 </div>
 
@@ -93,6 +93,21 @@ Every island has a demo in the **Playground**, and a short guided tour teaches t
 3. **Take the tour**, then try each island in the Playground.
 
 Available in English, Hindi, Spanish, Portuguese (Brazil), French, German, Italian, Dutch, Polish, Russian, Turkish, Indonesian and Japanese.
+
+## Security scans
+
+Scan results for the v2 APK (`app-performance.apk` inside the release zip) from two independent malware scanners:
+
+- [**VirusTotal report**](https://www.virustotal.com/gui/file/c50be41732d9fc2e0f18ace848ac84a409a7076c78df656a861284666c909476)
+- [**Koodous report**](https://koodous.com/apks/c50be41732d9fc2e0f18ace848ac84a409a7076c78df656a861284666c909476)
+
+You can check you have the same file. Its SHA-256 is:
+
+```
+c50be41732d9fc2e0f18ace848ac84a409a7076c78df656a861284666c909476
+```
+
+On a computer, run `sha256sum app-performance.apk` (Linux), `shasum -a 256 app-performance.apk` (macOS) or `certutil -hashfile app-performance.apk SHA256` (Windows).
 
 ## FAQ
 
