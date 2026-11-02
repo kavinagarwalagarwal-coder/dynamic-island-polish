@@ -1,140 +1,112 @@
+<div align="center">
+
+<img src="docs/images/island-glow-music.png" alt="Dynamic Droid music island with a soft edge glow" width="520">
+
 # Dynamic Droid
 
-Android Dynamic Island. The **shape and motion** are authored in SwiftUI (`Sources/IslandUI`) so they can be compiled to Android with [Skip](https://skip.tools). The live overlay (permissions, notifications, accessibility) stays in `android/`.
+**Your camera hole, now alive.**
 
-## What changed
+A Dynamic Island for Android that grows out of your punch-hole camera: music, calls, messages, timers, volume and more, with smooth spring animations.
 
-- Idle is **invisible inside the camera cutout**; activity arrival expands the island out of that point.
-- Width, height, radius, center, opacity, and detached-bubble position use interruptible springs. Idle → compact → split → expanded transitions preserve motion.
-- Compact and expanded live activities morph from the camera (music, calls, timers, messages).
+[**⬇ Download the latest APK**](https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases) · Android 8.0+ · No internet permission · 13 languages
 
-## Run on a phone
+</div>
 
-1. Open `android/` in Android Studio (SDK 35).
-2. Install the app, then grant **Display over other apps**, **Notification access**, and **Allow tapping over the status bar**.
-3. Tap **Start Dynamic Island**.
+---
 
-Or use **Actions → Build Android APK** after this repo is on GitHub.
+## Why you'll like it
 
-## SwiftUI + Skip
+- **It lives in the camera.** When nothing is happening, the island hides inside the punch-hole. When something happens, it springs out of it, then tucks back in.
+- **It moves like the real thing.** Width, height, corners and position all run on springs you can interrupt mid-motion. Numbers roll, bars glide, and a second activity drips off as its own little bubble.
+- **It replaces clutter.** The volume slider, the phone's notification pop-ups and the ring/silent toast all move into the island, so you only look in one place.
+- **It's private.** The app has no internet permission. It reads notification details to build the island and nothing leaves your phone.
 
-```
-Sources/IslandUI/     SwiftUI island (source of motion)
-android/              Overlay, listeners, Canvas port of the same springs
-Package.swift         Builds IslandUI on Swift 5.7+
-skip.yml              Skip module mapping
-```
+## What it shows
 
-This Mac is on Swift 5.7 (macOS 12), which cannot run the current Skip CLI (needs Swift 5.9 / Xcode 15). The Android Canvas island is a hand port of the SwiftUI springs so the phone app works today.
+<table>
+<tr>
+<td width="50%" align="center"><img src="docs/images/island-message.png" alt="Message island with Reply and Like buttons" width="100%"><br><b>Messages</b><br>Reply right from the island, or tap a button from the notification.</td>
+<td width="50%" align="center"><img src="docs/images/island-timer.png" alt="Timer island counting down" width="100%"><br><b>Timers</b><br>Live countdown with pause, resume and cancel.</td>
+</tr>
+<tr>
+<td align="center"><img src="docs/images/island-volume.png" alt="Volume island with a level bar" width="100%"><br><b>Volume</b><br>Replaces the system slider. Drag it, or hold a volume key to keep going.</td>
+<td align="center"><img src="docs/images/island-alarm.png" alt="Alarm island with Snooze and Dismiss" width="100%"><br><b>Alarms</b><br>Snooze or dismiss without opening the clock app.</td>
+</tr>
+<tr>
+<td align="center"><img src="docs/images/island-headphones.png" alt="Headphones connected island with battery" width="100%"><br><b>Headphones</b><br>Connects with a battery level, and warns you when a device drops.</td>
+<td align="center"><img src="docs/images/island-download.png" alt="Download progress island" width="100%"><br><b>Downloads</b><br>Progress for any app that shows a progress bar.</td>
+</tr>
+</table>
 
-On a newer Mac:
+Also: **music** with artwork, a waveform, seeking and controls; **calls** with answer and hang up, plus "Calling…" until the call connects; and **charging**.
 
-```sh
-brew install skiptools/skip/skip
-skip checkup
-swift build
-skip export --module IslandUI
-```
+### Ring, vibrate and silent, from the island
 
-Then host the exported Compose view from `IslandOverlayService` in place of `IslandView` when you are ready to switch renderers.
+<p align="center">
+<img src="docs/images/island-silent.png" alt="Silent island" height="56">&nbsp;
+<img src="docs/images/island-vibrate.png" alt="Vibrate island" height="56">&nbsp;
+<img src="docs/images/island-dnd.png" alt="Do Not Disturb island" height="56">
+</p>
 
-## Preview the island on macOS / iOS
+Switch the phone between Ring, Vibrate, Silent and Do Not Disturb with the buttons under the volume slider, or tap the ring/silent island to step to the next mode. Whenever the mode changes, the island shows it with a little animation: the bell swings, the phone buzzes, a slash draws across the bell.
 
-Open `Package.swift` in Xcode and preview `IslandPlayground` in `DynamicIslandView.swift`, or:
+### Two things at once
 
-```sh
-swift build
-```
+<p align="center"><img src="docs/images/island-split.png" alt="Island with a detached timer bubble" width="420"></p>
 
-## Island interaction and timer refinement
+Music and a timer? The second activity pulls off as a separate bubble. Hold either one to open it.
 
-The island body is opaque black. Wallpaper matching tints accents; an optional still-wallpaper skin with Liquid Glass refraction is described under *Still wallpaper and Liquid Glass* below. No screen capture is used.
+### Liquid Glass
 
-- Motion remains authored in SwiftUI with the existing interruptible Android Canvas spring port. Tighter damping, elastic dragging, press feedback, and system reduced-motion support keep transitions responsive without restarting shape velocity.
-- Tap a compact activity or its separate minimal bubble to open its app immediately. Hold either activity for 350 ms, or pull down, to expand it. Swipe upward or tap outside the expanded Android overlay to collapse. Notification controls remain immediate; no double-tap delay is imposed on opening an app.
-- Two concurrent activities appear as compact + minimal. Stable activity selection prevents per-second timer/music refreshes from stealing focus. Holding the second bubble promotes it into the expanded card; removal and foreground filtering promote a remaining activity. Incoming calls take priority on arrival. More than two activities are retained, but only two appear simultaneously.
-- Timers have a shared morphing ring/digit layout, tabular rolling digits, a frozen/dimmed paused state, real notification pause/resume/cancel actions, and a single completion expansion per run. The original clock app remains responsible for alarms and sound. The service tracks monotonic deadlines; notification updates do not restart the expanded timeout. Rings use the longest observed remaining duration when an app does not provide the original total.
-- The native settings preview includes a **Two live** example and working demo timer pause/resume/cancel controls.
-- SwiftUI exposes open/expand/collapse callbacks, secondary activity rendering, live countdowns, rolling digits, and timer action callbacks. Android continues to use its native overlay/services; SwiftUI has not been replaced.
+<p align="center"><img src="docs/images/island-glass.png" alt="Expanded island with a Liquid Glass wallpaper skin" width="520"></p>
 
-### Validation
+Choose your wallpaper and the open island turns into refracting glass.
 
-GitHub Actions runs Android regression tests and builds the debug APK, then runs SwiftUI package tests on macOS. Tests cover focus stability under repeated updates, explicit selection, foreground filtering, activity removal, incoming-call priority, bubble geometry on narrow/scaled screens, one completion per timer run, countdown rounding, and interrupted springs at 30–120 Hz.
+## Make it yours
 
-Physical-device visual verification is still required: music + timer together, rapidly interrupt expansion/collapse, hold each bubble, pause/resume/cancel real Clock notifications, let a short timer expire, rotate/change fit, and lock/unlock. Available actions and timer metadata depend on the clock app. This recreates supported iOS-style behavior; exact Apple system animations and integrations are not claimed.
+- **Hide the phone's pop-ups.** One toggle, and the island takes over from the banners that drop from the top. Notifications still land in your shade.
+- **Fit your phone.** Scale, nudge and resize the pill to sit perfectly on your camera. Open islands span the screen so they never look lopsided.
+- **Look.** Short or tall pill, a soft edge glow, an outline, coloured bubbles, corners that match your screen, and burn-in care.
+- **Rules.** Choose which apps can use the island, set priorities, hide it in certain apps, and set quiet hours.
+- **Haptics.** Separate switches for tap, hold and swipe, and quiet haptics in Do Not Disturb.
+- **Lock screen.** Optionally keep the island on the lock screen.
 
-## Camera idle and detached timer correction
+Every island has a demo in the **Playground**, and a short guided tour teaches the gestures on first launch.
 
-- Idle contracts and fades into the detected camera hole, stays touch-through, and does not replay a bar animation on an empty unlock.
-- Timers default to the detached countdown bubble when another normal activity is present, in either arrival order. Holding the timer explicitly focuses it; collapsing restores the normal pill + timer arrangement. Side-swipes switch the visible activities without opening an app.
-- Timer recognition accepts chronometer/countdown notifications without the ongoing flag, and retains known paused timers. Running timers stay eligible while Clock is foreground. Notifications without usable timer data remain limited by what the source app publishes.
-- The two surfaces detach/reattach with independent position/scale/opacity springs. The small timer shows remaining time rather than a static logo. Geometry uses the actual view width and stays bounded at scaled calibration values.
-- Reference design: Apple’s [Design dynamic Live Activities](https://developer.apple.com/videos/play/wwdc2023/10194/) and [Live Activities guidance](https://developer.apple.com/design/human-interface-guidelines/live-activities). These guide compact/minimal/expanded states, numeric transitions, elastic motion, and content placement; this does not claim access to Apple's private animation implementation.
-- CI now renders the native Canvas view on an Android 35 emulator and checks visible, non-overlapping split pills at 70/100/130% scale, expansion, reattachment, and invisible camera idle. Screenshots are uploaded as `island-render-checks`, alongside the debug APK artifact. Physical-device/OEM notification checks remain necessary.
+## Gestures
 
-## Android 16 Clock notification compatibility
+| Do this | To |
+| --- | --- |
+| Tap | Open the app |
+| Hold, or pull down | Expand the island |
+| Swipe up | Tuck it away |
+| Swipe sideways | Switch between two activities |
 
-Custom Clock notifications may contain a running `Chronometer` only inside their `RemoteViews`, with no standard chronometer extras, duration text, or ongoing flag. `NotificationClockReader` reads the supplied notification layout in memory, extracts its monotonic clock base or paused duration (including Android 16 compact notification text), stops the temporary widgets, and passes that real timing data to the overlay. It never reads the screen or guesses a countdown duration.
+## Get started
 
-Settings includes **Clock notification status** with the last package and recognised format, without saving notification text or images. This helps distinguish missing notification access from an unsupported Clock format on a physical device.
+1. **Download** the APK from [Releases](https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases) and install it. You may need to allow installs from your browser or file manager.
+2. **Open Dynamic Droid** and follow Setup:
+   - **Notification access** lets the island see your music, messages, timers and calls.
+   - **Allow tapping over the status bar** (accessibility) puts the island above the status bar and lets the volume keys drive it.
+   - **Display over other apps** is the fallback if you skip the accessibility step.
+   - **Optional:** usage access (spotting which app is open), Bluetooth (headphone battery) and Do Not Disturb access (Silent and Do Not Disturb from the island).
+3. **Take the tour**, then try each island in the Playground.
 
-The Android 16 emulator test installs a separate `notification-fixture` app. It posts a real media-session notification and a custom Clock notification with no normal timer fields, then verifies the actual accessibility overlay receives and visibly detaches the timer during running, paused, and resumed states. The fixture is test-only and is not included in the shipped app APK.
+Available in English, Hindi, Spanish, Portuguese (Brazil), French, German, Italian, Dutch, Polish, Russian, Turkish, Indonesian and Japanese.
 
-### Still wallpaper and Liquid Glass (1.3.1)
+## FAQ
 
-Under **Wallpaper Glass**, choose the same image used for your phone wallpaper. Android 13+ restricts direct wallpaper image reads, so this uses the system image picker instead of screen capture or broad storage access. The photo stays still. Adjust framing/strength and optionally enable refraction. Camera-hole idle, detached timers and the refined SwiftUI/Android spring morphs remain.
+**Does it drain the battery?**
+The island only animates while something is changing. At rest it doesn't redraw, and the small island's waveform runs at 30 fps.
 
-Object recognition, segmented layers, motion effects, bundled models, LiteRT and model download build tasks have been removed. The existing selected original image/settings migrate; old subject/background images are deleted. Images are sampled to at most 1024 pixels per side and stored privately in noBackupFilesDir; Remove wallpaper deletes the copy. No Internet, screen capture, camera or broad storage permission is added.
+**My phone's camera isn't in the centre.**
+Use **Phone fit** to move and resize the pill. Opened islands still centre on the screen.
 
-The crop calculation now tolerates floating-point rounding during morphs, which previously could throw an invalid-range exception. Glass caches the RenderNode recording, refraction effect and rim gradient until the image/style/geometry changes; settled frames reuse them. The adapted AndroidLiquidGlass shader uses three sample taps rather than seven. Static wallpaper starts no frame loop of its own. Driver/API errors fall back to plain wallpaper. A local marker also pauses glass if the process rapidly restarts while glass was active; normal fast process replacement can trigger this conservative fallback too. Users can re-enable it in settings. Java cannot catch native GPU crashes; no crash log from the physical device was available.
+**Can it hide the phone's own notification pop-ups?**
+Yes. Features → *Hide the phone's pop-up notifications*. For pop-ups that never flash at all, there's an optional one-time step from a computer, explained in the app. If you use it, turn the option off before uninstalling.
 
-Liquid Glass derives from [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass), commit `65ab177e90e5c1d8c62e70cf7755841982da65f6`, adapted to Canvas/RenderNode with its Apache-2.0 license in `assets/licenses/AndroidLiquidGlass-LICENSE.txt`. It refracts the imported wallpaper, not other apps' screens. Android 13+ hardware rendering is required; older/software rendering uses plain wallpaper. SwiftUI remains SwiftUI.
+## For developers
 
-### Activity drop / merge (1.3.2)
+The island's motion is authored in SwiftUI (`Sources/IslandUI`), and the Android app (`android/`) is a native Canvas port with its own overlay, notification listener and accessibility service. Every change is checked on Android emulators in CI.
 
-A second live activity now pulls out of the main pill as a droplet: the pill narrows, the bubble stretches along a shallow downward arc, a short vector neck pinches off, and the circle settles with a small spring overshoot. Removing it reverses the same spring into the pill. Notification refreshes do not restart the transition, and changes mid-flight preserve the current position and velocity. Reduced-motion skips the neck/arc. No blur layers, new dependencies, or continuous animation loop are added; the still-wallpaper crash fixes remain.
-
-### App → island handoff (1.3.3)
-
-Leaving an active music/call owner for Home now uses the reference sequence: a portrait card narrows, travels toward the camera as a strip, then widens into the compact island. The card is a small in-memory replica built from notification artwork/title/artist/app metadata, not the other app's real window or a screenshot. A pre-downsampled card provides a soft shrinking appearance without full-screen GPU blur. It is discarded when the transition finishes or is interrupted. SwiftUI views remain intact; Android's spring renderer drives the overlay handoff. Try **App → island** in the preview.
-
-Foreground detection now checks the unfiltered activity shelf (the owner's activity is intentionally hidden while its app is open). Existing accessibility window-state events supply package names only for relevant apps/Home, with Usage Access polling as a fallback. Window text/content retrieval remains disabled. The effect runs on return to Home, not arbitrary app switches; entering another app cancels it. Its full-screen overlay remains touch-through and shrinks back to the compact window when settled. No screenshot, camera, Internet or new permission is added. This approximates the reference motion without controlling Amazon Music's or Android's actual minimise animation.
-
-### Wallpaper and glass stability (1.6.3)
-
-- **Black pill after unlock:** Android can free an overlay's GPU display lists while the screen is off. The glass layer now notices (`RenderNode.hasDisplayList()`) and is also invalidated on screen-off, window re-show and attach, so the wallpaper redraws on the first frame after unlock instead of waiting for a tap. If the phone was rebooted, the saved wallpaper is re-read after the first unlock rather than staying empty.
-- **White edges / glitch while expanding:** the glass layer used to be re-recorded, resized and given a new shader effect on every animation frame. The wallpaper is now laid out once on a fixed stage behind the island, so the GPU layer never resizes or stretches (the 1.6.2 stopgap scaled the cached lens during motion). While the island moves, the lens is switched off and the still wallpaper shows through; the lens is rebuilt once when the shape settles. The picture stays still as the island opens over it (no zoom pumping), refraction near the edges samples real wallpaper instead of the layer border, and the rim highlight is fainter and fades with the island.
-- Smaller polish: no gradient allocations per frame for the rim or artwork placeholder, and some unused imports removed.
-
-### More islands, settings and languages (1.7.0)
-
-Everything here can be switched on or off on the new **Features** page, and each new island has a Playground demo.
-
-- **Volume island.** Volume keys show a level bar in the island instead of the system slider; drag the bar to set the level. The accessibility service filters key events but only ever looks at the two volume keys. The system slider still handles the keys when the screen is off, while locked (unless the island shows on the lock screen), while the phone is ringing, or when the island window is not attached. After updating, Android may need the accessibility service switched off and on once before it delivers key events.
-- **Headphones and Bluetooth lost.** When Bluetooth headphones or a wearable connect, a medium island shows the name and battery; when one drops away, a red one says so. This uses only the system's connection broadcasts and asks for the Nearby devices permission on Android 12+. Battery comes from Android's battery broadcast, which most but not all devices send.
-- **Downloads.** Any notification with a determinate progress bar becomes a progress island (ring and percent when small, bar when expanded). Updates are coalesced to whole percents.
-- **Alarms.** A ringing alarm (a Clock notification with Snooze) opens an amber island using the clock app's own Snooze and Dismiss buttons. It stays open until handled and shows over fullscreen apps.
-- **Calls.** Outgoing calls show *Calling…* until they connect, then the call timer. Android 12+ CallStyle types are used directly; older dialers are read from their buttons and chronometer.
-- **Messages.** New messages arrive as a medium island; hold to grow the full card. **Reply** sends text back through the app's own reply action; the text field is a small focusable window under the card, so the island itself never takes keyboard focus.
-- **Look.** Short or long small island, small island height (30–44 dp), full-width cards that follow the phone's own screen corners (Android 12+), coloured side bubbles whose timer outline shows the time left, an island outline (off / on events / always), burn-in care (static glyphs drift a pixel each minute), and an optional grey island on the lock screen (camera-area overlay only).
-- **Haptics.** Separate switches for tap, hold, side swipe and swipe up, and an option to stay quiet in Do Not Disturb.
-- **Languages.** UI text moved to string resources and translated into Hindi, Spanish, Portuguese (Brazil), French, German, Italian, Dutch, Polish, Russian, Turkish, Indonesian and Japanese. Translations are machine-written and would benefit from native-speaker review.
-
-`FeatureIslandRenderTest` renders each new island state on the emulator and saves screenshots with the other render checks.
-
-### Logo, launch and guided tour (1.7.0)
-
-- **Mark.** An original logo drawn in code: a red camera dot, the island pill growing out of it, and a droplet pinching off, the same story the island tells. It is also the adaptive launcher icon, with a themed (monochrome) version.
-- **Launch flourish.** The mark builds itself, the dot-matrix name sweeps in, then the sheet lifts away while the screen rises into place. The system splash uses the same black, so there is no white flash. It plays on a real launch, not on rotation.
-- **Guided tour.** Shown on first run and from *How to use the island* in Playground and Setup. Each page drives a real island with synthetic touches (tap, hold, swipe up, side swipe, then the volume, headphones and alarm islands), so it behaves exactly as on the phone. Touching the island pauses the demo so people can try it.
-- **Motion.** The header logo rebuilds on every page; pages stagger in; buttons spring; dialogs and new windows grow in. Everything follows the system animation scale. Instrumented tests run through `IslandTestRunner`, which skips the flourish and the tour; `TourAndLogoRenderTest` captures the logo frames and every tour page.
-
-### Hide the phone's own pop-ups
-
-Features → **Hide the phone's pop-up notifications** is a single toggle. When the island shows a new message, Dynamic Droid's accessibility service finds the system's own pop-up for it and swipes it up, which tucks it into the shade, so nothing is lost. Pop-ups stay as usual when the island isn't running, during quiet hours, or in apps where the island is hidden. An emulator test posts a real high-importance notification and checks the pop-up is gone while the notification is still in the shade.
-
-Optional: to stop pop-ups from flashing at all, grant a one-time permission from a computer (USB debugging on). Dynamic Droid then switches the phone's pop-ups off while the island runs and restores your setting afterwards. If you use this, turn the option off before uninstalling.
-
-```
-adb shell pm grant com.dynamicdroid.app android.permission.WRITE_SECURE_SETTINGS
-```
+Build notes, architecture and release history are in **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)**.
