@@ -55,7 +55,8 @@ class ImmersiveMediaOverlayTest {
                 })
                 Thread.sleep(1_000)
                 shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind video")
-                assertTrue("A full-screen video should hide the island", waitFor(8_000) { immersive() })
+                if (!waitFor(8_000) { immersive() })
+                    fail("A full-screen video should hide the island: " + IslandAccessibilityService.instance?.mediaDebug)
                 shell("input keyevent KEYCODE_HOME")
                 assertTrue("Leaving the video should bring the island back", waitFor(8_000) { !immersive() })
             } finally {

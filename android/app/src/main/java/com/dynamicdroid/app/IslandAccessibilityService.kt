@@ -80,10 +80,13 @@ class IslandAccessibilityService : AccessibilityService() {
 
     private fun scheduleMediaCheck(delay: Long) {
         // Nothing to hide (feature off, or no island showing): skip the work entirely.
-        if (wantsMediaCheck?.invoke() != true) { reportImmersive(false); return }
+        if (wantsMediaCheck?.invoke() != true) { mediaDebug = "not wanted"; reportImmersive(false); return }
         mediaHandler.removeCallbacks(mediaCheck)
         mediaHandler.postDelayed(mediaCheck, delay)
     }
+
+    /** What the last check saw, for test failure messages only. */
+    @Volatile internal var mediaDebug = "never checked"
 
     private fun checkImmersiveMedia() {
         lastMediaCheck = SystemClock.uptimeMillis()
@@ -92,8 +95,9 @@ class IslandAccessibilityService : AccessibilityService() {
     }
 
     private fun findMediaSurface(): Boolean {
-        val root = rootInActiveWindow ?: return false
+        val root = rootInActiveWindow ?: run { mediaDebug = "no active window"; return false }
         val pkg = root.packageName?.toString() ?: return false
+        val seen = StringBuilder(pkg)
         if (pkg == packageName || pkg == SYSTEM_UI) return false
         val metrics = resources.displayMetrics
         val screenW = metrics.widthPixels.toFloat()
@@ -110,6 +114,8 @@ class IslandAccessibilityService : AccessibilityService() {
             if (!node.isVisibleToUser) continue
             node.getBoundsInScreen(r)
             val area = r.width().toFloat() * r.height() / screenArea
+            if (seen.length < 400) seen.append(' ').append(node.className?.toString()?.substringAfterLast('.')).append('@').append((area * 100).toInt())
+            mediaDebug = seen.toString()
             if (ImmersiveMedia.isMediaSurface(node.className?.toString().orEmpty(), area, r.width() / screenW, imageApp)) return true
             // Small containers can't hold a full-screen surface; don't look inside them.
             if (!ImmersiveMedia.worthDescending(area)) continue
