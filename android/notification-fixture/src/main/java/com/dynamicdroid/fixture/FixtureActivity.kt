@@ -87,6 +87,14 @@ class FixtureActivity : Activity() {
         super.onCreate(state)
         val kind = intent.getStringExtra("kind") ?: "custom"
         FixturePoster.post(this, kind)
+        if (kind == "video") {
+            // A full-screen video surface with the status bar still showing, like a Short or a Reel.
+            setContentView(android.widget.FrameLayout(this).apply {
+                setBackgroundColor(android.graphics.Color.BLACK)
+                addView(android.view.TextureView(this@FixtureActivity), android.widget.FrameLayout.LayoutParams(-1, -1))
+            })
+            return
+        }
         if (kind == "player") {
             setContentView(android.widget.TextView(this).apply {
                 text = "Fixture music player"; textSize = 28f

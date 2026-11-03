@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Dynamic Droid Insel</string>
-    <string name="accessibility_description">Legt die Insel über die Statusleiste, nutzt App-Paketnamen, um App-Wechsel zu erkennen, und lässt die Lautstärketasten die Lautstärke-Insel zeigen. Nur die Lautstärketasten werden geprüft; alle anderen Tasten bleiben unberührt. Wenn du das Ausblenden der Pop-ups des Handys einschaltest, sucht er außerdem das System-Pop-up einer Benachrichtigung, die die Insel gerade zeigt, und wischt es in die Benachrichtigungsleiste; dafür schaut er nur auf System UI und auf nichts anderes am Bildschirm. Er macht nie Screenshots.</string>
+    <string name="accessibility_description">Legt die Insel über die Statusleiste, nutzt App-Paketnamen, um App-Wechsel zu erkennen, und lässt die Lautstärketasten die Lautstärke-Insel zeigen. Nur die Lautstärketasten werden geprüft; alle anderen Tasten bleiben unberührt. Wenn du das Ausblenden der Pop-ups des Handys einschaltest, sucht er außerdem das System-Pop-up einer Benachrichtigung, die die Insel gerade zeigt, und wischt es in die Benachrichtigungsleiste; dafür schaut er nur auf System UI und auf nichts anderes am Bildschirm. Er macht nie Screenshots. Wenn du das Ausblenden bei Videos und Fotos einschaltest, prüft er Typ und Größe der Ansichten in der App auf dem Bildschirm (nie deren Text), um zu erkennen, wann ein Video oder Foto den Bildschirm füllt.</string>
     <string name="island_calling">Anruf wird aufgebaut…</string>
     <string name="island_connected">Verbunden</string>
     <string name="island_disconnected">Getrennt</string>
@@ -289,4 +289,10 @@
     <string name="feature_full_width">Geöffnete Inseln in voller Breite</string>
     <string name="feature_full_width_note">Nachrichten, Lautstärke und andere geöffnete Inseln ziehen sich über den Bildschirm, statt aus der Kamera zu wachsen.</string>
     <string name="ringer_needs_access">Erlaube Dynamic Droid den Zugriff auf Bitte nicht stören, um auf Lautlos oder Bitte nicht stören zu schalten</string>
+    <string name="feature_art_backdrop">Albumcover hinter der Insel</string>
+    <string name="feature_art_backdrop_note">Während ein Song läuft, wird der Hintergrund der Insel zum Albumcover, sanft unscharf und abgedunkelt, damit Text gut lesbar bleibt. Beim Pausieren wird er wieder schwarz.</string>
+    <string name="feature_idle_pill">Insel im Ruhezustand behalten</string>
+    <string name="feature_idle_pill_note">Lässt eine kleine schwarze Pille um die Kamera stehen, wenn nichts passiert, statt in ihr zu verschwinden.</string>
+    <string name="feature_hide_media">Bei Videos und Fotos ausblenden</string>
+    <string name="feature_hide_media_note">Macht Platz für Shorts, Reels, Vollbildvideos und Fotobetrachter, auch wenn die Statusleiste sichtbar bleibt. Anrufe, Wecker und Lautstärke erscheinen weiterhin.</string>
 </resources>

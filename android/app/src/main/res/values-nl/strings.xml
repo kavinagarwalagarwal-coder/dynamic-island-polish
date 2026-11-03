@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Dynamic Droid-eiland</string>
-    <string name="accessibility_description">Plaatst het eiland boven de statusbalk, gebruikt pakketnamen van apps om appwissels te herkennen en laat de volumeknoppen het volume-eiland tonen. Alleen de volumeknoppen worden bekeken; alle andere toetsen gaan onaangeroerd door. Als je het verbergen van pop-ups van de telefoon aanzet, zoekt hij ook de systeem-pop-up van een melding die het eiland toont en veegt die naar het meldingenpaneel; daarvoor kijkt hij alleen naar System UI en verder niets op het scherm. Hij maakt nooit screenshots.</string>
+    <string name="accessibility_description">Plaatst het eiland boven de statusbalk, gebruikt pakketnamen van apps om appwissels te herkennen en laat de volumeknoppen het volume-eiland tonen. Alleen de volumeknoppen worden bekeken; alle andere toetsen gaan onaangeroerd door. Als je het verbergen van pop-ups van de telefoon aanzet, zoekt hij ook de systeem-pop-up van een melding die het eiland toont en veegt die naar het meldingenpaneel; daarvoor kijkt hij alleen naar System UI en verder niets op het scherm. Hij maakt nooit screenshots. Als je verbergen tijdens video\'s en foto\'s aanzet, kijkt hij naar het type en de grootte van de weergaven in de app op het scherm (nooit hun tekst) om te zien wanneer een video of foto het scherm vult.</string>
     <string name="island_calling">Bellen…</string>
     <string name="island_connected">Verbonden</string>
     <string name="island_disconnected">Verbinding verbroken</string>
@@ -289,4 +289,10 @@
     <string name="feature_full_width">Geopende eilanden over de volle breedte</string>
     <string name="feature_full_width_note">Berichten, volume en andere geopende eilanden lopen over het hele scherm in plaats van uit de camera te groeien.</string>
     <string name="ringer_needs_access">Geef Dynamic Droid toegang tot Niet storen om naar Stil of Niet storen te schakelen</string>
+    <string name="feature_art_backdrop">Albumhoes achter het eiland</string>
+    <string name="feature_art_backdrop_note">Terwijl er een nummer speelt, wordt de achtergrond van het eiland de albumhoes, zacht vervaagd en gedimd zodat tekst leesbaar blijft. Bij pauzeren wordt het weer zwart.</string>
+    <string name="feature_idle_pill">Eiland houden in rust</string>
+    <string name="feature_idle_pill_note">Laat een kleine zwarte pil rond de camera staan als er niets gebeurt, in plaats van erin te verdwijnen.</string>
+    <string name="feature_hide_media">Verbergen bij video\'s en foto\'s</string>
+    <string name="feature_hide_media_note">Gaat opzij voor Shorts, Reels, video\'s op volledig scherm en fotoviewers, ook als de statusbalk zichtbaar blijft. Oproepen, wekkers en volume blijven verschijnen.</string>
 </resources>

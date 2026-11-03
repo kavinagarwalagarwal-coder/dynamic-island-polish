@@ -131,6 +131,38 @@ class FeatureIslandRenderTest {
             }
             SystemClock.sleep(1500)
             capture("feature-glow-expanded")
+            // Album art behind the island while music plays, small and open.
+            val cover = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).also { b ->
+                val c = android.graphics.Canvas(b)
+                c.drawColor(Color.rgb(230, 70, 120))
+                c.drawCircle(44f, 20f, 26f, android.graphics.Paint().apply { color = Color.rgb(255, 190, 60) })
+                c.drawRect(0f, 40f, 64f, 64f, android.graphics.Paint().apply { color = Color.rgb(40, 80, 220) })
+            }
+            val playing = music.copy(key = "music-art", isPlaying = true, artwork = cover)
+            scenario.onActivity { activity ->
+                val view = findIsland(activity.window.decorView)!!
+                view.applyFeatures(IslandFeatureSet(artworkBackdrop = true))
+                view.show(playing, Presentation.COMPACT)
+            }
+            SystemClock.sleep(1500)
+            capture("feature-art-compact")
+            scenario.onActivity { activity -> findIsland(activity.window.decorView)!!.show(playing, Presentation.EXPANDED) }
+            SystemClock.sleep(1500)
+            capture("feature-art-expanded")
+            // Idle, with the resting pill kept on screen.
+            scenario.onActivity { activity ->
+                val view = findIsland(activity.window.decorView)!!
+                view.applyFeatures(IslandFeatureSet(idlePill = true))
+                view.show(null, Presentation.IDLE)
+            }
+            SystemClock.sleep(1500)
+            scenario.onActivity { activity ->
+                val view = findIsland(activity.window.decorView)!!
+                assertEquals(Presentation.IDLE, view.presentation)
+                val bounds = android.graphics.RectF().also(view::islandBounds)
+                assertTrue("Idle pill should stay visible: ${'$'}bounds", bounds.width() > bounds.height() * 2f)
+            }
+            capture("feature-idle-pill")
         }
     }
 }

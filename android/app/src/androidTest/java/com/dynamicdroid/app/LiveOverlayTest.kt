@@ -22,7 +22,8 @@ class LiveOverlayTest {
     }
     @Suppress("UNCHECKED_CAST")
     private fun <T> field(value: Any, name: String): T = value.javaClass.getDeclaredField(name).apply { isAccessible = true }.get(value) as T
-    private fun await(message: String, check: () -> Boolean) {
+    private fun await(message: String, check: () -> Boolean) = await({ message }, check)
+    private fun await(message: () -> String, check: () -> Boolean) {
         val until = SystemClock.uptimeMillis() + 20_000
         do {
             var done = false
@@ -30,7 +31,9 @@ class LiveOverlayTest {
             if (done) return
             Thread.sleep(80)
         } while (SystemClock.uptimeMillis() < until)
-        fail(message)
+        var text = ""
+        instrumentation.runOnMainSync { text = message() }
+        fail(text)
     }
     private fun capture(name: String) {
         val b = automation.takeScreenshot() ?: error("Missing screenshot")
@@ -77,7 +80,12 @@ class LiveOverlayTest {
                 }
                 capture("live-overlay-timer-chip")
                 shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind player")
-                await("Music island did not hide inside its owner app") {
+                await({
+                    val service = IslandBus.listener as? IslandOverlayService
+                    "Music island did not hide inside its owner app: fg=" + service?.let { field<String?>(it, "foregroundPkg") } +
+                        " activity=" + service?.let { field<IslandView?>(it, "island")?.activity?.let { a -> "${'$'}{a.mode}/${'$'}{a.packageName}" } } +
+                        " immersive=" + service?.let { field<Boolean>(it, "immersiveMedia") }
+                }) {
                     val service = IslandBus.listener as? IslandOverlayService ?: return@await false
                     field<String?>(service, "foregroundPkg") == "com.dynamicdroid.fixture" &&
                         field<IslandView?>(service, "island")?.activity == null

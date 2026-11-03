@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Dynamic Droid adası</string>
-    <string name="accessibility_description">Adayı durum çubuğunun üstüne yerleştirir, uygulama geçişlerini algılamak için uygulama paket adlarını kullanır ve ses tuşlarının ses adasını göstermesini sağlar. Yalnızca ses tuşları incelenir; diğer tüm tuşlar dokunulmadan geçer. Telefonun açılır bildirimlerini gizlemeyi açarsanız, adanın gösterdiği bir bildirimin sistem açılır penceresini bulup panele kaydırır; bunun için yalnızca System UI\'a bakar, ekrandaki başka hiçbir şeye bakmaz. Asla ekran görüntüsü almaz.</string>
+    <string name="accessibility_description">Adayı durum çubuğunun üstüne yerleştirir, uygulama geçişlerini algılamak için uygulama paket adlarını kullanır ve ses tuşlarının ses adasını göstermesini sağlar. Yalnızca ses tuşları incelenir; diğer tüm tuşlar dokunulmadan geçer. Telefonun açılır bildirimlerini gizlemeyi açarsanız, adanın gösterdiği bir bildirimin sistem açılır penceresini bulup panele kaydırır; bunun için yalnızca System UI\'a bakar, ekrandaki başka hiçbir şeye bakmaz. Asla ekran görüntüsü almaz. Videolar ve fotoğraflar sırasında gizlemeyi açarsanız, bir video veya fotoğrafın ekranı ne zaman doldurduğunu anlamak için ekrandaki uygulamanın görünümlerinin türüne ve boyutuna bakar (asla metinlerine değil).</string>
     <string name="island_calling">Aranıyor…</string>
     <string name="island_connected">Bağlandı</string>
     <string name="island_disconnected">Bağlantı kesildi</string>
@@ -289,4 +289,10 @@
     <string name="feature_full_width">Açılan adalar tam genişlikte</string>
     <string name="feature_full_width_note">Mesajlar, ses ve diğer açılan adalar kameradan büyümek yerine ekran boyunca uzanır.</string>
     <string name="ringer_needs_access">Sessiz veya Rahatsız Etmeyin moduna geçebilmesi için Dynamic Droid\'e Rahatsız Etmeyin erişimi verin</string>
+    <string name="feature_art_backdrop">Adanın arkasında albüm kapağı</string>
+    <string name="feature_art_backdrop_note">Bir şarkı çalarken adanın arka planı albüm kapağı olur; metin okunaklı kalsın diye hafifçe bulanık ve karartılmıştır. Duraklatınca yeniden siyaha döner.</string>
+    <string name="feature_idle_pill">Boştayken adayı göster</string>
+    <string name="feature_idle_pill_note">Hiçbir şey olmadığında kameranın içinde kaybolmak yerine çevresinde küçük siyah bir hap bırak.</string>
+    <string name="feature_hide_media">Video ve fotoğraflarda gizle</string>
+    <string name="feature_hide_media_note">Durum çubuğu görünse bile Shorts, Reels, tam ekran videolar ve fotoğraf görüntüleyicilerde kenara çekilir. Aramalar, alarmlar ve ses yine görünür.</string>
 </resources>

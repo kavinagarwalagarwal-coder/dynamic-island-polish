@@ -27,6 +27,9 @@ import androidx.core.content.ContextCompat
  * It also filters key events so the volume keys can drive the volume island instead of the system
  * slider. Only the two volume keys are ever looked at; every other key passes straight through.
  *
+ * With "Hide during videos and photos" on, it looks at the class names and sizes of the views in
+ * the app on screen (never their text) to notice a video or photo filling the screen.
+ *
  * With "Hide the phone's pop-up notifications" on, it also swipes the system's own pop-up away
  * the moment the island shows the same notification. Swiping a pop-up up only tucks it into the
  * shade, so nothing is lost. For that it looks at System UI's windows only, only right after a new
@@ -43,13 +46,101 @@ class IslandAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // Package metadata only. Never access event text or retrieve window content.
-        if (event?.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) {
-            val pkg = event.packageName?.toString() ?: return
-            // Ignore events from our non-focusable overlay; allow our actual settings activity.
-            if (pkg == packageName && event.className?.toString() != MainActivity::class.java.name) return
-            onForegroundPackage?.invoke(pkg)
+        // Package metadata only; never event text. Window content is read only by the two
+        // features documented on this class (pop-ups, and full-screen video and photos).
+        event ?: return
+        val pkg = event.packageName?.toString() ?: return
+        if (pkg == packageName || pkg == SYSTEM_UI) {
+            if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+                pkg == packageName && event.className?.toString() == MainActivity::class.java.name) {
+                onForegroundPackage?.invoke(pkg); reportImmersive(false)
+            }
+            return
         }
+        when (event.eventType) {
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                onForegroundPackage?.invoke(pkg)
+                scheduleMediaCheck(150L)
+                // Screen changes animate; look again once the new screen has settled.
+                if (mediaThreadLazy.isInitialized()) {
+                    mediaHandler.removeCallbacks(mediaSettleCheck)
+                    mediaHandler.postDelayed(mediaSettleCheck, 900L)
+                }
+            }
+            // Swiping to the next Short / Reel, or a viewer opening inside the same screen.
+            AccessibilityEvent.TYPE_VIEW_SCROLLED -> scheduleMediaCheck(250L)
+            AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ->
+                if (SystemClock.uptimeMillis() - lastMediaCheck > CONTENT_CHECK_EVERY_MS) scheduleMediaCheck(300L)
+        }
+    }
+
+    // ---------------------------------------------------------------- full-screen video and photos
+
+    /** Checks run off the main thread: walking another app's views costs a few binder calls. */
+    private val mediaThreadLazy = lazy { android.os.HandlerThread("island-media").apply { start() } }
+    private val mediaHandler by lazy { Handler(mediaThreadLazy.value.looper) }
+    @Volatile private var lastMediaCheck = 0L
+    private var immersive = false
+    private val mediaCheck = Runnable { checkImmersiveMedia() }
+    private val mediaSettleCheck = Runnable { checkImmersiveMedia() }
+    /** While hidden, keep confirming: a static screen sends no events to say the video is gone. */
+    private val mediaStillThere = Runnable { checkImmersiveMedia() }
+
+    private fun scheduleMediaCheck(delay: Long) {
+        // Nothing to hide (feature off, or no island showing): skip the work entirely.
+        if (wantsMediaCheck?.invoke() != true) { mediaDebug = "not wanted"; reportImmersive(false); return }
+        mediaHandler.removeCallbacks(mediaCheck)
+        mediaHandler.postDelayed(mediaCheck, delay)
+    }
+
+    /** What the last check saw, for test failure messages only. */
+    @Volatile internal var mediaDebug = "never checked"
+
+    private fun checkImmersiveMedia() {
+        lastMediaCheck = SystemClock.uptimeMillis()
+        val wanted = wantsMediaCheck?.invoke() == true
+        val found = wanted && runCatching { findMediaSurface() }.getOrDefault(false)
+        handler.post { reportImmersive(found) }
+        mediaHandler.removeCallbacks(mediaStillThere)
+        if (found) mediaHandler.postDelayed(mediaStillThere, STILL_THERE_MS)
+    }
+
+    private fun findMediaSurface(): Boolean {
+        val root = rootInActiveWindow ?: run { mediaDebug = "no active window"; return false }
+        val pkg = root.packageName?.toString() ?: return false
+        val seen = StringBuilder(pkg)
+        if (pkg == packageName || pkg == SYSTEM_UI) return false
+        val metrics = resources.displayMetrics
+        val screenW = metrics.widthPixels.toFloat()
+        val screenArea = screenW * metrics.heightPixels
+        val imageApp = imageApps.getOrPut(pkg) {
+            runCatching { packageManager.getApplicationInfo(pkg, 0).category == android.content.pm.ApplicationInfo.CATEGORY_IMAGE }
+                .getOrDefault(false)
+        }
+        val r = Rect()
+        val stack = ArrayDeque<AccessibilityNodeInfo>().apply { add(root) }
+        var visited = 0
+        while (stack.isNotEmpty() && visited++ < MEDIA_NODE_LIMIT) {
+            val node = stack.removeLast()
+            if (!node.isVisibleToUser) continue
+            node.getBoundsInScreen(r)
+            val area = r.width().toFloat() * r.height() / screenArea
+            if (seen.length < 400) seen.append(' ').append(node.className?.toString()?.substringAfterLast('.')).append('@').append((area * 100).toInt())
+            mediaDebug = seen.toString()
+            if (ImmersiveMedia.isMediaSurface(node.className?.toString().orEmpty(), area, r.width() / screenW, imageApp)) return true
+            // Small containers can't hold a full-screen surface; don't look inside them.
+            if (!ImmersiveMedia.worthDescending(area)) continue
+            for (i in 0 until node.childCount) node.getChild(i)?.let(stack::add)
+        }
+        return false
+    }
+
+    private val imageApps = java.util.concurrent.ConcurrentHashMap<String, Boolean>()
+
+    private fun reportImmersive(on: Boolean) {
+        if (on == immersive) return
+        immersive = on
+        onImmersiveMedia?.invoke(on)
     }
     override fun onInterrupt() = Unit
 
@@ -101,7 +192,7 @@ class IslandAccessibilityService : AccessibilityService() {
         val found = ArrayList<AccessibilityNodeInfo>()
         val queue = ArrayDeque<AccessibilityNodeInfo>().apply { add(root) }
         var visited = 0
-        while (queue.isNotEmpty() && visited++ < 600) {
+        while (queue.isNotEmpty() && visited++ < 1200) {
             val node = queue.removeFirst()
             val label = (node.text ?: node.contentDescription)?.toString()
             if (label != null && needles.any { label.contains(it, ignoreCase = true) }) found += node
@@ -193,11 +284,14 @@ class IslandAccessibilityService : AccessibilityService() {
 
     override fun onDestroy() {
         release()
+        if (mediaThreadLazy.isInitialized()) mediaThreadLazy.value.quitSafely()
         super.onDestroy()
     }
 
     private fun release() {
         stopVolumeRepeat()
+        if (mediaThreadLazy.isInitialized()) mediaHandler.removeCallbacksAndMessages(null)
+        reportImmersive(false)
         popupHunt?.let(handler::removeCallbacks)
         popupHunt = null
         if (instance === this) {
@@ -209,6 +303,9 @@ class IslandAccessibilityService : AccessibilityService() {
     companion object {
         private const val SYSTEM_UI = "com.android.systemui"
         private const val POPUP_SEARCH_MS = 1500L
+        private const val CONTENT_CHECK_EVERY_MS = 1500L
+        private const val MEDIA_NODE_LIMIT = 400
+        private const val STILL_THERE_MS = 2_000L
         /** Like a held key on a keyboard: a short pause, then steady steps. */
         const val VOLUME_REPEAT_DELAY_MS = 380L
         const val VOLUME_REPEAT_MS = 80L
@@ -219,6 +316,10 @@ class IslandAccessibilityService : AccessibilityService() {
         /** Set by the overlay service so it can move its window when this connects/disconnects. */
         var onChanged: (() -> Unit)? = null
         var onForegroundPackage: ((String) -> Unit)? = null
+        /** Set by the overlay service: a video or photo now fills the screen (or stopped). */
+        var onImmersiveMedia: ((Boolean) -> Unit)? = null
+        /** Set by the overlay service: whether checking is worth it right now. */
+        var wantsMediaCheck: (() -> Boolean)? = null
         /** Set by the overlay service; returns true when the island handled the key. */
         /** Set by the overlay service: make the island window touch-through for this many ms. */
         var beforePopupSwipe: ((Long) -> Unit)? = null

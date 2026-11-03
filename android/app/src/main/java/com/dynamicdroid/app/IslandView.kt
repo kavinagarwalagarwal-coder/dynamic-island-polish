@@ -2,6 +2,7 @@ package com.dynamicdroid.app
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.graphics.BitmapShader
 import android.graphics.Canvas
 import android.graphics.Color
@@ -125,6 +126,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val levelS = Spring(0f, 340f, 1f, 0.0015f)
     /** Where the ringer highlight sits: 0 ring, 1 vibrate, 2 silent. It slides between buttons. */
     private val modeS = Spring(0f, 420f, 0.86f, 0.002f)
+    /** Album-art backdrop: how much shows (fades with play/pause) and the crossfade between covers. */
+    private val artA = Spring(0f, 120f, 1f, 0.003f)
+    private val artMix = Spring(1f, 140f, 1f, 0.003f)
+    /** Tiny pre-blurred covers; drawn scaled up with filtering, they read as a soft blur for free. */
+    private var artBlur: Bitmap? = null
+    private var artBlurPrev: Bitmap? = null
+    private var artSource: Bitmap? = null
+    private val artPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+    private val artSrc = Rect()
     private val modeHits = ArrayList<Pair<RectF, RingerState>>()
     private val bubbleLevelS = Spring(0f, 300f, 1f, 0.0015f)
     private val musicBarS = Spring(0f, 420f, 1f, 0.0008f)
@@ -185,7 +195,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun restingDiameter() = (cutoutDiameter ?: dp(14f)) / fit.scale
     private fun restingTop() = (cutoutCenterY?.let { it + dp(fit.offsetY) } ?: (baseTop * fit.scale + dp(18f))) / fit.scale - restingDiameter() / 2
-    private fun targetTop(p: Presentation) = if (p == Presentation.IDLE) restingTop() else baseTop
+    private fun targetTop(p: Presentation) = if (p == Presentation.IDLE && !features.idlePill) restingTop() else baseTop
 
 
     fun applyFit(next: IslandFit) {
@@ -305,7 +315,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
     private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -436,7 +446,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         mediaActions = next?.let { activity -> IslandCustomization.mediaSelection(context, activity.packageName)
             ?: setOf(IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_TOGGLE, IslandBus.MEDIA_NEXT, IslandBus.MEDIA_SEEK) }
             ?: setOf(IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_TOGGLE, IslandBus.MEDIA_NEXT, IslandBus.MEDIA_SEEK)
-        presenceS.target = if (next != null) 1f else 0f
+        presenceS.target = if (next != null || features.idlePill) 1f else 0f
+        updateArtBackdrop(next)
         presentation = p
         secondaryA.target = if (secondary != null && p == Presentation.COMPACT) 1f else 0f
         dropS.target = secondaryA.target
@@ -529,7 +540,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             introS.snap(1f)
             val resting = specFor(Presentation.IDLE, null)
             widthS.snap(resting.w); heightS.snap(resting.h); radiusS.snap(resting.r)
-            centerS.snap(cameraCenter()); topS.snap(restingTop())
+            centerS.snap(cameraCenter()); topS.snap(targetTop(Presentation.IDLE))
+            if (features.idlePill) presenceS.snap(1f)
             callbacks?.onSettled()
             return
         }
@@ -662,6 +674,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun specFor(p: Presentation, a: LiveActivity?): Spec {
         if (p == Presentation.IDLE || a == null) {
+            if (features.idlePill) {
+                // A small resting pill around the camera, the same height as the live one.
+                val h = compactHeight()
+                return Spec(max(h * 2.4f, dp(IDLE_PILL_WIDTH_DP) * fit.pillWidth), h, h / 2f, cameraCenter())
+            }
             val d = restingDiameter()
             return Spec(d, d, d / 2f, cameraCenter())
         }
@@ -910,6 +927,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             liquidGlass.draw(canvas, wallpaperStage, rect, r, bodyAlpha, wallpaperSkin,
                 resizing = shapeSprings.any { !it.isAtRest } || !pressS.isAtRest || !stretchS.isAtRest)
         }
+        drawArtBackdrop(canvas, bodyAlpha * (1f - absorb))
 
         val ea = expandedA.value.coerceIn(0f, 1f) * reveal
         val ca = compactA.value.coerceIn(0f, 1f) * reveal
@@ -1447,8 +1465,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val hx = l + pos * (bw + gap)
         val from = floor(pos).toInt().coerceIn(0, 2)
         val to = ceil(pos).toInt().coerceIn(0, 2)
-        val states = listOf(RingerState.RING, RingerState.VIBRATE, RingerState.SILENT)
-        val highlight = ColorUtils.blendARGB(ringerTint(states[from]), ringerTint(states[to]), pos - from)
+        val highlight = ColorUtils.blendARGB(ringerTint(RINGER_ORDER[from]), ringerTint(RINGER_ORDER[to]), pos - from)
         for (i in 0 until 4) {
             val x = l + i * (bw + gap)
             fillPaint.color = withAlpha(off, alpha)
@@ -1503,6 +1520,67 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
         text(canvas, a.title, tx, cy - dp(2f), right - tx, titlePaint, Color.WHITE, alpha)
         text(canvas, a.subtitle, tx, cy + dp(16f), right - tx, smallPaint, if (a.lost) NothingStyle.red else GREY, alpha)
+    }
+
+    /**
+     * The cover shows only while music is actually playing; pausing fades it back to black. A new
+     * cover crossfades from the old one. All the blurring happens once per cover, off the frame path.
+     */
+    private fun updateArtBackdrop(next: LiveActivity?) {
+        val art = next?.takeIf { it.mode == IslandMode.MUSIC }?.artwork
+        val on = features.artworkBackdrop && art != null && next?.isPlaying == true
+        if (art != null && art !== artSource && features.artworkBackdrop) {
+            artSource = art
+            val blurred = blurredCover(art)
+            if (blurred != null && artBlur?.sameAs(blurred) != true) {
+                if (artA.value > 0.02f && artBlur != null) {
+                    artBlurPrev = artBlur
+                    artMix.snap(0f); artMix.target = 1f
+                } else {
+                    artBlurPrev = null
+                    artMix.snap(1f)
+                }
+                artBlur = blurred
+            }
+        }
+        artA.target = if (on) 1f else 0f
+        if (!on && artA.value < 0.01f && !features.artworkBackdrop) { artBlur = null; artBlurPrev = null; artSource = null }
+    }
+
+    /** Two small downscales: a cheap, smooth blur that costs nothing per frame. */
+    private fun blurredCover(src: Bitmap): Bitmap? = runCatching {
+        if (src.width < 2 || src.height < 2 || src.isRecycled) return null
+        val tiny = Bitmap.createScaledBitmap(src, ART_BLUR_TINY, ART_BLUR_TINY, true)
+        Bitmap.createScaledBitmap(tiny, ART_BLUR_SIZE, ART_BLUR_SIZE, true).also { if (it !== tiny) tiny.recycle() }
+    }.getOrNull()
+
+    private fun drawArtBackdrop(canvas: Canvas, bodyAlpha: Float) {
+        val show = artA.value.coerceIn(0f, 1f)
+        val cover = artBlur ?: return
+        if (show < 0.01f || bodyAlpha < 2f) return
+        // Centre-crop the square cover to the island's shape.
+        val aspect = rect.width() / max(1f, rect.height())
+        val n = cover.width
+        if (aspect >= 1f) {
+            val h = (n / aspect).toInt().coerceIn(1, n)
+            artSrc.set(0, (n - h) / 2, n, (n - h) / 2 + h)
+        } else {
+            val w = (n * aspect).toInt().coerceIn(1, n)
+            artSrc.set((n - w) / 2, 0, (n - w) / 2 + w, n)
+        }
+        val base = bodyAlpha * show
+        val mix = artMix.value.coerceIn(0f, 1f)
+        artBlurPrev?.takeIf { mix < 0.99f }?.let {
+            artPaint.alpha = (base * (1f - mix)).toInt()
+            canvas.drawBitmap(it, artSrc, rect, artPaint)
+        }
+        artPaint.alpha = (base * if (artBlurPrev != null) mix else 1f).toInt()
+        canvas.drawBitmap(cover, artSrc, rect, artPaint)
+        if (mix >= 0.99f) artBlurPrev = null
+        // Dim it so white text and controls stay easy to read; a touch more when open.
+        fillPaint.color = Color.BLACK
+        fillPaint.alpha = (base * (ART_DIM + 0.12f * expandedA.value.coerceIn(0f, 1f))).toInt()
+        canvas.drawRect(rect, fillPaint)
     }
 
     /**
@@ -1599,7 +1677,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         // Buzz marks either side, stronger while it shakes.
         ringPaint.color = withAlpha(color, (Color.alpha(color) * (0.55f + 0.45f * energy)).toInt())
         ringPaint.strokeWidth = dp(1.4f)
-        for (side in listOf(-1f, 1f)) {
+        for (k in 0..1) {
+            val side = if (k == 0) -1f else 1f
             val x = cx + side * s * .72f
             val w = side * s * .16f
             iconPath.reset()
@@ -1774,8 +1853,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun drawMoon(canvas: Canvas, cx: Float, cy: Float, r: Float, color: Int) {
         iconPath.reset()
         iconPath.addCircle(cx, cy, r, Path.Direction.CW)
-        val cut = Path().apply { addCircle(cx + r * .55f, cy - r * .45f, r * .85f, Path.Direction.CW) }
-        iconPath.op(cut, Path.Op.DIFFERENCE)
+        moonCut.reset()
+        moonCut.addCircle(cx + r * .55f, cy - r * .45f, r * .85f, Path.Direction.CW)
+        iconPath.op(moonCut, Path.Op.DIFFERENCE)
         fillPaint.color = color
         canvas.drawPath(iconPath, fillPaint)
     }
@@ -2513,6 +2593,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val OUTLINE_EVENT_MS = 4_000L
         private const val RINGER_HEIGHT_DP = 46f
         private const val RINGER_ROW_DP = 52f
+        private const val IDLE_PILL_WIDTH_DP = 96f
+        private val RINGER_ORDER = arrayOf(RingerState.RING, RingerState.VIBRATE, RingerState.SILENT)
+        private const val ART_BLUR_TINY = 6
+        private const val ART_BLUR_SIZE = 24
+        private const val ART_DIM = 0.42f
         private const val RINGER_ANIM_MS = 900L
         private const val GLOW_STEPS = 16
         private const val GLOW_REACH_DP = 10f

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Îlot Dynamic Droid</string>
-    <string name="accessibility_description">Place l\'îlot au-dessus de la barre d\'état, utilise les noms de paquet des apps pour détecter les changements d\'app et permet aux touches de volume d\'afficher l\'îlot de volume. Seules les touches de volume sont examinées ; toutes les autres passent intactes. Si vous activez le masquage des pop-ups du téléphone, il repère aussi le pop-up système d\'une notification affichée par l\'îlot et le glisse dans le volet ; pour cela il ne regarde que System UI, rien d\'autre à l\'écran. Il ne fait jamais de captures d\'écran.</string>
+    <string name="accessibility_description">Place l\'îlot au-dessus de la barre d\'état, utilise les noms de paquet des apps pour détecter les changements d\'app et permet aux touches de volume d\'afficher l\'îlot de volume. Seules les touches de volume sont examinées ; toutes les autres passent intactes. Si vous activez le masquage des pop-ups du téléphone, il repère aussi le pop-up système d\'une notification affichée par l\'îlot et le glisse dans le volet ; pour cela il ne regarde que System UI, rien d\'autre à l\'écran. Il ne fait jamais de captures d\'écran. Si vous activez le masquage pendant les vidéos et photos, il vérifie le type et la taille des vues de l\'app à l\'écran (jamais leur texte) pour savoir quand une vidéo ou une photo remplit l\'écran.</string>
     <string name="island_calling">Appel en cours…</string>
     <string name="island_connected">Connecté</string>
     <string name="island_disconnected">Déconnecté</string>
@@ -289,4 +289,10 @@
     <string name="feature_full_width">Îlots ouverts sur toute la largeur</string>
     <string name="feature_full_width_note">Les messages, le volume et les autres îlots ouverts s\'étendent sur tout l\'écran au lieu de grandir depuis la caméra.</string>
     <string name="ringer_needs_access">Autorisez l\'accès à Ne pas déranger pour que Dynamic Droid puisse passer en Silencieux ou Ne pas déranger</string>
+    <string name="feature_art_backdrop">Pochette d\'album derrière l\'îlot</string>
+    <string name="feature_art_backdrop_note">Pendant la lecture d\'un morceau, le fond de l\'îlot devient la pochette de l\'album, légèrement floutée et assombrie pour que le texte reste lisible. En pause, il redevient noir.</string>
+    <string name="feature_idle_pill">Garder l\'îlot au repos</string>
+    <string name="feature_idle_pill_note">Laisse une petite pilule noire autour de la caméra quand rien ne se passe, au lieu de disparaître dedans.</string>
+    <string name="feature_hide_media">Masquer pendant les vidéos et photos</string>
+    <string name="feature_hide_media_note">S\'efface pour les Shorts, Reels, vidéos plein écran et visionneuses de photos, même si la barre d\'état reste visible. Appels, alarmes et volume s\'affichent toujours.</string>
 </resources>

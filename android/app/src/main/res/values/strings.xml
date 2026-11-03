@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Dynamic Droid island</string>
-    <string name="accessibility_description">Places the island above the status bar, uses app package names to detect app switches, and lets the volume keys show the volume island. Only the volume keys are checked; every other key passes through untouched. If you turn on hiding the phone\'s pop-ups, it also finds the system\'s pop-up for a notification the island is showing and swipes it into the shade; it looks only at System UI for that and nothing else on screen. It never captures screenshots.</string>
+    <string name="accessibility_description">Places the island above the status bar, uses app package names to detect app switches, and lets the volume keys show the volume island. Only the volume keys are checked; every other key passes through untouched. If you turn on hiding the phone\'s pop-ups, it also finds the system\'s pop-up for a notification the island is showing and swipes it into the shade; it looks only at System UI for that and nothing else on screen. If you turn on hiding during videos and photos, it checks the type and size of views in the app on screen (never their text) to tell when a video or photo fills the screen. It never captures screenshots.</string>
     <!-- Island -->
     <string name="island_calling">Calling…</string>
     <string name="island_connected">Connected</string>
@@ -300,4 +300,10 @@
     <string name="feature_full_width">Open islands fill the width</string>
     <string name="feature_full_width_note">Messages, volume and other opened islands stretch across the screen instead of growing from the camera.</string>
     <string name="ringer_needs_access">Allow Do Not Disturb access for Dynamic Droid to switch to Silent or Do Not Disturb</string>
+    <string name="feature_art_backdrop">Album art behind the island</string>
+    <string name="feature_art_backdrop_note">While a song plays, the island\'s background becomes its album cover, softly blurred and dimmed so text stays readable. Pausing fades it back to black.</string>
+    <string name="feature_idle_pill">Keep the island when idle</string>
+    <string name="feature_idle_pill_note">Leave a small black pill around the camera when nothing is happening, instead of disappearing into it.</string>
+    <string name="feature_hide_media">Hide during videos and photos</string>
+    <string name="feature_hide_media_note">Step aside for Shorts, Reels, full-screen videos and photo viewers, even when the status bar stays visible. Calls, alarms and volume still show.</string>
 </resources>
