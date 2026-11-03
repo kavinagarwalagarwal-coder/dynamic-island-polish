@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Pulau Dynamic Droid</string>
-    <string name="accessibility_description">Menempatkan pulau di atas bilah status, memakai nama paket aplikasi untuk mendeteksi pergantian aplikasi, dan membuat tombol volume menampilkan pulau volume. Hanya tombol volume yang diperiksa; tombol lain diteruskan tanpa disentuh. Jika Anda menyalakan sembunyikan pop-up ponsel, layanan ini juga mencari pop-up sistem dari notifikasi yang sedang ditampilkan pulau lalu menggesernya ke panel; untuk itu hanya System UI yang dilihat, tidak ada hal lain di layar. Tidak pernah mengambil tangkapan layar.</string>
+    <string name="accessibility_description">Menempatkan pulau di atas bilah status, memakai nama paket aplikasi untuk mendeteksi pergantian aplikasi, dan membuat tombol volume menampilkan pulau volume. Hanya tombol volume yang diperiksa; tombol lain diteruskan tanpa disentuh. Jika Anda menyalakan sembunyikan pop-up ponsel, layanan ini juga mencari pop-up sistem dari notifikasi yang sedang ditampilkan pulau lalu menggesernya ke panel; untuk itu hanya System UI yang dilihat, tidak ada hal lain di layar. Tidak pernah mengambil tangkapan layar. Jika Anda menyalakan sembunyikan saat video dan foto, layanan ini memeriksa jenis dan ukuran tampilan di aplikasi pada layar (tidak pernah teksnya) untuk mengetahui kapan video atau foto memenuhi layar.</string>
     <string name="island_calling">Memanggil…</string>
     <string name="island_connected">Terhubung</string>
     <string name="island_disconnected">Terputus</string>
@@ -293,4 +293,6 @@
     <string name="feature_art_backdrop_note">Saat lagu diputar, latar pulau menjadi sampul albumnya, sedikit diburamkan dan digelapkan agar teks tetap mudah dibaca. Saat dijeda, kembali hitam.</string>
     <string name="feature_idle_pill">Tetap tampilkan pulau saat diam</string>
     <string name="feature_idle_pill_note">Tinggalkan pil hitam kecil di sekitar kamera saat tidak ada apa-apa, alih-alih menghilang ke dalamnya.</string>
+    <string name="feature_hide_media">Sembunyikan saat video dan foto</string>
+    <string name="feature_hide_media_note">Menyingkir saat Shorts, Reels, video layar penuh, dan penampil foto, meskipun bilah status tetap terlihat. Panggilan, alarm, dan volume tetap muncul.</string>
 </resources>

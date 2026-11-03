@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Dynamic Droid アイランド</string>
-    <string name="accessibility_description">アイランドをステータスバーの上に配置し、アプリの切り替えを検出するためにアプリのパッケージ名を使い、音量ボタンで音量アイランドを表示します。確認するのは音量ボタンだけで、ほかのキーはそのまま通します。端末のポップアップを隠すをオンにすると、アイランドが表示中の通知のシステムポップアップを見つけて通知シェードへスワイプします。その際に見るのは System UI だけで、画面のほかの部分は見ません。スクリーンショットは一切撮りません。</string>
+    <string name="accessibility_description">アイランドをステータスバーの上に配置し、アプリの切り替えを検出するためにアプリのパッケージ名を使い、音量ボタンで音量アイランドを表示します。確認するのは音量ボタンだけで、ほかのキーはそのまま通します。端末のポップアップを隠すをオンにすると、アイランドが表示中の通知のシステムポップアップを見つけて通知シェードへスワイプします。その際に見るのは System UI だけで、画面のほかの部分は見ません。スクリーンショットは一切撮りません。 動画と写真の表示中に隠すをオンにすると、動画や写真が画面いっぱいに表示されているかを判断するため、画面上のアプリのビューの種類と大きさを確認します(テキストは一切読みません)。</string>
     <string name="island_calling">発信中…</string>
     <string name="island_connected">接続済み</string>
     <string name="island_disconnected">切断されました</string>
@@ -293,4 +293,6 @@
     <string name="feature_art_backdrop_note">曲の再生中は、アイランドの背景がアルバムジャケットになります。文字が読みやすいよう、やわらかくぼかして暗くしています。一時停止すると黒に戻ります。</string>
     <string name="feature_idle_pill">待機中もアイランドを表示</string>
     <string name="feature_idle_pill_note">何も起きていないとき、カメラの中に消える代わりに、カメラの周りに小さな黒いピルを残します。</string>
+    <string name="feature_hide_media">動画や写真の表示中は隠す</string>
+    <string name="feature_hide_media_note">ステータスバーが表示されたままでも、ショート、リール、全画面動画、写真ビューアーでは表示を控えます。通話、アラーム、音量は引き続き表示されます。</string>
 </resources>

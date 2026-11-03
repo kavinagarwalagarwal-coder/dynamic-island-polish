@@ -260,6 +260,14 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             ContextCompat.RECEIVER_EXPORTED
         )
         watcher = ForegroundWatcher(this, ::onForegroundChanged)
+        IslandAccessibilityService.onImmersiveMedia = { on ->
+            immersiveMedia = on
+            render()
+        }
+        IslandAccessibilityService.wantsMediaCheck = {
+            IslandFeatures.read(this).hideForMedia && island != null &&
+                (activities.all().isNotEmpty() || transient != null || IslandFeatures.read(this).idlePill)
+        }
         IslandAccessibilityService.onForegroundPackage = { pkg ->
             if (pkg !in keyboardPackages && (pkg in homePackages || activities.all().any { it.packageName == pkg } ||
                     packageManager.getLaunchIntentForPackage(pkg) != null)) watcher?.hint(pkg)
@@ -436,7 +444,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // Calls stay visible even over fullscreen video; everything else steps aside.
         val swiftMorphStarted = absorb && t == null && p == Presentation.COMPACT &&
             a != null && startSwiftMorph(a)
-        val concealed = fullscreen && a?.mode != IslandMode.CALL && a?.mode != IslandMode.ALARM && a?.mode != IslandMode.VOLUME
+        val concealed = (fullscreen || immersiveMedia) && a?.mode != IslandMode.CALL && a?.mode != IslandMode.ALARM && a?.mode != IslandMode.VOLUME
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
         params?.let { lp ->
@@ -733,6 +741,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         render()
     }
 
+    /** A Short, Reel, full-screen player or photo viewer fills the screen while the status bar stays. */
+    private var immersiveMedia = false
+
     override fun onInteraction() {
         // Keep things open while the user is touching them.
         transient?.let {
@@ -950,6 +961,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         if (IslandBus.listener === this) IslandBus.listener = null
         IslandAccessibilityService.onChanged = null
         IslandAccessibilityService.onForegroundPackage = null
+        IslandAccessibilityService.onImmersiveMedia = null
+        IslandAccessibilityService.wantsMediaCheck = null
         if (IslandAccessibilityService.onVolumeKey != null) IslandAccessibilityService.onVolumeKey = null
         IslandBus.listenerChanged = null
         IslandAccessibilityService.beforePopupSwipe = null

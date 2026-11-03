@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Isla de Dynamic Droid</string>
-    <string name="accessibility_description">Coloca la isla sobre la barra de estado, usa los nombres de paquete de las apps para detectar cambios de app y permite que los botones de volumen muestren la isla de volumen. Solo se revisan los botones de volumen; las demás teclas pasan sin tocarse. Si activas ocultar los avisos del teléfono, también busca el aviso del sistema de una notificación que la isla está mostrando y lo desliza al panel; para ello solo mira System UI y nada más de la pantalla. Nunca hace capturas de pantalla.</string>
+    <string name="accessibility_description">Coloca la isla sobre la barra de estado, usa los nombres de paquete de las apps para detectar cambios de app y permite que los botones de volumen muestren la isla de volumen. Solo se revisan los botones de volumen; las demás teclas pasan sin tocarse. Si activas ocultar los avisos del teléfono, también busca el aviso del sistema de una notificación que la isla está mostrando y lo desliza al panel; para ello solo mira System UI y nada más de la pantalla. Nunca hace capturas de pantalla. Si activas ocultar durante vídeos y fotos, revisa el tipo y el tamaño de las vistas de la app en pantalla (nunca su texto) para saber cuándo un vídeo o una foto ocupa la pantalla.</string>
     <string name="island_calling">Llamando…</string>
     <string name="island_connected">Conectado</string>
     <string name="island_disconnected">Desconectado</string>
@@ -293,4 +293,6 @@
     <string name="feature_art_backdrop_note">Mientras suena una canción, el fondo de la isla pasa a ser la portada del álbum, suavemente desenfocada y oscurecida para que el texto se lea bien. Al pausar vuelve a negro.</string>
     <string name="feature_idle_pill">Mantener la isla en reposo</string>
     <string name="feature_idle_pill_note">Deja una pequeña píldora negra alrededor de la cámara cuando no pasa nada, en lugar de desaparecer en ella.</string>
+    <string name="feature_hide_media">Ocultar durante vídeos y fotos</string>
+    <string name="feature_hide_media_note">Se aparta en Shorts, Reels, vídeos a pantalla completa y visores de fotos, aunque la barra de estado siga visible. Llamadas, alarmas y volumen se siguen mostrando.</string>
 </resources>

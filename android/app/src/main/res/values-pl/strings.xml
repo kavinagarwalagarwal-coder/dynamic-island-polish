@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Wyspa Dynamic Droid</string>
-    <string name="accessibility_description">Umieszcza wyspę nad paskiem stanu, używa nazw pakietów aplikacji do wykrywania zmiany aplikacji i pozwala przyciskom głośności pokazywać wyspę głośności. Sprawdzane są tylko przyciski głośności; pozostałe klawisze przechodzą nietknięte. Jeśli włączysz ukrywanie wyskakujących powiadomień telefonu, usługa znajduje też systemowe okienko powiadomienia, które pokazuje wyspa, i przesuwa je do panelu; patrzy przy tym tylko na System UI i na nic innego na ekranie. Nigdy nie robi zrzutów ekranu.</string>
+    <string name="accessibility_description">Umieszcza wyspę nad paskiem stanu, używa nazw pakietów aplikacji do wykrywania zmiany aplikacji i pozwala przyciskom głośności pokazywać wyspę głośności. Sprawdzane są tylko przyciski głośności; pozostałe klawisze przechodzą nietknięte. Jeśli włączysz ukrywanie wyskakujących powiadomień telefonu, usługa znajduje też systemowe okienko powiadomienia, które pokazuje wyspa, i przesuwa je do panelu; patrzy przy tym tylko na System UI i na nic innego na ekranie. Nigdy nie robi zrzutów ekranu. Jeśli włączysz ukrywanie podczas filmów i zdjęć, sprawdza typ i rozmiar widoków w aplikacji na ekranie (nigdy ich tekstu), by wiedzieć, kiedy film lub zdjęcie wypełnia ekran.</string>
     <string name="island_calling">Łączenie…</string>
     <string name="island_connected">Połączono</string>
     <string name="island_disconnected">Rozłączono</string>
@@ -293,4 +293,6 @@
     <string name="feature_art_backdrop_note">Podczas odtwarzania utworu tłem wyspy staje się okładka albumu, delikatnie rozmyta i przyciemniona, by tekst był czytelny. Po wstrzymaniu wraca do czerni.</string>
     <string name="feature_idle_pill">Zostaw wyspę w spoczynku</string>
     <string name="feature_idle_pill_note">Gdy nic się nie dzieje, zostaw małą czarną pigułkę wokół aparatu zamiast znikać w nim.</string>
+    <string name="feature_hide_media">Ukrywaj przy filmach i zdjęciach</string>
+    <string name="feature_hide_media_note">Usuwa się przy Shorts, Reels, filmach na pełnym ekranie i przeglądarkach zdjęć, nawet gdy pasek stanu jest widoczny. Połączenia, alarmy i głośność nadal się pokazują.</string>
 </resources>

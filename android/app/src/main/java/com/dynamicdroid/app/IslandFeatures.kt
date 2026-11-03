@@ -27,6 +27,8 @@ data class IslandFeatureSet(
     val artworkBackdrop: Boolean = true,
     /** With nothing going on, keep a small black pill at the camera instead of disappearing. */
     val idlePill: Boolean = false,
+    /** Step aside for Shorts, Reels, full-screen players and photo viewers, not just true fullscreen. */
+    val hideForMedia: Boolean = true,
     /** Off by default: it takes over from the phone's own pop-ups. */
     val hidePhonePopups: Boolean = false,
     val messagesMediumFirst: Boolean = true,
@@ -78,6 +80,7 @@ object IslandFeatures {
             fullWidthOpen = p.getBoolean("full_width_open", d.fullWidthOpen),
             artworkBackdrop = p.getBoolean("artwork_backdrop", d.artworkBackdrop),
             idlePill = p.getBoolean("idle_pill", d.idlePill),
+            hideForMedia = p.getBoolean("hide_for_media", d.hideForMedia),
             hidePhonePopups = p.getBoolean("hide_phone_popups", d.hidePhonePopups),
             messagesMediumFirst = p.getBoolean("messages_medium", d.messagesMediumFirst),
             shortCompact = p.getBoolean("short_compact", d.shortCompact),

@@ -48,6 +48,14 @@ object FixturePoster {
         nm.notify(101, Notification.Builder(context, "fixture").setSmallIcon(android.R.drawable.ic_media_play)
             .setContentTitle("Fixture music").setOngoing(true)
             .setStyle(Notification.MediaStyle().setMediaSession(session!!.sessionToken)).build())
+        if (kind == "video") {
+            // A full-screen video surface with the status bar still showing, like a Short or a Reel.
+            setContentView(android.widget.FrameLayout(this).apply {
+                setBackgroundColor(android.graphics.Color.BLACK)
+                addView(android.view.TextureView(this@FixtureActivity), android.widget.FrameLayout.LayoutParams(-1, -1))
+            })
+            return
+        }
         if (kind == "player") {
             nm.cancel(202)
             return

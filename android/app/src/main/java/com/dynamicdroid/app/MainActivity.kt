@@ -719,6 +719,7 @@ class MainActivity : AppCompatActivity() {
         toggle(R.string.feature_full_width, "full_width_open", features.fullWidthOpen, R.string.feature_full_width_note)
         toggle(R.string.feature_art_backdrop, "artwork_backdrop", features.artworkBackdrop, R.string.feature_art_backdrop_note)
         toggle(R.string.feature_idle_pill, "idle_pill", features.idlePill, R.string.feature_idle_pill_note)
+        toggle(R.string.feature_hide_media, "hide_for_media", features.hideForMedia, R.string.feature_hide_media_note)
         column.addView(label(getString(R.string.feature_outline), 16f, NothingStyle.foreground).apply {
             typeface = NothingStyle.body; setPadding(0, dp(12), 0, 0)
         }, row(-2))

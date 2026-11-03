@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Isola Dynamic Droid</string>
-    <string name="accessibility_description">Posiziona l\'isola sopra la barra di stato, usa i nomi dei pacchetti delle app per rilevare i cambi di app e permette ai tasti del volume di mostrare l\'isola del volume. Vengono controllati solo i tasti del volume; tutti gli altri passano intatti. Se attivi l\'opzione per nascondere i pop-up del telefono, trova anche il pop-up di sistema di una notifica che l\'isola sta mostrando e lo scorre nella tendina; per farlo guarda solo System UI e nient\'altro sullo schermo. Non acquisisce mai screenshot.</string>
+    <string name="accessibility_description">Posiziona l\'isola sopra la barra di stato, usa i nomi dei pacchetti delle app per rilevare i cambi di app e permette ai tasti del volume di mostrare l\'isola del volume. Vengono controllati solo i tasti del volume; tutti gli altri passano intatti. Se attivi l\'opzione per nascondere i pop-up del telefono, trova anche il pop-up di sistema di una notifica che l\'isola sta mostrando e lo scorre nella tendina; per farlo guarda solo System UI e nient\'altro sullo schermo. Non acquisisce mai screenshot. Se attivi il nascondimento durante video e foto, controlla tipo e dimensione delle viste dell\'app sullo schermo (mai il loro testo) per capire quando un video o una foto riempie lo schermo.</string>
     <string name="island_calling">Chiamata in corso…</string>
     <string name="island_connected">Connesso</string>
     <string name="island_disconnected">Disconnesso</string>
@@ -293,4 +293,6 @@
     <string name="feature_art_backdrop_note">Mentre suona un brano, lo sfondo dell\'isola diventa la copertina dell\'album, leggermente sfocata e scurita perché il testo resti leggibile. In pausa torna nero.</string>
     <string name="feature_idle_pill">Mantieni l\'isola a riposo</string>
     <string name="feature_idle_pill_note">Lascia una piccola pillola nera attorno alla fotocamera quando non succede nulla, invece di scomparire al suo interno.</string>
+    <string name="feature_hide_media">Nascondi durante video e foto</string>
+    <string name="feature_hide_media_note">Si fa da parte per Shorts, Reels, video a schermo intero e visualizzatori di foto, anche se la barra di stato resta visibile. Chiamate, sveglie e volume compaiono comunque.</string>
 </resources>
