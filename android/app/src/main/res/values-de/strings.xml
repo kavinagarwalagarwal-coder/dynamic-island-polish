@@ -295,4 +295,5 @@
     <string name="feature_idle_pill_note">Lässt eine kleine schwarze Pille um die Kamera stehen, wenn nichts passiert, statt in ihr zu verschwinden.</string>
     <string name="feature_hide_media">Bei Videos und Fotos ausblenden</string>
     <string name="feature_hide_media_note">Macht Platz für Shorts, Reels, Vollbildvideos und Fotobetrachter, auch wenn die Statusleiste sichtbar bleibt. Anrufe, Wecker und Lautstärke erscheinen weiterhin.</string>
+    <string name="setup_a11y_stuck">Kamerabereich-Overlay angehalten: aus- und wieder einschalten</string>
 </resources>

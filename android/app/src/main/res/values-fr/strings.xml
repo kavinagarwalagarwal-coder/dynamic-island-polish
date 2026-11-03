@@ -295,4 +295,5 @@
     <string name="feature_idle_pill_note">Laisse une petite pilule noire autour de la caméra quand rien ne se passe, au lieu de disparaître dedans.</string>
     <string name="feature_hide_media">Masquer pendant les vidéos et photos</string>
     <string name="feature_hide_media_note">S\'efface pour les Shorts, Reels, vidéos plein écran et visionneuses de photos, même si la barre d\'état reste visible. Appels, alarmes et volume s\'affichent toujours.</string>
+    <string name="setup_a11y_stuck">La superposition de la zone caméra s\'est arrêtée : désactivez-la puis réactivez-la</string>
 </resources>

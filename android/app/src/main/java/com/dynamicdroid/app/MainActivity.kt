@@ -205,7 +205,14 @@ class MainActivity : AppCompatActivity() {
         buttons["overlay"]?.text = if (overlay) getString(R.string.setup_overlay_allowed) else getString(R.string.setup_overlay_allow)
         buttons["usage"]?.text = if (ForegroundWatcher.hasPermission(this)) getString(R.string.setup_usage_allowed) else getString(R.string.setup_usage_allow)
         val a11y = IslandAccessibilityService.isEnabled(this)
-        buttons["a11y"]?.text = if (a11y) getString(R.string.setup_a11y_enabled) else getString(R.string.setup_a11y_enable)
+        // Switched on in Settings but not running: Android shows "Not working" after the app was
+        // force-stopped, and only switching it off and on again brings it back.
+        val a11yStuck = a11y && IslandAccessibilityService.instance == null
+        buttons["a11y"]?.text = getString(when {
+            a11yStuck -> R.string.setup_a11y_stuck
+            a11y -> R.string.setup_a11y_enabled
+            else -> R.string.setup_a11y_enable
+        })
         val notifications = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
         buttons["notifications"]?.text = if (notifications) getString(R.string.setup_notifications_enabled) else getString(R.string.setup_notifications_connect)
         val ready = notifications && (overlay || a11y)
@@ -549,7 +556,7 @@ class MainActivity : AppCompatActivity() {
         column.addView(placementChoices, row(-2))
         column.addView(action("test-fit", getString(R.string.fit_test)) {
             if (Settings.canDrawOverlays(this) || IslandAccessibilityService.isEnabled(this)) {
-                ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_TEST))
+                startService(Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_TEST))
                 startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME))
             } else { selectPage("Setup"); toast(getString(R.string.fit_need_overlay)) }
         }, row(-2).apply { topMargin = dp(10) })
@@ -1090,7 +1097,7 @@ class MainActivity : AppCompatActivity() {
         quietEndButton?.text = getString(R.string.rules_quiet_until, minuteLabel(IslandCustomization.quietEnd(this)))
         timerBubbleSwitch?.isChecked = IslandCustomization.timerAsBubble(this)
         if (Settings.canDrawOverlays(this) || IslandAccessibilityService.isEnabled(this))
-            ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_CUSTOMIZATION))
+            startService(Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_CUSTOMIZATION))
     }
 
     private fun selectPage(name: String) {
@@ -1188,7 +1195,7 @@ class MainActivity : AppCompatActivity() {
         preview.applyWallpaper(wallpaperStyle, bitmap)
         wallpaperPreview?.applyWallpaper(wallpaperStyle, bitmap)
         if (Settings.canDrawOverlays(this) || IslandAccessibilityService.isEnabled(this)) {
-            ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_WALLPAPER))
+            startService(Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_WALLPAPER))
         }
     }
 
@@ -1283,7 +1290,7 @@ class MainActivity : AppCompatActivity() {
         placementInfo?.text = placementExplanation()
         preview.applyFit(fit.copy(offsetY = 0f))
         if (Settings.canDrawOverlays(this) || IslandAccessibilityService.isEnabled(this)) {
-            ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_FIT))
+            startService(Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_FIT))
         }
     }
 
@@ -1320,7 +1327,7 @@ class MainActivity : AppCompatActivity() {
             setStroke(2, NothingStyle.line)
         }
         if (Settings.canDrawOverlays(this) || IslandAccessibilityService.isEnabled(this)) {
-            ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_THEME))
+            startService(Intent(this, IslandOverlayService::class.java).setAction(IslandOverlayService.ACTION_THEME))
         }
     }
 
@@ -1329,7 +1336,7 @@ class MainActivity : AppCompatActivity() {
     private fun dp(value: Int) = (value * resources.displayMetrics.density).toInt()
 
     private fun startIsland() {
-        ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java))
+        startService(Intent(this, IslandOverlayService::class.java))
     }
 
     companion object {

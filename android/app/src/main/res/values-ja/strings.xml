@@ -295,4 +295,5 @@
     <string name="feature_idle_pill_note">何も起きていないとき、カメラの中に消える代わりに、カメラの周りに小さな黒いピルを残します。</string>
     <string name="feature_hide_media">動画や写真の表示中は隠す</string>
     <string name="feature_hide_media_note">ステータスバーが表示されたままでも、ショート、リール、全画面動画、写真ビューアーでは表示を控えます。通話、アラーム、音量は引き続き表示されます。</string>
+    <string name="setup_a11y_stuck">カメラ周辺のオーバーレイが停止しました:オフにしてから再度オンにしてください</string>
 </resources>

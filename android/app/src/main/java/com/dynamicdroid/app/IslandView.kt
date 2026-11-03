@@ -2383,7 +2383,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 if (seeking) seekFraction = fractionAt(e.x)
                 // Only the slider row drags; the ringer buttons below it are taps.
                 volumeDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.VOLUME &&
-                    e.y / fit.scale < rect.top + dp(VOLUME_HEIGHT_DP) + dp(2f)
+                    e.y < rect.top + dp(VOLUME_HEIGHT_DP) + dp(2f)
                 if (volumeDragging) setVolumeFromTouch(e.x)
                 if (touchingSecondary) bubblePress.target = if (reduceMotion) 1f else 0.94f
                 else pressS.target = if (reduceMotion) 1f else if (presentation == Presentation.EXPANDED) 0.985f else 0.96f
@@ -2492,7 +2492,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             Presentation.COMPACT -> callbacks?.onOpen(a)
             Presentation.EXPANDED -> {
                 // System islands have no app to open; a tap just tucks them away.
-                modeHits.firstOrNull { it.first.contains(x / fit.scale, y / fit.scale) }?.let {
+                modeHits.firstOrNull { it.first.contains(x, y) }?.let {
                     haptic(HapticGesture.TAP, HapticFeedbackConstants.KEYBOARD_TAP)
                     callbacks?.onRingerMode(it.second)
                     return
@@ -2554,6 +2554,28 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     /** The island's current shape in view pixels (after phone-fit scaling), for guided demos. */
+    /**
+     * Where the island takes touches, in view pixels: where it is now plus where it is heading,
+     * with its bubble and a small margin. Empty when there is nothing to touch.
+     */
+    fun touchBounds(out: RectF) {
+        val a = activity
+        if (a == null || isConcealed) { out.setEmpty(); return }
+        val spec = specFor(presentation, a)
+        val cx = IslandFit.center(layoutWidth() / fit.scale, spec.w, spec.cx, dp(4f))
+        val top = targetTop(presentation)
+        out.set(cx - spec.w / 2f, top, cx + spec.w / 2f, top + spec.h)
+        if (rect.width() > 1f) out.union(rect)
+        if (secondary != null && presentation == Presentation.COMPACT) {
+            val c = compactCluster()
+            val d = bubbleDiameter()
+            out.union(c.bubbleCenter - d / 2f, top, c.bubbleCenter + d / 2f, top + d)
+            if (!secondaryRect.isEmpty) out.union(secondaryRect)
+        }
+        val m = dp(TOUCH_MARGIN_DP)
+        out.set((out.left - m) * fit.scale, max(0f, out.top - m) * fit.scale, (out.right + m) * fit.scale, (out.bottom + m) * fit.scale)
+    }
+
     fun islandBounds(out: RectF) {
         out.set(rect.left * fit.scale, rect.top * fit.scale, rect.right * fit.scale, rect.bottom * fit.scale)
     }
@@ -2594,6 +2616,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val RINGER_HEIGHT_DP = 46f
         private const val RINGER_ROW_DP = 52f
         private const val IDLE_PILL_WIDTH_DP = 96f
+        private const val TOUCH_MARGIN_DP = 10f
         private val RINGER_ORDER = arrayOf(RingerState.RING, RingerState.VIBRATE, RingerState.SILENT)
         private const val ART_BLUR_TINY = 6
         private const val ART_BLUR_SIZE = 24

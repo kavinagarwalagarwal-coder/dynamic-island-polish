@@ -295,4 +295,5 @@
     <string name="feature_idle_pill_note">Tinggalkan pil hitam kecil di sekitar kamera saat tidak ada apa-apa, alih-alih menghilang ke dalamnya.</string>
     <string name="feature_hide_media">Sembunyikan saat video dan foto</string>
     <string name="feature_hide_media_note">Menyingkir saat Shorts, Reels, video layar penuh, dan penampil foto, meskipun bilah status tetap terlihat. Panggilan, alarm, dan volume tetap muncul.</string>
+    <string name="setup_a11y_stuck">Overlay area kamera berhenti: matikan lalu nyalakan lagi</string>
 </resources>

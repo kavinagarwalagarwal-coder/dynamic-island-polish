@@ -23,6 +23,8 @@ import android.os.PowerManager
 import android.os.SystemClock
 import android.provider.Settings
 import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -230,17 +232,35 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         view.playIntro()
     }
 
+    private fun serviceNotification() = NotificationCompat.Builder(this, CHANNEL_ID)
+        .setSmallIcon(android.R.drawable.ic_dialog_info)
+        .setContentTitle(getString(R.string.service_title))
+        .setContentText(getString(R.string.service_text))
+        .setPriority(NotificationCompat.PRIORITY_MIN)
+        .setCategory(Notification.CATEGORY_SERVICE)
+        .setOngoing(true)
+        .build()
+
+    /**
+     * The accessibility service already keeps Dynamic Droid alive, so a foreground service is only
+     * needed without it. Dropping it keeps the app out of Android's "Active apps" list, whose Stop
+     * button force-stops the app and leaves its accessibility service "Not working" until it is
+     * switched off and on again.
+     */
+    private fun syncForeground() {
+        if (IslandAccessibilityService.instance != null) {
+            runCatching { stopForeground(Service.STOP_FOREGROUND_REMOVE) }
+        } else {
+            runCatching { startForeground(NOTIFICATION_ID, serviceNotification()) }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         createChannel()
-        startForeground(NOTIFICATION_ID, NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_info)
-            .setContentTitle(getString(R.string.service_title))
-            .setContentText(getString(R.string.service_text))
-            .setPriority(NotificationCompat.PRIORITY_MIN)
-            .setCategory(Notification.CATEGORY_SERVICE)
-            .setOngoing(true)
-            .build())
+        // Android requires this first for a service started with startForegroundService.
+        startForeground(NOTIFICATION_ID, serviceNotification())
+        syncForeground()
         lastRingerMode = audio?.ringerMode ?: -1
         lastDnd = IslandFeatures.dndActive(this)
         ContextCompat.registerReceiver(this, ringerReceiver, IntentFilter().apply {
@@ -274,6 +294,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         status = StatusMonitor(this) { info -> island?.applyStatus(info) }.also { it.start() }
         IslandAccessibilityService.onChanged = { handler.post {
+            syncForeground()
             reattach()
             if (activities.all().isNotEmpty()) watcher?.start()
         } }
@@ -289,6 +310,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // A startForegroundService() call must always be answered, even when we're already running.
+        runCatching { startForeground(NOTIFICATION_ID, serviceNotification()) }
+        syncForeground()
         if (island == null && attachWindow()) render()
         if (intent?.action == ACTION_FIT) {
             island?.let { view ->
@@ -371,10 +395,11 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             }
         }
         params = lp
-        if (runCatching { wm.addView(view, lp) }.isFailure) {
+        if (runCatching { wm.addView(view, drawParams(lp)) }.isFailure) {
             island = null; params = null
             return false
         }
+        attachTouchWindow(wm, host, type)
         view.hideForIntro()
         view.post { view.playIntro() }
         return true
@@ -384,6 +409,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         reply?.dismiss(notify = false)
         removeSwiftMorph()
         island?.let { v -> runCatching { windowManager?.removeView(v) } }
+        touchView?.let { v -> runCatching { windowManager?.removeView(v) } }
+        touchView = null; touchParams = null; touchApplied.setEmpty()
         island = null
         params = null
     }
@@ -453,7 +480,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             if (touchable == isOff) {
                 lp.flags = if (touchable) lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
                 else lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                runCatching { windowManager?.updateViewLayout(view, lp) }
+                applyIslandWindow()
             }
         }
         val changedPresentation = view.activity?.key != a?.key || view.presentation != p
@@ -468,6 +495,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         growWindow(view.windowSizeFor(a, p), false)
         view.show(a?.let { appTint(this, it) }, p, false)
         if (swiftMorphStarted) view.prepareReturnHandoff()
+        updateTouchWindow()
     }
 
     /**
@@ -592,7 +620,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         params?.let { lp ->
             if (lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
                 lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
-                runCatching { windowManager?.updateViewLayout(view, lp) }
+                applyIslandWindow()
             }
         }
         handler.postDelayed({ if (!passingTouches) render() }, ms + 16L)
@@ -901,10 +929,95 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             changed = true
         }
-        if (changed) runCatching { windowManager?.updateViewLayout(view, lp) }
+        if (changed) applyIslandWindow() else updateTouchWindow()
     }
 
     // ---------------------------------------------------------------- window
+    //
+    // Two windows. The island draws in a wide window along the top that never takes a touch, so
+    // swiping down anywhere else on the status bar still opens the shade, and apps' own top bars
+    // stay tappable. A second, invisible window sits exactly over the island (and its bubble)
+    // and hands its touches to the island. [params] keeps describing what the island wants;
+    // FLAG_NOT_TOUCHABLE there now means "the island takes no touches right now".
+
+    private var touchView: View? = null
+    private var touchParams: WindowManager.LayoutParams? = null
+    private val touchBounds = android.graphics.RectF()
+    private val touchApplied = android.graphics.Rect()
+    private val islandOnScreen = IntArray(2)
+
+    private fun drawParams(lp: WindowManager.LayoutParams) = WindowManager.LayoutParams().also {
+        it.copyFrom(lp)
+        it.flags = it.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+    }
+
+    private fun attachTouchWindow(wm: WindowManager, host: Context, type: Int) {
+        val view = object : View(host) {
+            override fun onTouchEvent(e: MotionEvent): Boolean {
+                val target = island ?: return false
+                val tp = touchParams ?: return false
+                target.getLocationOnScreen(islandOnScreen)
+                val ev = MotionEvent.obtain(e)
+                if (e.actionMasked != MotionEvent.ACTION_OUTSIDE) {
+                    ev.offsetLocation((tp.x - islandOnScreen[0]).toFloat(), (tp.y - islandOnScreen[1]).toFloat())
+                }
+                target.dispatchTouchEvent(ev)
+                ev.recycle()
+                return true
+            }
+        }.apply { importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO }
+        val tp = WindowManager.LayoutParams(1, 1, type,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT).apply {
+            gravity = Gravity.TOP or Gravity.LEFT
+            if (Build.VERSION.SDK_INT >= 30) { setFitInsetsTypes(0); setFitInsetsSides(0) }
+            if (Build.VERSION.SDK_INT >= 28) {
+                layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= 30) WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+                    else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
+        }
+        if (runCatching { wm.addView(view, tp) }.isSuccess) { touchView = view; touchParams = tp }
+    }
+
+    /** Push the island's wishes to both windows. */
+    private fun applyIslandWindow() {
+        val view = island ?: return
+        val lp = params ?: return
+        runCatching { windowManager?.updateViewLayout(view, drawParams(lp)) }
+        updateTouchWindow()
+    }
+
+    /** Move the touch window over wherever the island is (or is heading); cheap when nothing moved. */
+    private fun updateTouchWindow() {
+        val view = island ?: return
+        val lp = params ?: return
+        val tv = touchView ?: return
+        val tp = touchParams ?: return
+        val wants = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0 && !passingTouches
+        val next = android.graphics.Rect()
+        if (wants) {
+            view.touchBounds(touchBounds)
+            view.getLocationOnScreen(islandOnScreen)
+            touchBounds.offset(islandOnScreen[0].toFloat(), islandOnScreen[1].toFloat())
+            touchBounds.roundOut(next)
+        }
+        val on = wants && !next.isEmpty
+        val flags = if (on) tp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
+            else tp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        if (flags == tp.flags && (!on || next == touchApplied)) return
+        if (on) {
+            tp.x = next.left; tp.y = next.top
+            tp.width = next.width().coerceAtLeast(1); tp.height = next.height().coerceAtLeast(1)
+            touchApplied.set(next)
+        } else touchApplied.setEmpty()
+        tp.flags = flags
+        runCatching { windowManager?.updateViewLayout(tv, tp) }
+    }
 
     private fun growWindow(target: Pair<Int, Int>, absorb: Boolean) {
         val view = island ?: return
@@ -922,7 +1035,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         lp.width = w
         lp.height = h
         lp.flags = flags
-        runCatching { windowManager?.updateViewLayout(view, lp) }
+        applyIslandWindow()
     }
 
     // ---------------------------------------------------------------- launching

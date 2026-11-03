@@ -295,4 +295,5 @@
     <string name="feature_idle_pill_note">Laat een kleine zwarte pil rond de camera staan als er niets gebeurt, in plaats van erin te verdwijnen.</string>
     <string name="feature_hide_media">Verbergen bij video\'s en foto\'s</string>
     <string name="feature_hide_media_note">Gaat opzij voor Shorts, Reels, video\'s op volledig scherm en fotoviewers, ook als de statusbalk zichtbaar blijft. Oproepen, wekkers en volume blijven verschijnen.</string>
+    <string name="setup_a11y_stuck">Overlay bij de camera is gestopt: zet hem uit en weer aan</string>
 </resources>
