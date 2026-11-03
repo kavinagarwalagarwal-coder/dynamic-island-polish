@@ -289,4 +289,8 @@
     <string name="feature_full_width">Pulau terbuka selebar layar</string>
     <string name="feature_full_width_note">Pesan, volume, dan pulau terbuka lainnya membentang di layar alih-alih tumbuh dari kamera.</string>
     <string name="ringer_needs_access">Izinkan akses Jangan Ganggu agar Dynamic Droid bisa beralih ke Senyap atau Jangan Ganggu</string>
+    <string name="feature_art_backdrop">Sampul album di belakang pulau</string>
+    <string name="feature_art_backdrop_note">Saat lagu diputar, latar pulau menjadi sampul albumnya, sedikit diburamkan dan digelapkan agar teks tetap mudah dibaca. Saat dijeda, kembali hitam.</string>
+    <string name="feature_idle_pill">Tetap tampilkan pulau saat diam</string>
+    <string name="feature_idle_pill_note">Tinggalkan pil hitam kecil di sekitar kamera saat tidak ada apa-apa, alih-alih menghilang ke dalamnya.</string>
 </resources>

@@ -289,4 +289,8 @@
     <string name="feature_full_width">Otwarte wyspy na całą szerokość</string>
     <string name="feature_full_width_note">Wiadomości, głośność i inne otwarte wyspy rozciągają się na cały ekran, zamiast wyrastać z aparatu.</string>
     <string name="ringer_needs_access">Zezwól Dynamic Droid na dostęp do Nie przeszkadzać, aby mógł włączać tryb Cichy lub Nie przeszkadzać</string>
+    <string name="feature_art_backdrop">Okładka albumu za wyspą</string>
+    <string name="feature_art_backdrop_note">Podczas odtwarzania utworu tłem wyspy staje się okładka albumu, delikatnie rozmyta i przyciemniona, by tekst był czytelny. Po wstrzymaniu wraca do czerni.</string>
+    <string name="feature_idle_pill">Zostaw wyspę w spoczynku</string>
+    <string name="feature_idle_pill_note">Gdy nic się nie dzieje, zostaw małą czarną pigułkę wokół aparatu zamiast znikać w nim.</string>
 </resources>

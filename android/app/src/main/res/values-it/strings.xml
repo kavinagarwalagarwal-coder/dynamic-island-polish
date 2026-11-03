@@ -289,4 +289,8 @@
     <string name="feature_full_width">Isole aperte a tutta larghezza</string>
     <string name="feature_full_width_note">Messaggi, volume e altre isole aperte si estendono su tutto lo schermo invece di crescere dalla fotocamera.</string>
     <string name="ringer_needs_access">Consenti l\'accesso a Non disturbare perché Dynamic Droid possa passare a Silenzioso o Non disturbare</string>
+    <string name="feature_art_backdrop">Copertina dell\'album dietro l\'isola</string>
+    <string name="feature_art_backdrop_note">Mentre suona un brano, lo sfondo dell\'isola diventa la copertina dell\'album, leggermente sfocata e scurita perché il testo resti leggibile. In pausa torna nero.</string>
+    <string name="feature_idle_pill">Mantieni l\'isola a riposo</string>
+    <string name="feature_idle_pill_note">Lascia una piccola pillola nera attorno alla fotocamera quando non succede nulla, invece di scomparire al suo interno.</string>
 </resources>

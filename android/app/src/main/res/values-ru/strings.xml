@@ -289,4 +289,8 @@
     <string name="feature_full_width">Открытые острова во всю ширину</string>
     <string name="feature_full_width_note">Сообщения, громкость и другие открытые острова растягиваются на весь экран, а не растут из камеры.</string>
     <string name="ringer_needs_access">Разрешите Dynamic Droid доступ к «Не беспокоить», чтобы переключаться в режим без звука или «Не беспокоить»</string>
+    <string name="feature_art_backdrop">Обложка альбома за островом</string>
+    <string name="feature_art_backdrop_note">Пока играет песня, фоном острова становится обложка альбома, мягко размытая и затемнённая, чтобы текст оставался читаемым. На паузе фон снова становится чёрным.</string>
+    <string name="feature_idle_pill">Оставлять остров в покое</string>
+    <string name="feature_idle_pill_note">Когда ничего не происходит, оставлять маленькую чёрную таблетку вокруг камеры, а не исчезать в ней.</string>
 </resources>

@@ -289,4 +289,8 @@
     <string name="feature_full_width">Îlots ouverts sur toute la largeur</string>
     <string name="feature_full_width_note">Les messages, le volume et les autres îlots ouverts s\'étendent sur tout l\'écran au lieu de grandir depuis la caméra.</string>
     <string name="ringer_needs_access">Autorisez l\'accès à Ne pas déranger pour que Dynamic Droid puisse passer en Silencieux ou Ne pas déranger</string>
+    <string name="feature_art_backdrop">Pochette d\'album derrière l\'îlot</string>
+    <string name="feature_art_backdrop_note">Pendant la lecture d\'un morceau, le fond de l\'îlot devient la pochette de l\'album, légèrement floutée et assombrie pour que le texte reste lisible. En pause, il redevient noir.</string>
+    <string name="feature_idle_pill">Garder l\'îlot au repos</string>
+    <string name="feature_idle_pill_note">Laisse une petite pilule noire autour de la caméra quand rien ne se passe, au lieu de disparaître dedans.</string>
 </resources>

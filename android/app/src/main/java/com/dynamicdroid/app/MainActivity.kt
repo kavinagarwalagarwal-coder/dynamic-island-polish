@@ -717,6 +717,8 @@ class MainActivity : AppCompatActivity() {
         toggle(R.string.feature_bubbles, "coloured_bubbles", features.colouredBubbles, R.string.feature_bubbles_note)
         toggle(R.string.feature_glow, "edge_glow", features.edgeGlow, R.string.feature_glow_note)
         toggle(R.string.feature_full_width, "full_width_open", features.fullWidthOpen, R.string.feature_full_width_note)
+        toggle(R.string.feature_art_backdrop, "artwork_backdrop", features.artworkBackdrop, R.string.feature_art_backdrop_note)
+        toggle(R.string.feature_idle_pill, "idle_pill", features.idlePill, R.string.feature_idle_pill_note)
         column.addView(label(getString(R.string.feature_outline), 16f, NothingStyle.foreground).apply {
             typeface = NothingStyle.body; setPadding(0, dp(12), 0, 0)
         }, row(-2))

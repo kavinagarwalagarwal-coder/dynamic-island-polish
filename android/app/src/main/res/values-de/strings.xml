@@ -289,4 +289,8 @@
     <string name="feature_full_width">Geöffnete Inseln in voller Breite</string>
     <string name="feature_full_width_note">Nachrichten, Lautstärke und andere geöffnete Inseln ziehen sich über den Bildschirm, statt aus der Kamera zu wachsen.</string>
     <string name="ringer_needs_access">Erlaube Dynamic Droid den Zugriff auf Bitte nicht stören, um auf Lautlos oder Bitte nicht stören zu schalten</string>
+    <string name="feature_art_backdrop">Albumcover hinter der Insel</string>
+    <string name="feature_art_backdrop_note">Während ein Song läuft, wird der Hintergrund der Insel zum Albumcover, sanft unscharf und abgedunkelt, damit Text gut lesbar bleibt. Beim Pausieren wird er wieder schwarz.</string>
+    <string name="feature_idle_pill">Insel im Ruhezustand behalten</string>
+    <string name="feature_idle_pill_note">Lässt eine kleine schwarze Pille um die Kamera stehen, wenn nichts passiert, statt in ihr zu verschwinden.</string>
 </resources>

@@ -23,6 +23,10 @@ data class IslandFeatureSet(
     val ringerControls: Boolean = true,
     /** Opened islands (messages, volume, devices) span the screen instead of sitting at the camera. */
     val fullWidthOpen: Boolean = true,
+    /** While a song plays, the pill's background is its album cover, blurred and dimmed. */
+    val artworkBackdrop: Boolean = true,
+    /** With nothing going on, keep a small black pill at the camera instead of disappearing. */
+    val idlePill: Boolean = false,
     /** Off by default: it takes over from the phone's own pop-ups. */
     val hidePhonePopups: Boolean = false,
     val messagesMediumFirst: Boolean = true,
@@ -72,6 +76,8 @@ object IslandFeatures {
             ringer = p.getBoolean("ringer", d.ringer),
             ringerControls = p.getBoolean("ringer_controls", d.ringerControls),
             fullWidthOpen = p.getBoolean("full_width_open", d.fullWidthOpen),
+            artworkBackdrop = p.getBoolean("artwork_backdrop", d.artworkBackdrop),
+            idlePill = p.getBoolean("idle_pill", d.idlePill),
             hidePhonePopups = p.getBoolean("hide_phone_popups", d.hidePhonePopups),
             messagesMediumFirst = p.getBoolean("messages_medium", d.messagesMediumFirst),
             shortCompact = p.getBoolean("short_compact", d.shortCompact),

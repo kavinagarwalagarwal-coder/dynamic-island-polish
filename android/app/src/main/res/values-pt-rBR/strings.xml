@@ -289,4 +289,8 @@
     <string name="feature_full_width">Ilhas abertas na largura toda</string>
     <string name="feature_full_width_note">Mensagens, volume e outras ilhas abertas ocupam a largura da tela em vez de crescer a partir da câmera.</string>
     <string name="ringer_needs_access">Permita o acesso ao Não perturbe para o Dynamic Droid poder mudar para Silencioso ou Não perturbe</string>
+    <string name="feature_art_backdrop">Capa do álbum atrás da ilha</string>
+    <string name="feature_art_backdrop_note">Enquanto uma música toca, o fundo da ilha vira a capa do álbum, levemente desfocada e escurecida para o texto continuar legível. Ao pausar, volta ao preto.</string>
+    <string name="feature_idle_pill">Manter a ilha em repouso</string>
+    <string name="feature_idle_pill_note">Deixa uma pequena pílula preta em volta da câmera quando nada está acontecendo, em vez de sumir nela.</string>
 </resources>

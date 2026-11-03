@@ -289,4 +289,8 @@
     <string name="feature_full_width">खुले आइलैंड पूरी चौड़ाई लें</string>
     <string name="feature_full_width_note">मैसेज, वॉल्यूम और दूसरे खुले आइलैंड कैमरे से बढ़ने की जगह पूरी स्क्रीन पर फैलते हैं।</string>
     <string name="ringer_needs_access">साइलेंट या \'परेशान न करें\' पर जाने के लिए Dynamic Droid को \'परेशान न करें\' की पहुँच दें</string>
+    <string name="feature_art_backdrop">आइलैंड के पीछे एल्बम आर्ट</string>
+    <string name="feature_art_backdrop_note">गाना चलते समय आइलैंड का बैकग्राउंड उसका एल्बम कवर बन जाता है, हल्का धुंधला और गहरा ताकि टेक्स्ट पढ़ने में आसान रहे। रोकने पर यह फिर से काला हो जाता है।</string>
+    <string name="feature_idle_pill">खाली होने पर भी आइलैंड दिखाएँ</string>
+    <string name="feature_idle_pill_note">कुछ न होने पर कैमरे में गायब होने की जगह उसके चारों ओर एक छोटी काली पिल रखें।</string>
 </resources>

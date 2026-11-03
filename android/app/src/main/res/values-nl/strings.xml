@@ -289,4 +289,8 @@
     <string name="feature_full_width">Geopende eilanden over de volle breedte</string>
     <string name="feature_full_width_note">Berichten, volume en andere geopende eilanden lopen over het hele scherm in plaats van uit de camera te groeien.</string>
     <string name="ringer_needs_access">Geef Dynamic Droid toegang tot Niet storen om naar Stil of Niet storen te schakelen</string>
+    <string name="feature_art_backdrop">Albumhoes achter het eiland</string>
+    <string name="feature_art_backdrop_note">Terwijl er een nummer speelt, wordt de achtergrond van het eiland de albumhoes, zacht vervaagd en gedimd zodat tekst leesbaar blijft. Bij pauzeren wordt het weer zwart.</string>
+    <string name="feature_idle_pill">Eiland houden in rust</string>
+    <string name="feature_idle_pill_note">Laat een kleine zwarte pil rond de camera staan als er niets gebeurt, in plaats van erin te verdwijnen.</string>
 </resources>

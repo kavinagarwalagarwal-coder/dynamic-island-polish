@@ -289,4 +289,8 @@
     <string name="feature_full_width">開いたアイランドを画面幅いっぱいに</string>
     <string name="feature_full_width_note">メッセージや音量などの開いたアイランドを、カメラから広げる代わりに画面の横幅いっぱいに表示します。</string>
     <string name="ringer_needs_access">サイレントやサイレントモードに切り替えるには、Dynamic Droid にサイレントモードへのアクセスを許可してください</string>
+    <string name="feature_art_backdrop">アイランドの背景にアルバムアート</string>
+    <string name="feature_art_backdrop_note">曲の再生中は、アイランドの背景がアルバムジャケットになります。文字が読みやすいよう、やわらかくぼかして暗くしています。一時停止すると黒に戻ります。</string>
+    <string name="feature_idle_pill">待機中もアイランドを表示</string>
+    <string name="feature_idle_pill_note">何も起きていないとき、カメラの中に消える代わりに、カメラの周りに小さな黒いピルを残します。</string>
 </resources>

@@ -289,4 +289,8 @@
     <string name="feature_full_width">Açılan adalar tam genişlikte</string>
     <string name="feature_full_width_note">Mesajlar, ses ve diğer açılan adalar kameradan büyümek yerine ekran boyunca uzanır.</string>
     <string name="ringer_needs_access">Sessiz veya Rahatsız Etmeyin moduna geçebilmesi için Dynamic Droid\'e Rahatsız Etmeyin erişimi verin</string>
+    <string name="feature_art_backdrop">Adanın arkasında albüm kapağı</string>
+    <string name="feature_art_backdrop_note">Bir şarkı çalarken adanın arka planı albüm kapağı olur; metin okunaklı kalsın diye hafifçe bulanık ve karartılmıştır. Duraklatınca yeniden siyaha döner.</string>
+    <string name="feature_idle_pill">Boştayken adayı göster</string>
+    <string name="feature_idle_pill_note">Hiçbir şey olmadığında kameranın içinde kaybolmak yerine çevresinde küçük siyah bir hap bırak.</string>
 </resources>
