@@ -61,6 +61,8 @@ class ImmersiveMediaOverlayTest {
                 assertTrue("Leaving the video should bring the island back", waitFor(8_000) { !immersive() })
             } finally {
                 shell("am broadcast -f 32 -n com.dynamicdroid.fixture/.FixtureReceiver --es kind clear")
+                // Don't leave the video screen in the fixture's back stack for later tests.
+                shell("am force-stop com.dynamicdroid.fixture")
                 shell("cmd notification disallow_listener com.dynamicdroid.app/com.dynamicdroid.app.IslandNotificationListener")
                 shell("settings delete secure enabled_accessibility_services")
                 shell("settings put secure accessibility_enabled 0")

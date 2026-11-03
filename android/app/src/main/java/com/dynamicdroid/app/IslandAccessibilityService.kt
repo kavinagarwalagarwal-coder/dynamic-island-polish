@@ -61,6 +61,11 @@ class IslandAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 onForegroundPackage?.invoke(pkg)
                 scheduleMediaCheck(150L)
+                // Screen changes animate; look again once the new screen has settled.
+                if (mediaThreadLazy.isInitialized()) {
+                    mediaHandler.removeCallbacks(mediaSettleCheck)
+                    mediaHandler.postDelayed(mediaSettleCheck, 900L)
+                }
             }
             // Swiping to the next Short / Reel, or a viewer opening inside the same screen.
             AccessibilityEvent.TYPE_VIEW_SCROLLED -> scheduleMediaCheck(250L)
@@ -77,6 +82,9 @@ class IslandAccessibilityService : AccessibilityService() {
     @Volatile private var lastMediaCheck = 0L
     private var immersive = false
     private val mediaCheck = Runnable { checkImmersiveMedia() }
+    private val mediaSettleCheck = Runnable { checkImmersiveMedia() }
+    /** While hidden, keep confirming: a static screen sends no events to say the video is gone. */
+    private val mediaStillThere = Runnable { checkImmersiveMedia() }
 
     private fun scheduleMediaCheck(delay: Long) {
         // Nothing to hide (feature off, or no island showing): skip the work entirely.
@@ -90,8 +98,11 @@ class IslandAccessibilityService : AccessibilityService() {
 
     private fun checkImmersiveMedia() {
         lastMediaCheck = SystemClock.uptimeMillis()
-        val found = runCatching { findMediaSurface() }.getOrDefault(false)
+        val wanted = wantsMediaCheck?.invoke() == true
+        val found = wanted && runCatching { findMediaSurface() }.getOrDefault(false)
         handler.post { reportImmersive(found) }
+        mediaHandler.removeCallbacks(mediaStillThere)
+        if (found) mediaHandler.postDelayed(mediaStillThere, STILL_THERE_MS)
     }
 
     private fun findMediaSurface(): Boolean {
@@ -279,7 +290,7 @@ class IslandAccessibilityService : AccessibilityService() {
 
     private fun release() {
         stopVolumeRepeat()
-        if (mediaThreadLazy.isInitialized()) mediaHandler.removeCallbacks(mediaCheck)
+        if (mediaThreadLazy.isInitialized()) mediaHandler.removeCallbacksAndMessages(null)
         reportImmersive(false)
         popupHunt?.let(handler::removeCallbacks)
         popupHunt = null
@@ -294,6 +305,7 @@ class IslandAccessibilityService : AccessibilityService() {
         private const val POPUP_SEARCH_MS = 1500L
         private const val CONTENT_CHECK_EVERY_MS = 1500L
         private const val MEDIA_NODE_LIMIT = 400
+        private const val STILL_THERE_MS = 2_000L
         /** Like a held key on a keyboard: a short pause, then steady steps. */
         const val VOLUME_REPEAT_DELAY_MS = 380L
         const val VOLUME_REPEAT_MS = 80L
