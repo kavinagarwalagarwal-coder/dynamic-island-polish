@@ -110,6 +110,16 @@ class DotMusicTest {
             dots.drawMeter(canvas, paint, 4f, 4f, 30f, 20f, 4, 3, Color.WHITE, 1f, 255)
             val px = IntArray(160 * 160).also { bitmap.getPixels(it, 0, 160, 0, 0, 160, 160) }
             assertTrue("Island dots drew nothing", px.count { Color.alpha(it) > 200 } > 1_500)
+
+            // The whole-island field: white dots carving the cover, edge to edge.
+            val field = IslandDotField()
+            field.prepare(cover(Color.rgb(200, 40, 90)), animate = false)
+            val pill = Bitmap.createBitmap(360, 90, Bitmap.Config.ARGB_8888)
+            field.draw(android.graphics.Canvas(pill), paint, 0f, 0f, 360f, 90f, 12f, dots, true, 255)
+            val fp = IntArray(360 * 90).also { pill.getPixels(it, 0, 360, 0, 0, 360, 90) }
+            val left = fp.indices.count { it % 360 < 40 && Color.alpha(fp[it]) > 60 }
+            val right = fp.indices.count { it % 360 > 320 && Color.alpha(fp[it]) > 60 }
+            assertTrue("Dot field should reach both ends of the island ($left, $right)", left > 50 && right > 50)
         }
     }
 

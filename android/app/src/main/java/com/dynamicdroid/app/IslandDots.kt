@@ -10,6 +10,7 @@ import kotlin.math.cos
 import kotlin.math.exp
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
 import kotlin.math.roundToInt
 import kotlin.math.sin
 import kotlin.math.sqrt
@@ -155,6 +156,24 @@ class IslandDots(private val n: Int) {
         beatGlow = max(0f, beatGlow - dt * 2.2f)
     }
 
+    /** Seconds since this started; the dot field breathes on the same clock. */
+    val time: Float get() = t
+
+    /**
+     * How much the beat ripples swell a dot at [dist] (0 at the centre, 1 at the edge), for the
+     * dot field to ripple in step with the record.
+     */
+    fun swell(dist: Float): Float {
+        var k = 1f
+        for (j in rippleT.indices) {
+            val age = t - rippleT[j]
+            if (age < 0f || age > 1.2f) continue
+            val front = age * 1.15f - dist
+            k *= 1f + 0.7f * rippleS[j] * exp(-front * front / (2f * 0.012f)) * (1f - age / 1.2f)
+        }
+        return k
+    }
+
     /** The record, [radius] pixels, centred on ([cx], [cy]). */
     fun drawRecord(canvas: Canvas, paint: Paint, cx: Float, cy: Float, radius: Float, playing: Boolean, alpha: Int) {
         if (!ready) return
@@ -237,4 +256,90 @@ class IslandDots(private val n: Int) {
             (Color.green(a) + (Color.green(b) - Color.green(a)) * f).toInt(),
             (Color.blue(a) + (Color.blue(b) - Color.blue(a)) * f).toInt())
     }
+}
+
+
+/**
+ * The whole island as white dots with the album cover carved into them: a halftone where the
+ * cover's bright parts are big dots and its dark parts small ones, edge to edge across the pill.
+ * It breathes and ripples with [IslandDots], and fades from one cover into the next.
+ *
+ * The cover is reduced once per song to a small brightness map; each frame only looks values up.
+ */
+class IslandDotField {
+    private val size = 40
+    private val lum = FloatArray(size * size)
+    private val lumFrom = FloatArray(size * size)
+    private var source: Bitmap? = null
+    private var mix = 1f
+    private var ready = false
+
+    fun prepare(art: Bitmap?, animate: Boolean) {
+        if (ready && art === source) return
+        source = art
+        val m = ease(mix)
+        for (i in lum.indices) lumFrom[i] = if (ready) lumFrom[i] + (lum[i] - lumFrom[i]) * m else 0f
+        if (art == null) {
+            for (y in 0 until size) for (x in 0 until size) {
+                val dx = x - size / 2f; val dy = y - size / 2f
+                lum[y * size + x] = 0.25f + 0.2f * (1f - min(1f, sqrt(dx * dx + dy * dy) / size))
+            }
+        } else {
+            val colors = DotArt.sample(art, size)
+            var lo = 1f; var hi = 0f
+            for (i in colors.indices) { val l = DotArt.luminance(colors[i]); lum[i] = l; lo = min(lo, l); hi = max(hi, l) }
+            // Stretch the contrast so even a dark cover reads as a picture in dots.
+            val span = max(0.15f, hi - lo)
+            for (i in lum.indices) lum[i] = ((lum[i] - lo) / span).coerceIn(0f, 1f)
+        }
+        mix = if (ready && animate) 0f else 1f
+        if (!ready || !animate) for (i in lum.indices) lumFrom[i] = lum[i]
+        ready = true
+    }
+
+    fun step(dt: Float) { if (mix < 1f) mix = min(1f, mix + dt / 0.9f) }
+
+    /**
+     * Fills [l],[t],[r],[b] (already clipped to the island's shape) with dots [pitch] apart.
+     * [alpha] is the field's overall strength, kept low enough that text on top stays readable.
+     */
+    fun draw(canvas: Canvas, paint: Paint, l: Float, t: Float, r: Float, b: Float, pitch: Float,
+             dots: IslandDots, playing: Boolean, alpha: Int) {
+        if (!ready || alpha <= 2) return
+        val w = r - l
+        val h = b - t
+        if (w < pitch || h < pitch) return
+        val cols = (w / pitch).toInt() + 1
+        val rows = (h / pitch).toInt() + 1
+        val ox = l + (w - (cols - 1) * pitch) / 2f
+        val oy = t + (h - (rows - 1) * pitch) / 2f
+        // Centre-crop the square cover to the island's shape.
+        val side = max(w, h)
+        val u0 = (side - w) / 2f / side
+        val v0 = (side - h) / 2f / side
+        val cx = l + w / 2f
+        val cy = t + h / 2f
+        val reach = sqrt(w * w + h * h) / 2f
+        val m = ease(mix)
+        val time = dots.time
+        val breathe = if (playing) 0.08f else 0.02f
+        paint.color = Color.WHITE
+        for (yy in 0 until rows) {
+            val py = oy + yy * pitch
+            val v = (v0 + (py - t) / side).coerceIn(0f, 0.999f)
+            for (xx in 0 until cols) {
+                val px = ox + xx * pitch
+                val u = (u0 + (px - l) / side).coerceIn(0f, 0.999f)
+                val i = (v * size).toInt() * size + (u * size).toInt()
+                val lv = lumFrom[i] + (lum[i] - lumFrom[i]) * m
+                val dist = sqrt((px - cx) * (px - cx) + (py - cy) * (py - cy)) / reach
+                var rad = pitch * (0.09f + 0.33f * lv.pow(0.85f))
+                rad *= (1f + breathe * sin(time * 1.8f - dist * 6f)) * dots.swell(dist)
+                paint.alpha = (alpha * (0.35f + 0.65f * lv)).toInt().coerceIn(0, 255)
+                canvas.drawCircle(px, py, rad, paint)
+            }
+        }
+    }
+
+    private fun ease(v: Float) = 1f - (1f - v) * (1f - v) * (1f - v)
 }

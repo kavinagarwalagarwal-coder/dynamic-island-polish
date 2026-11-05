@@ -141,6 +141,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // ---------------------------------------------------------------- dot music
     private val compactDots = IslandDots(9)
     private val cardDots = IslandDots(15)
+    private val dotField = IslandDotField()
+    /** How strongly the dot field shows: full while playing, faint when paused. */
+    private val fieldA = Spring(0f, 120f, 1f, 0.003f)
     /** Real band levels from the visualizer while the music card is open (null: steady pulse). */
     @Volatile var dotSpectrum: FloatArray? = null
     private var dotMono = false
@@ -157,12 +160,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         dotSong = song
         compactDots.prepare(a.artwork, dotMono, animate = changed)
         cardDots.prepare(a.artwork, dotMono, animate = changed)
+        dotField.prepare(a.artwork, animate = changed)
+        if (changed && !reduceMotion) cardDots.ripple(1.3f)
         if (now == dotsAt) return
         val dt = if (dotsAt == 0L) 1f / 60f else ((now - dotsAt) / 1000f).coerceIn(0f, 0.1f)
         dotsAt = now
         val spectrum = dotSpectrum
         compactDots.step(dt, a.isPlaying, spectrum, reduceMotion)
         cardDots.step(dt, a.isPlaying, spectrum, reduceMotion)
+        dotField.step(dt)
     }
 
     /** The open music card's album art, which opens the dot player. */
@@ -347,7 +353,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
     private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -961,7 +967,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             liquidGlass.draw(canvas, wallpaperStage, rect, r, bodyAlpha, wallpaperSkin,
                 resizing = shapeSprings.any { !it.isAtRest } || !pressS.isAtRest || !stretchS.isAtRest)
         }
-        drawArtBackdrop(canvas, bodyAlpha * (1f - absorb))
+        if (usesDots(a)) drawDotField(canvas, a, bodyAlpha * (1f - absorb)) else drawArtBackdrop(canvas, bodyAlpha * (1f - absorb))
 
         val ea = expandedA.value.coerceIn(0f, 1f) * reveal
         val ca = compactA.value.coerceIn(0f, 1f) * reveal
@@ -1607,6 +1613,22 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val tiny = Bitmap.createScaledBitmap(src, ART_BLUR_TINY, ART_BLUR_TINY, true)
         Bitmap.createScaledBitmap(tiny, ART_BLUR_SIZE, ART_BLUR_SIZE, true).also { if (it !== tiny) tiny.recycle() }
     }.getOrNull()
+
+    /**
+     * Dot music: the whole island in white dots with the cover carved into them, breathing and
+     * rippling with the record. Kept faint enough that the title and controls read on top.
+     */
+    private fun drawDotField(canvas: Canvas, a: LiveActivity, bodyAlpha: Float) {
+        fieldA.target = if (a.isPlaying) 1f else 0.4f
+        val show = fieldA.value.coerceIn(0f, 1f)
+        if (show < 0.01f || bodyAlpha < 2f) return
+        advanceDots(a)
+        val open = expandedA.value.coerceIn(0f, 1f)
+        val strength = (0.62f - 0.22f * open) * show
+        val pitch = dp(5f + 1.5f * open)
+        dotField.draw(canvas, fillPaint, rect.left, rect.top, rect.right, rect.bottom, pitch, cardDots, a.isPlaying,
+            (bodyAlpha * strength).toInt())
+    }
 
     private fun drawArtBackdrop(canvas: Canvas, bodyAlpha: Float) {
         val show = artA.value.coerceIn(0f, 1f)
