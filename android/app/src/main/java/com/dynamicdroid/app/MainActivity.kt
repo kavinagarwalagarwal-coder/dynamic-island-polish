@@ -2,7 +2,9 @@ package com.dynamicdroid.app
 
 import android.Manifest
 import android.app.PendingIntent
+import android.content.ComponentName
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
@@ -72,6 +74,12 @@ class MainActivity : AppCompatActivity() {
     private var wallpaperPreview: IslandView? = null
     private var wallpaperSwitch: SwitchCompat? = null
     private val wallpaperWorker = java.util.concurrent.Executors.newSingleThreadExecutor()
+    private val pickDotPhoto = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+        if (uri == null) return@registerForActivityResult
+        toast(getString(if (WallpaperPhoto.save(this, uri)) R.string.dot_photo_saved else R.string.dot_photo_failed))
+        refreshDotPhoto()
+    }
+    private val micPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) {}
     private val pickImage = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
         if (uri != null) wallpaperWorker.execute {
             val theme = runCatching { WallpaperSkinStore.decodeImage(applicationContext, uri).let { bitmap ->
@@ -467,6 +475,7 @@ class MainActivity : AppCompatActivity() {
         })
         column.addView(systemRow, row(-2).apply { topMargin = dp(8) })
         column.addView(eventRow, row(-2).apply { topMargin = dp(8) })
+        ringerRow.addView(chip(getString(R.string.dot_open_short)) { startActivity(Intent(this, DotPlayerActivity::class.java)) })
         column.addView(ringerRow, row(-2).apply { topMargin = dp(8) })
         timerLabelInput = android.widget.EditText(this).apply {
             hint = getString(R.string.timer_name_hint); setSingleLine(); textSize = 15f
@@ -756,6 +765,87 @@ class MainActivity : AppCompatActivity() {
         toggle(R.string.haptic_swipe, "haptic_swipe", features.hapticSwipe)
         toggle(R.string.haptic_up, "haptic_up", features.hapticUp)
         toggle(R.string.haptic_dnd, "haptic_dnd_quiet", features.quietHapticsInDnd)
+
+        addDotMusic(column, ::section)
+    }
+
+    /**
+     * Dot music: the full-screen dot player, the four dot widgets and the dot live wallpaper.
+     * Settings live in their own small store ([DotPrefs]), shared with the widgets and wallpaper.
+     */
+    private fun addDotMusic(column: LinearLayout, section: (Int, Boolean) -> Unit) {
+        fun dotToggle(textId: Int, checked: Boolean, note: Int, onChange: (Boolean) -> Unit) {
+            column.addView(SwitchCompat(this).apply {
+                text = getString(textId); textSize = 16f; minHeight = dp(56)
+                setTextColor(NothingStyle.foreground); typeface = NothingStyle.body
+                isChecked = checked
+                setOnCheckedChangeListener { _, value -> onChange(value) }
+            }, row(-2))
+            column.addView(label(getString(note), 13f, NothingStyle.muted), row(-2).apply { bottomMargin = dp(6) })
+        }
+        fun button(key: String, textId: Int, click: () -> Unit) =
+            column.addView(action(key, getString(textId), click), row(-2).apply { topMargin = dp(8) })
+
+        section(R.string.dot_section, false)
+        column.addView(label(getString(R.string.dot_note), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
+        button("dot-open", R.string.dot_open) { startActivity(Intent(this, DotPlayerActivity::class.java)) }
+
+        column.addView(label(getString(R.string.dot_widgets), 16f, NothingStyle.foreground).apply {
+            typeface = NothingStyle.body; setPadding(0, dp(16), 0, 0)
+        }, row(-2))
+        button("dot-stage", R.string.dot_add_stage) { pinDotWidget(StageDotWidget::class.java) }
+        button("dot-medium", R.string.dot_add_medium) { pinDotWidget(MediumDotWidget::class.java) }
+        button("dot-small", R.string.dot_add_small) { pinDotWidget(SmallDotWidget::class.java) }
+        button("dot-wide", R.string.dot_add_wide) { pinDotWidget(WideDotWidget::class.java) }
+
+        column.addView(label(getString(R.string.dot_wallpaper), 16f, NothingStyle.foreground).apply {
+            typeface = NothingStyle.body; setPadding(0, dp(16), 0, 0)
+        }, row(-2))
+        column.addView(label(getString(R.string.dot_wallpaper_note), 13f, NothingStyle.muted), row(-2).apply { topMargin = dp(4) })
+        button("dot-photo", R.string.dot_photo_pick) { pickDotPhoto.launch("image/*") }
+        button("dot-photo-clear", R.string.dot_photo_remove) { WallpaperPhoto.clear(this); refreshDotPhoto() }
+        dotToggle(R.string.dot_wallpaper_dots, DotPrefs.wallpaperDots(this), R.string.dot_wallpaper_dots_note) {
+            DotPrefs.setWallpaperDots(this, it)
+        }
+        dotToggle(R.string.dot_wallpaper_playing, DotPrefs.wallpaperOnlyPlaying(this), R.string.dot_wallpaper_playing_note) {
+            DotPrefs.setWallpaperOnlyPlaying(this, it)
+        }
+        button("dot-set-wallpaper", R.string.dot_set_wallpaper) {
+            val intent = Intent(android.app.WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER).putExtra(
+                android.app.WallpaperManager.EXTRA_LIVE_WALLPAPER_COMPONENT, ComponentName(this, DotWallpaper::class.java))
+            runCatching { startActivity(intent) }.onFailure {
+                runCatching { startActivity(Intent(android.app.WallpaperManager.ACTION_LIVE_WALLPAPER_CHOOSER)) }
+            }
+        }
+        refreshDotPhoto()
+
+        column.addView(label(getString(R.string.dot_style), 16f, NothingStyle.foreground).apply {
+            typeface = NothingStyle.body; setPadding(0, dp(16), 0, 0)
+        }, row(-2))
+        dotToggle(R.string.dot_mono, DotPrefs.mono(this), R.string.dot_mono_note) {
+            DotPrefs.setMono(this, it); MusicWidgets.refresh(this)
+        }
+        dotToggle(R.string.dot_animations, DotPrefs.animations(this), R.string.dot_animations_note) {
+            DotPrefs.setAnimations(this, it); MusicWidgets.refresh(this)
+        }
+        dotToggle(R.string.dot_beat, DotPrefs.beat(this), R.string.dot_beat_note) { on ->
+            DotPrefs.setBeat(this, on)
+            if (on && checkSelfPermission(android.Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                micPermission.launch(android.Manifest.permission.RECORD_AUDIO)
+            }
+        }
+    }
+
+    private fun refreshDotPhoto() {
+        val has = WallpaperPhoto.exists(this)
+        buttons["dot-photo"]?.text = getString(if (has) R.string.dot_photo_change else R.string.dot_photo_pick)
+        buttons["dot-photo-clear"]?.visibility = if (has) View.VISIBLE else View.GONE
+    }
+
+    private fun pinDotWidget(cls: Class<*>) {
+        val manager = getSystemService(android.appwidget.AppWidgetManager::class.java)
+        if (manager?.isRequestPinAppWidgetSupported == true) manager.requestPinAppWidget(ComponentName(this, cls), null, null)
+        else toast(getString(R.string.dot_pin_unsupported))
     }
 
     private fun navLabel(key: String) = getString(when (key) {

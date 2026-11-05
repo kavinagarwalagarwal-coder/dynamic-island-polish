@@ -62,6 +62,12 @@ Music and a timer? The second activity pulls off as a separate bubble. Hold eith
 
 Choose your wallpaper and the open island turns into refracting glass.
 
+### Dot music
+
+Tap the album art on the open music island and your song becomes a **spinning record of dots**: the cover redrawn as a halftone of springy dots, ripples on every beat, a ring of dots bouncing like an equaliser around it. Flick the record to skip, tap to pause, drag your finger through the dots. Optionally it follows the real beat of the music.
+
+The same dot record comes as **four home-screen widgets** (2×2 record, 4×1 strip, 4×2 player and a 4×4 stage) and as a **live wallpaper** over your own photo that appears only while music plays, switchable from a Quick Settings tile. Everything is under Features → Dot music.
+
 ## Make it yours
 
 - **Hide the phone's pop-ups.** One toggle, and the island takes over from the banners that drop from the top. Notifications still land in your shade.

@@ -204,6 +204,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                     island?.hideForIntro()
                 }
                 Intent.ACTION_SCREEN_ON, Intent.ACTION_USER_PRESENT -> {
+                    MusicCenter.scheduleTick()
                     if (intent.action == Intent.ACTION_USER_PRESENT) {
                         // The wallpaper may not have been readable before the first unlock.
                         island?.applyWallpaper(WallpaperSkinStore.read(this@IslandOverlayService),
@@ -258,6 +259,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     override fun onCreate() {
         super.onCreate()
         createChannel()
+        MusicCenter.attach(this)
         // Android requires this first for a service started with startForegroundService.
         startForeground(NOTIFICATION_ID, serviceNotification())
         syncForeground()
@@ -762,6 +764,13 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     override fun onDismiss(activity: LiveActivity) = onCollapseRequest()
+
+    override fun onDotPlayer() {
+        onCollapseRequest()
+        runCatching {
+            startActivity(Intent(this, DotPlayerActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        }
+    }
 
     override fun onFullscreenChanged(fullscreen: Boolean) {
         if (this.fullscreen == fullscreen) return

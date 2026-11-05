@@ -68,6 +68,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fun onReply(activity: LiveActivity) {}
         /** The volume island's bar was dragged to [fraction] of the stream's range. */
         fun onVolumeChange(fraction: Float) {}
+        /** The album art on the open music card was tapped: show the full-screen dot player. */
+        fun onDotPlayer() {}
         /** A ring / vibrate / silent / Do Not Disturb button, or the ringer island, was tapped. */
         fun onRingerMode(state: RingerState) {}
     }
@@ -136,6 +138,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val artPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val artSrc = Rect()
     private val modeHits = ArrayList<Pair<RectF, RingerState>>()
+    /** The open music card's album art, which opens the dot player. */
+    private val musicArtHit = RectF()
     private val bubbleLevelS = Spring(0f, 300f, 1f, 0.0015f)
     private val musicBarS = Spring(0f, 420f, 1f, 0.0008f)
     // A brief thickening of the volume bar on each key press.
@@ -933,6 +937,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val ca = compactA.value.coerceIn(0f, 1f) * reveal
         val liveTimer = isLiveTimer(a)
         actionHits.clear()
+        musicArtHit.setEmpty()
         modeHits.clear()
         if (ea > 0.01f) {
             // Nothing-inspired island stays monochrome; no coloured content glow.
@@ -1266,6 +1271,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val rr = rect.right - pad
         val art = dp(58f)
         drawArtwork(canvas, a, l, t, art, dp(14f), alpha)
+        musicArtHit.set(l - dp(6f), t - dp(6f), l + art + dp(6f), t + art + dp(6f))
         val tx = l + art + dp(14f)
         val waveW = dp(24f)
         drawWave(canvas, rr - waveW, t + dp(20f), waveW, dp(18f), userAccent ?: waveColor, waveS.value, alpha)
@@ -2520,7 +2526,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     haptic(HapticGesture.TAP, HapticFeedbackConstants.KEYBOARD_TAP)
                     return
                 }
-                if (a.mode == IslandMode.MUSIC && y > barY + dp(16f)) {
+                if (a.mode == IslandMode.MUSIC && musicArtHit.contains(x, y)) {
+                    callbacks?.onDotPlayer()
+                } else if (a.mode == IslandMode.MUSIC && y > barY + dp(16f)) {
                     val cx = rect.centerX()
                     when {
                         x < cx - dp(36f) && showsMediaAction(IslandBus.MEDIA_PREVIOUS) -> callbacks?.onMedia(a, IslandBus.MEDIA_PREVIOUS)

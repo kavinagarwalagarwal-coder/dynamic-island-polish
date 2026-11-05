@@ -150,3 +150,15 @@ adb shell pm grant com.dynamicdroid.app android.permission.WRITE_SECURE_SETTINGS
 - Holding a volume key keeps stepping: the accessibility key filter takes the press before Android would generate repeats, so the service repeats it itself.
 - Messages, volume, device and ringer islands open across the full width, centred on the screen, rather than at the (possibly nudged) camera position. Optional soft edge glow.
 - `VolumeAndRingerTest` and `PhonePopupTest` cover these on the API 36 emulator.
+
+### Dot music (2.1)
+
+The dot player from the standalone Dot Music app, fed by the island's own media session:
+
+- `MusicCenter` turns the island's MUSIC activity (via `IslandBus`) into a `Track` and sends controls back through `IslandBus.mediaControl`.
+- `DotStage` is the player's picture and physics (≈700 spring dots, halftone sizes, beat ripples, ring equaliser, scatter on song change), shared by `DotPlayerView` (full-screen `DotPlayerActivity`), the `DotWallpaper` live wallpaper and the 4×4 widget's snapshot.
+- Widgets (`dot_widget_*`) are RemoteViews; the equaliser, orbiting comet and ripples are animated vector drawables in indeterminate ProgressBars, so the launcher animates them itself.
+- `BeatListener` uses `Visualizer(0)` FFT (RECORD_AUDIO, nothing recorded) for real beats; otherwise a steady pulse.
+- The wallpaper draws a user-picked photo (`WallpaperPhoto`) with the dots fading in always or only while playing; `DotTile` toggles them from Quick Settings.
+- Open from the island: tapping the expanded music card's artwork calls `Callbacks.onDotPlayer()`.
+- Tests: `DotArtTest` (unit), `DotMusicTest` (every widget inflates like on a launcher, stage snapshot, headless wallpaper stage, photo pipeline, player through song changes).

@@ -50,6 +50,7 @@ class IslandNotificationListener : NotificationListenerService() {
     }
 
     override fun onListenerConnected() {
+        MusicCenter.attach(this)
         super.onListenerConnected()
         instance = this
         IslandBus.mediaControl = ::handleMedia
