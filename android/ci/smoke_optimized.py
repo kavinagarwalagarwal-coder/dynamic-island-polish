@@ -113,6 +113,16 @@ def main():
 
 try:
     main()
+except Exception as error:
+    # Surface the reason in the GitHub UI (logs aren't always reachable), plus any crash.
+    crash = ""
+    try:
+        crash = adb("logcat", "-d", "-s", "AndroidRuntime:E")[-1500:]
+    except Exception:
+        pass
+    summary = f"{type(error).__name__}: {error} | {crash}".replace("%", "%25").replace("\n", " | ")
+    print(f"::error title=Optimized smoke failed::{summary[:3800]}")
+    raise
 finally:
     output = pathlib.Path("island-screenshots")
     output.mkdir(parents=True, exist_ok=True)
