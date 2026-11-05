@@ -34,6 +34,7 @@ class DotWallpaper : WallpaperService() {
         private val stage = DotStage(app).also {
             it.showControls = false
             it.gestures = false
+            it.recordOnly = true
         }
         private val beat = BeatListener(app) { bands -> stage.spectrum = bands }
         private var photo: Bitmap? = null

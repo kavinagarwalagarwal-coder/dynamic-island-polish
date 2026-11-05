@@ -92,6 +92,27 @@ class DotMusicTest {
         assertTrue(!WallpaperPhoto.exists(context))
     }
 
+    /** The island's dot record pulses on the beat, rebuilds on a song change, and draws. */
+    @Test fun islandDotsPulseRebuildAndDraw() {
+        instrumentation.runOnMainSync {
+            val dots = IslandDots(15)
+            dots.prepare(cover(Color.RED), mono = false, animate = false)
+            var glowed = false
+            repeat(90) { dots.step(1f / 60f, playing = true, spectrum = null, reduceMotion = false); glowed = glowed || dots.beatGlow > 0.3f }
+            assertTrue("No beat ripple in 1.5 s of playing", glowed)
+            dots.prepare(cover(Color.GREEN), mono = false, animate = true)
+            repeat(60) { dots.step(1f / 60f, playing = true, spectrum = FloatArray(48) { 0.6f }, reduceMotion = false) }
+            val bitmap = Bitmap.createBitmap(160, 160, Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bitmap)
+            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG)
+            dots.drawRing(canvas, paint, 80f, 80f, 62f, 6f, 2.4f, 3, Color.YELLOW, true, 255)
+            dots.drawRecord(canvas, paint, 80f, 80f, 56f, true, 255)
+            dots.drawMeter(canvas, paint, 4f, 4f, 30f, 20f, 4, 3, Color.WHITE, 1f, 255)
+            val px = IntArray(160 * 160).also { bitmap.getPixels(it, 0, 160, 0, 0, 160, 160) }
+            assertTrue("Island dots drew nothing", px.count { Color.alpha(it) > 200 } > 1_500)
+        }
+    }
+
     /** The player runs, survives song changes and play/pause, and keeps drawing frames. */
     @Test fun playerRunsThroughSongChanges() {
         ActivityScenario.launch(DotPlayerActivity::class.java).use { scenario ->

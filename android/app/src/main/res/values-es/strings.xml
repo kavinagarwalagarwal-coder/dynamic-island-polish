@@ -307,7 +307,7 @@
     <string name="dot_add_wide">Añadir la tira 4×1</string>
     <string name="dot_pin_unsupported">Tu launcher no puede añadir widgets desde una app. Mantén pulsada la pantalla de inicio, elige Widgets y busca Dynamic Droid.</string>
     <string name="dot_wallpaper">Fondo de pantalla animado</string>
-    <string name="dot_wallpaper_note">El reproductor de puntos sobre tu propia foto en la pantalla de inicio. Android no deja a las apps leer tu fondo actual, así que elige la misma foto aquí una vez.</string>
+    <string name="dot_wallpaper_note">Un pequeño disco de puntos sobre tu propia foto en la pantalla de inicio, sin texto que amontone tus apps. Android no deja a las apps leer tu fondo actual, así que elige la misma foto aquí una vez.</string>
     <string name="dot_photo_pick">Elegir foto de fondo</string>
     <string name="dot_photo_change">Cambiar foto de fondo</string>
     <string name="dot_photo_remove">Usar un fondo negro liso</string>
@@ -345,4 +345,6 @@
     <string name="action_play_pause">Reproducir o pausar</string>
     <string name="action_next">Siguiente canción</string>
     <string name="action_previous">Canción anterior</string>
+    <string name="dot_island">Puntos en la isla</string>
+    <string name="dot_island_note">Mientras suena música, la portada de la isla se convierte en un pequeño disco de puntos que gira y la onda en un ecualizador de puntos. Abre la tarjeta para el disco grande: ondula con el ritmo dentro de un anillo de puntos que rebotan y estalla en la siguiente portada al cambiar de canción.</string>
 </resources>

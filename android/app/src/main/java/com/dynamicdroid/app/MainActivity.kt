@@ -788,6 +788,13 @@ class MainActivity : AppCompatActivity() {
 
         section(R.string.dot_section, false)
         column.addView(label(getString(R.string.dot_note), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
+        column.addView(SwitchCompat(this).apply {
+            text = getString(R.string.dot_island); textSize = 16f; minHeight = dp(56)
+            setTextColor(NothingStyle.foreground); typeface = NothingStyle.body
+            isChecked = IslandFeatures.read(this@MainActivity).dotMusic
+            setOnCheckedChangeListener { _, on -> IslandFeatures.setBoolean(this@MainActivity, "dot_music", on); applyFeaturesUpdate() }
+        }, row(-2))
+        column.addView(label(getString(R.string.dot_island_note), 13f, NothingStyle.muted), row(-2).apply { bottomMargin = dp(6) })
         button("dot-open", R.string.dot_open) { startActivity(Intent(this, DotPlayerActivity::class.java)) }
 
         column.addView(label(getString(R.string.dot_widgets), 16f, NothingStyle.foreground).apply {
@@ -823,7 +830,7 @@ class MainActivity : AppCompatActivity() {
             typeface = NothingStyle.body; setPadding(0, dp(16), 0, 0)
         }, row(-2))
         dotToggle(R.string.dot_mono, DotPrefs.mono(this), R.string.dot_mono_note) {
-            DotPrefs.setMono(this, it); MusicWidgets.refresh(this)
+            DotPrefs.setMono(this, it); MusicWidgets.refresh(this); applyFeaturesUpdate()
         }
         dotToggle(R.string.dot_animations, DotPrefs.animations(this), R.string.dot_animations_note) {
             DotPrefs.setAnimations(this, it); MusicWidgets.refresh(this)

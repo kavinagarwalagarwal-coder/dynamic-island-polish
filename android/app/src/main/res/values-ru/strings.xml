@@ -307,7 +307,7 @@
     <string name="dot_add_wide">Добавить полосу 4×1</string>
     <string name="dot_pin_unsupported">Ваш лаунчер не умеет добавлять виджеты из приложения. Удерживайте главный экран, выберите «Виджеты» и найдите Dynamic Droid.</string>
     <string name="dot_wallpaper">Живые обои</string>
-    <string name="dot_wallpaper_note">Плеер из точек поверх вашего фото на главном экране. Android не даёт приложениям читать текущие обои, поэтому выберите то же фото здесь один раз.</string>
+    <string name="dot_wallpaper_note">Маленькая пластинка из точек поверх вашего фото на главном экране, без текста, который загромождает приложения. Android не даёт приложениям читать текущие обои, поэтому выберите то же фото здесь один раз.</string>
     <string name="dot_photo_pick">Выбрать фоновое фото</string>
     <string name="dot_photo_change">Сменить фоновое фото</string>
     <string name="dot_photo_remove">Простой чёрный фон</string>
@@ -345,4 +345,6 @@
     <string name="action_play_pause">Воспроизвести или пауза</string>
     <string name="action_next">Следующая песня</string>
     <string name="action_previous">Предыдущая песня</string>
+    <string name="dot_island">Точки в острове</string>
+    <string name="dot_island_note">Пока играет музыка, обложка в острове становится маленькой вращающейся пластинкой из точек, а волна — эквалайзером из точек. Откройте карточку, чтобы увидеть большую пластинку: она колышется в такт внутри кольца прыгающих точек и рассыпается в новую обложку при смене песни.</string>
 </resources>

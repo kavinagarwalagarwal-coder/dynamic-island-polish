@@ -138,6 +138,33 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val artPaint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
     private val artSrc = Rect()
     private val modeHits = ArrayList<Pair<RectF, RingerState>>()
+    // ---------------------------------------------------------------- dot music
+    private val compactDots = IslandDots(9)
+    private val cardDots = IslandDots(15)
+    /** Real band levels from the visualizer while the music card is open (null: steady pulse). */
+    @Volatile var dotSpectrum: FloatArray? = null
+    private var dotMono = false
+    private var dotSong: String? = null
+    private var dotsAt = 0L
+
+    private fun usesDots(a: LiveActivity?) = features.dotMusic && a?.mode == IslandMode.MUSIC
+
+    /** Once per frame: feed the cover to both records and move them along. */
+    private fun advanceDots(a: LiveActivity) {
+        val now = SystemClock.uptimeMillis()
+        val song = a.key + "|" + a.title + "|" + a.subtitle
+        val changed = dotSong != null && dotSong != song
+        dotSong = song
+        compactDots.prepare(a.artwork, dotMono, animate = changed)
+        cardDots.prepare(a.artwork, dotMono, animate = changed)
+        if (now == dotsAt) return
+        val dt = if (dotsAt == 0L) 1f / 60f else ((now - dotsAt) / 1000f).coerceIn(0f, 0.1f)
+        dotsAt = now
+        val spectrum = dotSpectrum
+        compactDots.step(dt, a.isPlaying, spectrum, reduceMotion)
+        cardDots.step(dt, a.isPlaying, spectrum, reduceMotion)
+    }
+
     /** The open music card's album art, which opens the dot player. */
     private val musicArtHit = RectF()
     private val bubbleLevelS = Spring(0f, 300f, 1f, 0.0015f)
@@ -151,6 +178,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     fun applyFeatures(next: IslandFeatureSet) {
         features = next.safe()
+        dotMono = DotPrefs.mono(context)
         if (!features.burnInCare) removeCallbacks(burnInTick)
         show(activity, presentation)
         invalidate()
@@ -789,6 +817,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         return when {
             // The small island's waveform reads fine at 30 fps; the open card's progress bar gets 60.
             a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else 33L
+            // A tap's ripple (or a burst between songs) finishes even while paused.
+            usesDots(a) && cardDots.beatGlow > 0.01f -> 16L
             a.mode == IslandMode.CALL -> 33L
             a.mode == IslandMode.ALARM -> 33L
             a.clockBaseElapsed != null && a.pausedTimerMs == null -> {
@@ -1048,7 +1078,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 rolling(canvas, "bubble", digits, center - paint.measureText(digits) / 2,
                     cy - (paint.ascent() + paint.descent()) / 2, paint, timerColor, timerAlpha, travel = .7f)
             }
-            IslandMode.MUSIC -> drawWave(canvas, center - dp(9f), cy, dp(18f), dp(14f), userAccent ?: waveColor, a.isPlaying, alpha)
+            IslandMode.MUSIC -> if (usesDots(a)) {
+                advanceDots(a)
+                compactDots.drawMeter(canvas, fillPaint, center - dp(9f), cy - dp(7f), dp(18f), dp(14f), 3, 3,
+                    userAccent ?: waveColor, if (a.isPlaying) 1f else 0f, alpha)
+            } else drawWave(canvas, center - dp(9f), cy, dp(18f), dp(14f), userAccent ?: waveColor, a.isPlaying, alpha)
             IslandMode.CALL -> drawPhone(canvas, center, cy, dp(18f), alpha, false)
             IslandMode.ALARM -> drawAlarmGlyph(canvas, center, cy, dp(15f), withAlpha(ALARM, alpha))
             IslandMode.DOWNLOAD -> drawMiniProgress(canvas, center, cy, dp(10f), bubbleLevelS.value, alpha)
@@ -1221,7 +1255,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val s = dp(22f)
         val l = rect.left + dp(7f)
         when (a.mode) {
-            IslandMode.MUSIC -> drawArtwork(canvas, a, l, cy - s / 2, s, dp(6f), alpha)
+            IslandMode.MUSIC -> if (usesDots(a)) {
+                advanceDots(a)
+                compactDots.drawRecord(canvas, fillPaint, l + s / 2, cy, s / 2 + dp(1.5f), a.isPlaying, alpha)
+            } else drawArtwork(canvas, a, l, cy - s / 2, s, dp(6f), alpha)
             IslandMode.CALL -> {
                 fillPaint.color = withAlpha(NothingStyle.muted, alpha)
                 canvas.drawCircle(l + s / 2, cy, s / 2, fillPaint)
@@ -1239,7 +1276,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         when (a.mode) {
             IslandMode.MUSIC -> {
                 // Artwork and waveform flank the camera, matching the SwiftUI compact layout.
-                drawWave(canvas, right - dp(20f), cy, dp(20f), dp(14f), userAccent ?: waveColor, waveS.value, alpha)
+                if (usesDots(a)) compactDots.drawMeter(canvas, fillPaint, right - dp(20f), cy - dp(8f), dp(20f), dp(16f), 4, 3,
+                    userAccent ?: waveColor, waveS.value, alpha)
+                else drawWave(canvas, right - dp(20f), cy, dp(20f), dp(14f), userAccent ?: waveColor, waveS.value, alpha)
             }
             IslandMode.CALL -> {
                 val t = a.chronometerText()
@@ -1270,11 +1309,20 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val t = rect.top + pad
         val rr = rect.right - pad
         val art = dp(58f)
-        drawArtwork(canvas, a, l, t, art, dp(14f), alpha)
+        if (usesDots(a)) {
+            // The record spins inside its ring of bouncing dots.
+            advanceDots(a)
+            val acx = l + art / 2f
+            val acy = t + art / 2f
+            cardDots.drawRing(canvas, fillPaint, acx, acy, dp(23.5f), dp(2.6f), dp(1.05f), 3, userAccent ?: a.accent, a.isPlaying, alpha)
+            cardDots.drawRecord(canvas, fillPaint, acx, acy, dp(21.5f), a.isPlaying, alpha)
+        } else drawArtwork(canvas, a, l, t, art, dp(14f), alpha)
         musicArtHit.set(l - dp(6f), t - dp(6f), l + art + dp(6f), t + art + dp(6f))
         val tx = l + art + dp(14f)
         val waveW = dp(24f)
-        drawWave(canvas, rr - waveW, t + dp(20f), waveW, dp(18f), userAccent ?: waveColor, waveS.value, alpha)
+        if (usesDots(a)) cardDots.drawMeter(canvas, fillPaint, rr - waveW, t + dp(11f), waveW, dp(18f), 4, 4,
+            userAccent ?: waveColor, waveS.value, alpha)
+        else drawWave(canvas, rr - waveW, t + dp(20f), waveW, dp(18f), userAccent ?: waveColor, waveS.value, alpha)
         text(canvas, a.title, tx, t + dp(25f), rr - waveW - dp(12f) - tx, titlePaint, Color.WHITE, alpha)
         text(canvas, a.subtitle, tx, t + dp(46f), rr - tx, bodyPaint, GREY, alpha)
 
@@ -2541,6 +2589,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                                 positionUpdatedAt = SystemClock.elapsedRealtime(),
                             )
                             callbacks?.onMedia(a, IslandBus.MEDIA_TOGGLE)
+                            if (usesDots(a)) cardDots.ripple(1f)
                             kick()
                         }
                         else -> callbacks?.onOpen(a)

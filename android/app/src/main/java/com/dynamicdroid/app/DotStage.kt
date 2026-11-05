@@ -42,6 +42,11 @@ class DotStage(private val context: Context, unit: Float? = null) {
     var showControls = true
     /** Flick to skip and tap to pause (off on the wallpaper: those gestures belong to the launcher). */
     var gestures = true
+    /**
+     * Just the record and its ring, smaller, with no text or controls: the calm wallpaper look,
+     * so it sits behind app icons without crowding them.
+     */
+    var recordOnly = false
     /** Paint its own black background (off on the wallpaper, which draws the photo underneath). */
     var opaque = true
     /** Host hooks: redraw, and a haptic tick (no-op on the wallpaper). */
@@ -178,13 +183,13 @@ class DotStage(private val context: Context, unit: Float? = null) {
         topInset = top
         bottomInset = bottom
         val usable = h - topInset - bottomInset
-        val size = min(w - 56 * d, usable * 0.5f)
+        val size = if (recordOnly) min(w * 0.5f, usable * 0.3f) else min(w - 56 * d, usable * 0.5f)
         discRadius = size / 2f
         cell = size / n
         // Stack: record, title, artist, progress, controls, centred in the usable height.
         val titleH = titleRows * pitch()
         val stack = size + 36 * d + titleH + 34 * d + 44 * d + if (showControls) 84 * d else 20 * d
-        val top = topInset + max(24 * d, (usable - stack) / 2f)
+        val top = if (recordOnly) topInset + usable * 0.42f - size / 2f else topInset + max(24 * d, (usable - stack) / 2f)
         cx = w / 2f
         cy = top + discRadius
         titleTop = cy + discRadius + 36 * d
@@ -402,6 +407,7 @@ class DotStage(private val context: Context, unit: Float? = null) {
         drawGlow(canvas, playing)
         drawRing(canvas, playing)
         drawRecord(canvas, playing)
+        if (recordOnly) return
         drawTitle(canvas)
         drawInfo(canvas)
         if (showControls) drawControls(canvas)

@@ -307,7 +307,7 @@
     <string name="dot_add_wide">4×1 şerit ekle</string>
     <string name="dot_pin_unsupported">Başlatıcınız bir uygulamadan widget ekleyemiyor. Ana ekrana uzun basın, Widget\'lar\'ı seçin ve Dynamic Droid\'i bulun.</string>
     <string name="dot_wallpaper">Canlı duvar kâğıdı</string>
-    <string name="dot_wallpaper_note">Ana ekranda kendi fotoğrafınızın üzerinde nokta oynatıcı. Android, uygulamaların mevcut duvar kâğıdını okumasına izin vermez; aynı fotoğrafı burada bir kez seçin.</string>
+    <string name="dot_wallpaper_note">Ana ekranda kendi fotoğrafınızın üzerinde küçük bir nokta plak; uygulamalarınızı kalabalıklaştıracak yazı yok. Android, uygulamaların mevcut duvar kâğıdını okumasına izin vermez; aynı fotoğrafı burada bir kez seçin.</string>
     <string name="dot_photo_pick">Arka plan fotoğrafı seç</string>
     <string name="dot_photo_change">Arka plan fotoğrafını değiştir</string>
     <string name="dot_photo_remove">Düz siyah arka plan kullan</string>
@@ -345,4 +345,6 @@
     <string name="action_play_pause">Oynat veya duraklat</string>
     <string name="action_next">Sonraki şarkı</string>
     <string name="action_previous">Önceki şarkı</string>
+    <string name="dot_island">Adada noktalar</string>
+    <string name="dot_island_note">Müzik çalarken adadaki albüm kapağı küçük, dönen bir nokta plağına, dalga da nokta ekolayzıra dönüşür. Büyük plak için kartı açın: zıplayan noktalardan bir halkanın içinde ritimle dalgalanır ve şarkı değişince dağılıp yeni kapağa dönüşür.</string>
 </resources>

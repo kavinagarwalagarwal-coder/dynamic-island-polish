@@ -318,7 +318,7 @@
     <string name="dot_add_wide">Add the 4×1 strip</string>
     <string name="dot_pin_unsupported">Your launcher can\'t add widgets from an app. Long-press the home screen, choose Widgets and find Dynamic Droid.</string>
     <string name="dot_wallpaper">Live wallpaper</string>
-    <string name="dot_wallpaper_note">The dot player over your own photo on the home screen. Android doesn\'t let apps read your current wallpaper, so pick the same photo here once.</string>
+    <string name="dot_wallpaper_note">A small dot record over your own photo on the home screen, with no text to crowd your apps. Android doesn\'t let apps read your current wallpaper, so pick the same photo here once.</string>
     <string name="dot_photo_pick">Choose background photo</string>
     <string name="dot_photo_change">Change background photo</string>
     <string name="dot_photo_remove">Use a plain black background</string>
@@ -356,4 +356,6 @@
     <string name="action_play_pause">Play or pause</string>
     <string name="action_next">Next song</string>
     <string name="action_previous">Previous song</string>
+    <string name="dot_island">Dots in the island</string>
+    <string name="dot_island_note">While music plays, the island\'s album art becomes a tiny spinning record of dots and the waveform a dot equaliser. Open the card for the bigger record: it ripples on the beat inside a ring of bouncing dots, and bursts into the next cover when the song changes.</string>
 </resources>

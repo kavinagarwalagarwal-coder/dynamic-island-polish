@@ -307,7 +307,7 @@
     <string name="dot_add_wide">4×1-strook toevoegen</string>
     <string name="dot_pin_unsupported">Je launcher kan geen widgets vanuit een app toevoegen. Houd het startscherm ingedrukt, kies Widgets en zoek Dynamic Droid.</string>
     <string name="dot_wallpaper">Live achtergrond</string>
-    <string name="dot_wallpaper_note">De stippenspeler over je eigen foto op het startscherm. Android laat apps je huidige achtergrond niet lezen, dus kies hier één keer dezelfde foto.</string>
+    <string name="dot_wallpaper_note">Een kleine stippenplaat over je eigen foto op het startscherm, zonder tekst die je apps overvol maakt. Android laat apps je huidige achtergrond niet lezen, dus kies hier één keer dezelfde foto.</string>
     <string name="dot_photo_pick">Achtergrondfoto kiezen</string>
     <string name="dot_photo_change">Achtergrondfoto wijzigen</string>
     <string name="dot_photo_remove">Effen zwarte achtergrond gebruiken</string>
@@ -345,4 +345,6 @@
     <string name="action_play_pause">Afspelen of pauzeren</string>
     <string name="action_next">Volgend nummer</string>
     <string name="action_previous">Vorig nummer</string>
+    <string name="dot_island">Stippen in het eiland</string>
+    <string name="dot_island_note">Terwijl er muziek speelt, wordt de albumhoes in het eiland een kleine draaiende plaat van stippen en de golf een stippenequalizer. Open de kaart voor de grote plaat: die rimpelt op de beat in een ring van stuiterende stippen en spat uiteen in de volgende hoes als het nummer wisselt.</string>
 </resources>

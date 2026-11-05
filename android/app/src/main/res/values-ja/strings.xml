@@ -307,7 +307,7 @@
     <string name="dot_add_wide">4×1 ストリップを追加</string>
     <string name="dot_pin_unsupported">お使いのランチャーはアプリからウィジェットを追加できません。ホーム画面を長押しし、ウィジェットを選んで Dynamic Droid を探してください。</string>
     <string name="dot_wallpaper">ライブ壁紙</string>
-    <string name="dot_wallpaper_note">ホーム画面の自分の写真の上にドットプレーヤーを表示します。Android ではアプリが現在の壁紙を読み取れないため、同じ写真をここで一度選んでください。</string>
+    <string name="dot_wallpaper_note">ホーム画面の自分の写真の上に小さなドットのレコードを表示します。アプリを邪魔する文字はありません。Android ではアプリが現在の壁紙を読み取れないため、同じ写真をここで一度選んでください。</string>
     <string name="dot_photo_pick">背景の写真を選ぶ</string>
     <string name="dot_photo_change">背景の写真を変更</string>
     <string name="dot_photo_remove">黒一色の背景にする</string>
@@ -345,4 +345,6 @@
     <string name="action_play_pause">再生または一時停止</string>
     <string name="action_next">次の曲</string>
     <string name="action_previous">前の曲</string>
+    <string name="dot_island">アイランドにドット</string>
+    <string name="dot_island_note">再生中、アイランドのアルバムアートが回転する小さなドットのレコードに、波形がドットのイコライザーになります。カードを開くと大きなレコードに。跳ねるドットのリングの中でビートに合わせて波打ち、曲が変わると弾けて次のジャケットに組み変わります。</string>
 </resources>

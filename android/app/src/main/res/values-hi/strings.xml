@@ -307,7 +307,7 @@
     <string name="dot_add_wide">4×1 स्ट्रिप जोड़ें</string>
     <string name="dot_pin_unsupported">आपका लॉन्चर ऐप से विजेट नहीं जोड़ सकता। होम स्क्रीन को देर तक दबाएँ, विजेट चुनें और Dynamic Droid ढूँढें।</string>
     <string name="dot_wallpaper">लाइव वॉलपेपर</string>
-    <string name="dot_wallpaper_note">होम स्क्रीन पर आपकी अपनी फ़ोटो के ऊपर डॉट प्लेयर। Android ऐप्स को मौजूदा वॉलपेपर पढ़ने नहीं देता, इसलिए वही फ़ोटो यहाँ एक बार चुनें।</string>
+    <string name="dot_wallpaper_note">होम स्क्रीन पर आपकी अपनी फ़ोटो के ऊपर एक छोटा डॉट रिकॉर्ड, बिना ऐसे टेक्स्ट के जो ऐप्स को भीड़भाड़ वाला बनाए। Android ऐप्स को मौजूदा वॉलपेपर पढ़ने नहीं देता, इसलिए वही फ़ोटो यहाँ एक बार चुनें।</string>
     <string name="dot_photo_pick">बैकग्राउंड फ़ोटो चुनें</string>
     <string name="dot_photo_change">बैकग्राउंड फ़ोटो बदलें</string>
     <string name="dot_photo_remove">सादा काला बैकग्राउंड रखें</string>
@@ -345,4 +345,6 @@
     <string name="action_play_pause">चलाएँ या रोकें</string>
     <string name="action_next">अगला गाना</string>
     <string name="action_previous">पिछला गाना</string>
+    <string name="dot_island">आइलैंड में डॉट्स</string>
+    <string name="dot_island_note">म्यूज़िक चलते समय आइलैंड की एल्बम आर्ट डॉट्स का छोटा घूमता रिकॉर्ड और वेवफ़ॉर्म डॉट इक्वलाइज़र बन जाता है। बड़े रिकॉर्ड के लिए कार्ड खोलें: यह उछलते डॉट्स की रिंग में बीट पर लहराता है, और गाना बदलने पर बिखरकर नए कवर में बदल जाता है।</string>
 </resources>

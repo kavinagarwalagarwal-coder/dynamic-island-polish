@@ -498,6 +498,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         view.show(a?.let { appTint(this, it) }, p, false)
         if (swiftMorphStarted) view.prepareReturnHandoff()
         updateTouchWindow()
+        syncDotBeat(a, p)
     }
 
     /**
@@ -764,6 +765,18 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     override fun onDismiss(activity: LiveActivity) = onCollapseRequest()
+
+    /** Real beats for the island's dot record, only while the music card is open and the setting is on. */
+    private val dotBeat by lazy { BeatListener(this) { bands -> island?.dotSpectrum = bands } }
+    private var dotBeatOn = false
+
+    private fun syncDotBeat(a: LiveActivity?, p: Presentation) {
+        val want = a?.mode == IslandMode.MUSIC && a.isPlaying && p == Presentation.EXPANDED &&
+            IslandFeatures.read(this).dotMusic && DotPrefs.beat(this)
+        if (want == dotBeatOn) return
+        dotBeatOn = want
+        if (want) dotBeat.start() else dotBeat.stop()
+    }
 
     override fun onDotPlayer() {
         onCollapseRequest()
@@ -1084,6 +1097,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         IslandAccessibilityService.onChanged = null
         IslandAccessibilityService.onForegroundPackage = null
         IslandAccessibilityService.onImmersiveMedia = null
+        if (dotBeatOn) { dotBeat.stop(); dotBeatOn = false }
         IslandAccessibilityService.wantsMediaCheck = null
         if (IslandAccessibilityService.onVolumeKey != null) IslandAccessibilityService.onVolumeKey = null
         IslandBus.listenerChanged = null

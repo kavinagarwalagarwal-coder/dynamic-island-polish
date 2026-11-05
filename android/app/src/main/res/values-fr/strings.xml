@@ -307,7 +307,7 @@
     <string name="dot_add_wide">Ajouter la bande 4×1</string>
     <string name="dot_pin_unsupported">Votre lanceur ne peut pas ajouter de widgets depuis une app. Appuyez longuement sur l\'écran d\'accueil, choisissez Widgets et cherchez Dynamic Droid.</string>
     <string name="dot_wallpaper">Fond d\'écran animé</string>
-    <string name="dot_wallpaper_note">Le lecteur de points par-dessus votre propre photo sur l\'écran d\'accueil. Android ne laisse pas les apps lire votre fond d\'écran actuel : choisissez la même photo ici une fois.</string>
+    <string name="dot_wallpaper_note">Un petit disque de points par-dessus votre propre photo sur l\'écran d\'accueil, sans texte qui encombre vos apps. Android ne laisse pas les apps lire votre fond d\'écran actuel : choisissez la même photo ici une fois.</string>
     <string name="dot_photo_pick">Choisir une photo de fond</string>
     <string name="dot_photo_change">Changer la photo de fond</string>
     <string name="dot_photo_remove">Utiliser un fond noir uni</string>
@@ -345,4 +345,6 @@
     <string name="action_play_pause">Lecture ou pause</string>
     <string name="action_next">Morceau suivant</string>
     <string name="action_previous">Morceau précédent</string>
+    <string name="dot_island">Points dans l\'îlot</string>
+    <string name="dot_island_note">Pendant la musique, la pochette de l\'îlot devient un petit disque de points qui tourne et l\'onde un égaliseur de points. Ouvrez la carte pour le grand disque : il ondule sur le rythme dans un anneau de points rebondissants, et éclate en la pochette suivante au changement de morceau.</string>
 </resources>

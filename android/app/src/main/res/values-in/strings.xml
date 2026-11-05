@@ -307,7 +307,7 @@
     <string name="dot_add_wide">Tambah strip 4×1</string>
     <string name="dot_pin_unsupported">Peluncurmu tidak bisa menambah widget dari aplikasi. Tekan lama layar utama, pilih Widget, lalu cari Dynamic Droid.</string>
     <string name="dot_wallpaper">Wallpaper hidup</string>
-    <string name="dot_wallpaper_note">Pemutar titik di atas fotomu sendiri di layar utama. Android tidak mengizinkan aplikasi membaca wallpaper saat ini, jadi pilih foto yang sama di sini sekali.</string>
+    <string name="dot_wallpaper_note">Piringan titik kecil di atas fotomu sendiri di layar utama, tanpa teks yang membuat aplikasi terasa sesak. Android tidak mengizinkan aplikasi membaca wallpaper saat ini, jadi pilih foto yang sama di sini sekali.</string>
     <string name="dot_photo_pick">Pilih foto latar</string>
     <string name="dot_photo_change">Ganti foto latar</string>
     <string name="dot_photo_remove">Pakai latar hitam polos</string>
@@ -345,4 +345,6 @@
     <string name="action_play_pause">Putar atau jeda</string>
     <string name="action_next">Lagu berikutnya</string>
     <string name="action_previous">Lagu sebelumnya</string>
+    <string name="dot_island">Titik di pulau</string>
+    <string name="dot_island_note">Saat musik diputar, sampul album di pulau menjadi piringan titik kecil yang berputar dan gelombang menjadi ekualiser titik. Buka kartu untuk piringan besar: beriak mengikuti ketukan di dalam cincin titik yang memantul, dan pecah menjadi sampul berikutnya saat lagu berganti.</string>
 </resources>

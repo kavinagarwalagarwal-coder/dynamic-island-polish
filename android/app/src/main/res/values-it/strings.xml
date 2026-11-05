@@ -307,7 +307,7 @@
     <string name="dot_add_wide">Aggiungi la striscia 4×1</string>
     <string name="dot_pin_unsupported">Il tuo launcher non può aggiungere widget da un\'app. Tieni premuta la schermata Home, scegli Widget e cerca Dynamic Droid.</string>
     <string name="dot_wallpaper">Sfondo animato</string>
-    <string name="dot_wallpaper_note">Il lettore a punti sopra la tua foto nella schermata Home. Android non permette alle app di leggere lo sfondo attuale, quindi scegli qui la stessa foto una volta.</string>
+    <string name="dot_wallpaper_note">Un piccolo disco a punti sopra la tua foto nella schermata Home, senza testo che affolli le app. Android non permette alle app di leggere lo sfondo attuale, quindi scegli qui la stessa foto una volta.</string>
     <string name="dot_photo_pick">Scegli foto di sfondo</string>
     <string name="dot_photo_change">Cambia foto di sfondo</string>
     <string name="dot_photo_remove">Usa uno sfondo nero</string>
@@ -345,4 +345,6 @@
     <string name="action_play_pause">Riproduci o pausa</string>
     <string name="action_next">Brano successivo</string>
     <string name="action_previous">Brano precedente</string>
+    <string name="dot_island">Punti nell\'isola</string>
+    <string name="dot_island_note">Mentre suona la musica, la copertina dell\'isola diventa un piccolo disco di punti che gira e l\'onda un equalizzatore a punti. Apri la scheda per il disco grande: ondeggia a ritmo dentro un anello di punti che rimbalzano ed esplode nella copertina successiva al cambio di brano.</string>
 </resources>
