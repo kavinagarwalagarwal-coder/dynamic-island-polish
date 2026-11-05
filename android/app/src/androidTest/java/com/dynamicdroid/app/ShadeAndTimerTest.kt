@@ -85,9 +85,17 @@ class ShadeAndTimerTest {
                 })
 
                 // A real swipe down from the status bar, well clear of the island, opens the shade.
+                // A slow, long swipe from the very top edge, like a finger; tried twice, since the
+                // emulator's status bar sometimes misses the first gesture right after a window change.
                 val x = (screenW * 0.92f).toInt()
-                shell("input swipe $x 4 $x ${context.resources.displayMetrics.heightPixels / 2} 250")
-                val opened = waitFor(4_000) { shadeOpen() }
+                val bottom = context.resources.displayMetrics.heightPixels * 2 / 3
+                var opened = false
+                for (attempt in 0 until 2) {
+                    shell("input swipe $x 1 $x $bottom 600")
+                    opened = waitFor(5_000) { shadeOpen() }
+                    if (opened) break
+                    Thread.sleep(800)
+                }
                 shell("cmd statusbar collapse")
                 assertTrue("Swiping down beside the island did not open the shade", opened)
                 Thread.sleep(600)
