@@ -29,6 +29,7 @@ class IslandNotificationListener : NotificationListenerService() {
     private var mediaNotification: StatusBarNotification? = null
     private var controller: MediaController? = null
     private val timers = HashMap<String, LiveActivity>()
+    private val systemPackages = setOf("com.android.systemui", "android")
     private val lastMessageText = HashMap<String, String>()
     private val lastProgress = HashMap<String, Float>()
 
@@ -72,6 +73,9 @@ class IslandNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName || !IslandCustomization.allowed(this, sbn.packageName)) return
+        // System UI's own notifications (screen recording, casting, battery...) already have their
+        // own status-bar chips; the recording one would read as a stopwatch and never stop.
+        if (sbn.packageName in systemPackages) return
         val n = sbn.notification
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val extras = n.extras
@@ -100,6 +104,15 @@ class IslandNotificationListener : NotificationListenerService() {
             clockApp,
             ClockTimeline.parseRemaining(text) != null || ClockTimeline.parseRemaining(title) != null,
             n.actions.orEmpty().any { a -> listOf("pause", "resume", "cancel", "stop").any { a.title.toString().contains(it, true) } })
+        // A known timer whose update no longer carries any time (finished, or the notification
+        // turned into something else) ends here instead of counting on forever from memory.
+        if (sbn.key in timers && !chronometer && customClock == null &&
+            ClockTimeline.parseRemaining(text) == null && ClockTimeline.parseRemaining(title) == null &&
+            n.actions.orEmpty().none { a -> listOf("pause", "resume", "cancel", "stop", "reset").any { a.title.toString().contains(it, true) } }) {
+            timers.remove(sbn.key)
+            IslandBus.remove(sbn.key)
+            return
+        }
         if (clockApp || customClock != null || sbn.key in timers) {
             TimerDiagnostics.record(this, sbn.packageName, customClock?.source ?: "standard fields",
                 recognizedTimer, n.contentView != null || n.bigContentView != null)

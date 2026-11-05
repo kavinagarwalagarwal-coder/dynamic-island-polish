@@ -59,6 +59,7 @@ class IslandAccessibilityService : AccessibilityService() {
         }
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                ensureIsland()
                 onForegroundPackage?.invoke(pkg)
                 scheduleMediaCheck(150L)
                 // Screen changes animate; look again once the new screen has settled.
@@ -72,6 +73,17 @@ class IslandAccessibilityService : AccessibilityService() {
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ->
                 if (SystemClock.uptimeMillis() - lastMediaCheck > CONTENT_CHECK_EVERY_MS) scheduleMediaCheck(300L)
         }
+    }
+
+    private var lastIslandStart = 0L
+
+    /** If Android ever stopped the island while we kept running, bring it back. */
+    private fun ensureIsland() {
+        if (IslandBus.listener != null) return
+        val now = SystemClock.uptimeMillis()
+        if (now - lastIslandStart < 10_000L) return
+        lastIslandStart = now
+        runCatching { ContextCompat.startForegroundService(this, Intent(this, IslandOverlayService::class.java)) }
     }
 
     // ---------------------------------------------------------------- full-screen video and photos

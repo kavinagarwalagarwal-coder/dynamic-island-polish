@@ -306,4 +306,5 @@
     <string name="feature_idle_pill_note">Leave a small black pill around the camera when nothing is happening, instead of disappearing into it.</string>
     <string name="feature_hide_media">Hide during videos and photos</string>
     <string name="feature_hide_media_note">Step aside for Shorts, Reels, full-screen videos and photo viewers, even when the status bar stays visible. Calls, alarms and volume still show.</string>
+    <string name="setup_a11y_stuck">Camera-area overlay stopped: turn it off and on</string>
 </resources>

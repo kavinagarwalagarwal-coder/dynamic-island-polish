@@ -27,6 +27,17 @@ object FixturePoster {
             nm.cancelAll(); session?.release(); session = null
             return
         }
+        if (kind == "recording" || kind == "recording-done") {
+            // Like a screen recorder: an ongoing count-up chronometer, then a "saved" update
+            // of the same notification with no time at all.
+            nm.createNotificationChannel(NotificationChannel("rec", "Recording", NotificationManager.IMPORTANCE_LOW))
+            val done = kind == "recording-done"
+            nm.notify(404, Notification.Builder(context, "rec").setSmallIcon(android.R.drawable.presence_video_online)
+                .setContentTitle(if (done) "Recording saved" else "Recording")
+                .setOngoing(!done).setUsesChronometer(!done).setShowWhen(!done)
+                .setWhen(System.currentTimeMillis() - 5_000).build())
+            return
+        }
         if (kind == "message" || kind == "message2") {
             // High importance, so the phone shows its own pop-up for it.
             nm.createNotificationChannel(NotificationChannel("alerts", "Alerts", NotificationManager.IMPORTANCE_HIGH))

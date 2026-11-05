@@ -295,4 +295,5 @@
     <string name="feature_idle_pill_note">Deja una pequeña píldora negra alrededor de la cámara cuando no pasa nada, en lugar de desaparecer en ella.</string>
     <string name="feature_hide_media">Ocultar durante vídeos y fotos</string>
     <string name="feature_hide_media_note">Se aparta en Shorts, Reels, vídeos a pantalla completa y visores de fotos, aunque la barra de estado siga visible. Llamadas, alarmas y volumen se siguen mostrando.</string>
+    <string name="setup_a11y_stuck">La superposición del área de la cámara se detuvo: desactívala y actívala</string>
 </resources>

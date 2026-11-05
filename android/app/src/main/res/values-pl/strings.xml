@@ -295,4 +295,5 @@
     <string name="feature_idle_pill_note">Gdy nic się nie dzieje, zostaw małą czarną pigułkę wokół aparatu zamiast znikać w nim.</string>
     <string name="feature_hide_media">Ukrywaj przy filmach i zdjęciach</string>
     <string name="feature_hide_media_note">Usuwa się przy Shorts, Reels, filmach na pełnym ekranie i przeglądarkach zdjęć, nawet gdy pasek stanu jest widoczny. Połączenia, alarmy i głośność nadal się pokazują.</string>
+    <string name="setup_a11y_stuck">Nakładka obszaru aparatu zatrzymana: wyłącz ją i włącz ponownie</string>
 </resources>
