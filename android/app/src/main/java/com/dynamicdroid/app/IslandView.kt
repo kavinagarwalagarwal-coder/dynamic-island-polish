@@ -506,13 +506,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             absorbS.snap(0f); morphCard = null; softMorphCard = null
         }
         if (absorb && next != null && !reduceMotion) {
-            removeCallbacks(introWiden); introHoldUntil = 0L; introS.snap(1f)
-            concealS.snap(1f) // Home is visible; avoid a full-screen alpha layer left over from fullscreen media.
-            widthS.snap(spec.w); heightS.snap(spec.h); radiusS.snap(spec.r)
-            centerS.snap(spec.cx); topS.snap(targetTop(p)); presenceS.snap(1f)
-            morphCard = makeMorphCard(next)
-            softMorphCard = morphCard?.let { runCatching { Bitmap.createScaledBitmap(it, 32, 56, true) }.getOrNull() }
-            absorbS.snap(1f); compactA.snap(0f); expandedA.snap(0f)
+            // Back from the app: the island grows out of the camera as one smooth motion, a dot
+            // that pops round and stretches into the pill with its content fading in, the same
+            // as waking the phone but quicker. No black stand-in shape, no swap halfway through.
+            playReturn(spec, p)
+            return
         }
         widthS.target = spec.w
         heightS.target = spec.h
@@ -594,6 +592,27 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         introS.target = 1f
         introHoldUntil = SystemClock.uptimeMillis() + INTRO_HOLD_MS
         postDelayed(introWiden, INTRO_HOLD_MS)
+        settled = false
+        kick()
+    }
+
+    private fun playReturn(spec: Spec, p: Presentation) {
+        removeCallbacks(introWiden)
+        absorbS.snap(0f); morphCard = null; softMorphCard = null
+        alpha = 1f
+        concealS.snap(1f) // Home is visible; avoid a full-screen alpha layer left over from fullscreen media.
+        introS.snap(1f); presenceS.snap(1f)
+        compactA.snap(0f); expandedA.snap(0f); idleA.snap(0f)
+        secondaryA.snap(0f); dropS.snap(0f)
+        val d = min(spec.h, dp(34f))
+        // Start from a small dot in the camera hole, already on screen (never a flash of black).
+        widthS.snap(d * 0.45f); heightS.snap(d * 0.45f); radiusS.snap(d * 0.225f)
+        centerS.snap(cameraCenter()); topS.snap(baseTop + d * 0.275f)
+        shapeSprings.forEach { it.stiffness = 320f; it.dampingRatio = 0.6f }
+        widthS.target = d; heightS.target = d; radiusS.target = d / 2f
+        topS.target = baseTop
+        introHoldUntil = SystemClock.uptimeMillis() + RETURN_HOLD_MS
+        postDelayed(introWiden, RETURN_HOLD_MS)
         settled = false
         kick()
     }
@@ -2699,6 +2718,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val WALLPAPER_STAGE_DP = 240f
         private const val SHEEN_MS = 800L
         private const val INTRO_HOLD_MS = 190L
+        private const val RETURN_HOLD_MS = 110L
         private const val ROLL_MS = 240L
         private const val OUTLINE_EVENT_MS = 4_000L
         private const val RINGER_HEIGHT_DP = 46f

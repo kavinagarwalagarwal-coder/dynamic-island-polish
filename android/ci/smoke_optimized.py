@@ -79,6 +79,21 @@ def main():
     check_crash()
     click_if_present("Skip")
     check_crash()
+    # The tour, the launch flourish or a stray emulator dialog can still be on screen on a slow
+    # runner: wait for the main screen instead of failing on the first look.
+    for attempt in range(12):
+        labels = [(n.get("text", "") or n.get("content-desc", "")) for n in hierarchy().iter("node")]
+        if any(l.casefold() == "playground" for l in labels):
+            break
+        if any(l.casefold() == "skip" for l in labels):
+            click_if_present("Skip", wait=1)
+        else:
+            adb("shell", "am", "broadcast", "-a", "android.intent.action.CLOSE_SYSTEM_DIALOGS")
+            if attempt in (5, 9):
+                adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.MainActivity")
+        time.sleep(1)
+    else:
+        raise AssertionError("Main screen never showed 'Playground'; visible: " + ", ".join(l for l in labels if l)[:600])
     click("Playground")
     click("Preview SwiftUI morph", scroll=True)
     time.sleep(2)
@@ -108,8 +123,8 @@ def main():
     time.sleep(2)
     check_crash()
     assert adb("shell", "pidof", PACKAGE).strip() == before, "App restarted during the live handoff"
-    assert "SwiftUI morph started" in adb("logcat", "-d", "-s", "IslandHandoff:I"), "Live SwiftUI handoff did not start"
-    print("Optimized standalone APK: SwiftUI preview and real player-to-Home handoff passed.")
+    assert "Native return started" in adb("logcat", "-d", "-s", "IslandHandoff:I"), "The island did not grow back after leaving the player"
+    print("Optimized standalone APK: SwiftUI preview and real player-to-Home return passed.")
 
 try:
     main()
