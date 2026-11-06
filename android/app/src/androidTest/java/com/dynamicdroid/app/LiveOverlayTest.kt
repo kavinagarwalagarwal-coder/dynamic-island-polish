@@ -91,23 +91,16 @@ class LiveOverlayTest {
                         field<IslandView?>(service, "island")?.activity == null
                 }
                 shell("input keyevent KEYCODE_HOME")
-                await("Leaving the real player for Home did not start the SwiftUI morph") {
+                await("Leaving the real player for Home did not bring the island back by itself") {
                     val service = IslandBus.listener as? IslandOverlayService ?: return@await false
-                    val overlay = field<SwiftIslandMorphView?>(service, "morphOverlay") ?: return@await false
                     val view = field<IslandView?>(service, "island") ?: return@await false
-                    if (!field<Boolean>(service, "swiftMorphActive") || view.alpha != 0f) return@await false
-                    // Inspect in the same main-thread observation as the active check:
-                    // a second dispatch can run after this short animation has ended.
-                    val layout = overlay.layoutParams as android.view.WindowManager.LayoutParams
-                    val expected = view.returnHandoffBounds(view.activity!!)
-                    assertTrue("Live entrance must stay in the status area, never cover Home",
-                        layout.height < view.resources.displayMetrics.heightPixels / 4)
-                    assertTrue(kotlin.math.abs(layout.height -
-                        (expected.bottom + 16f * view.resources.displayMetrics.density).toInt()) <= 1)
-                    true
+                    // The island grows back in its own window: no black SwiftUI stand-in, never invisible.
+                    field<SwiftIslandMorphView?>(service, "morphOverlay") == null &&
+                        !field<Boolean>(service, "swiftMorphActive") &&
+                        view.alpha == 1f && view.activity?.mode == IslandMode.MUSIC
                 }
                 capture("live-app-to-island")
-                await("SwiftUI handoff did not settle into a touchable compact island") {
+                await("Return from the app did not settle into a touchable compact island") {
                     val service = IslandBus.listener as? IslandOverlayService ?: return@await false
                     val view = field<IslandView>(service, "island")
                     val window = field<android.view.WindowManager.LayoutParams>(service, "params")

@@ -108,8 +108,8 @@ def main():
     time.sleep(2)
     check_crash()
     assert adb("shell", "pidof", PACKAGE).strip() == before, "App restarted during the live handoff"
-    assert "SwiftUI morph started" in adb("logcat", "-d", "-s", "IslandHandoff:I"), "Live SwiftUI handoff did not start"
-    print("Optimized standalone APK: SwiftUI preview and real player-to-Home handoff passed.")
+    assert "Native return started" in adb("logcat", "-d", "-s", "IslandHandoff:I"), "The island did not grow back after leaving the player"
+    print("Optimized standalone APK: SwiftUI preview and real player-to-Home return passed.")
 
 try:
     main()

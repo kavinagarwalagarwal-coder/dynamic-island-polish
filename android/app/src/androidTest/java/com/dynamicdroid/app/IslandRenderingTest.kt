@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import androidx.test.core.app.ActivityScenario
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import kotlin.math.max
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -84,7 +85,7 @@ class IslandRenderingTest {
         bitmap.recycle()
     }
 
-    @Test fun appCardPinchesTravelsAndOpensIntoIsland() {
+    @Test fun returnFromAppGrowsOutOfTheCamera() {
         val music = LiveActivity("handoff", "music.test", IslandMode.MUSIC, "Reference motion", "Local notification card", "Player", null, null,
             0xFFFFFFFF.toInt(), isPlaying = false)
         val frames = ArrayList<Bitmap>()
@@ -96,18 +97,21 @@ class IslandRenderingTest {
                 }
                 SystemClock.sleep(1000)
                 val done = CountDownLatch(1)
-                var narrow = false; var rose = false
+                var minWidth = Float.MAX_VALUE; var maxWidth = 0f; var hidden = false
                 scenario.onActivity { activity ->
                     val view = findIsland(activity.window.decorView)!!
                     view.show(music, Presentation.COMPACT, absorb = true)
-                    assertNotNull(field<Bitmap?>(view, "morphCard"))
-                    var index = 0; var previousTop = 0f
+                    // Back from an app the island grows out of the camera itself: no stand-in card,
+                    // no invisible window waiting for a handoff.
+                    assertNull(field<Bitmap?>(view, "morphCard"))
+                    assertFalse(view.isAbsorbing)
+                    var index = 0
                     val callback = object : android.view.Choreographer.FrameCallback {
                         override fun doFrame(time: Long) {
-                            val g = field<AppMorphGeometry>(view, "appMorph")
-                            narrow = narrow || g.width < view.width * .20f && g.height > g.width
-                            rose = rose || g.top < previousTop && g.width < view.width * .20f
-                            previousTop = g.top
+                            val w = field<RectF>(view, "rect").width()
+                            if (index < 12 && w > 0f) minWidth = kotlin.math.min(minWidth, w)
+                            maxWidth = max(maxWidth, w)
+                            hidden = hidden || view.alpha < 0.99f
                             if (index < 60 && index % 3 == 0) {
                                 val b = Bitmap.createBitmap(view.width / 2, view.height / 2, Bitmap.Config.ARGB_8888)
                                 val c = android.graphics.Canvas(b); c.drawColor(android.graphics.Color.DKGRAY); c.scale(.5f, .5f)
@@ -118,13 +122,17 @@ class IslandRenderingTest {
                     }
                     android.view.Choreographer.getInstance().postFrameCallback(callback)
                 }
-                assertTrue(done.await(15, TimeUnit.SECONDS)); assertTrue("Card never pinched", narrow); assertTrue("Card never travelled upward", rose)
+                assertTrue(done.await(15, TimeUnit.SECONDS))
                 scenario.onActivity { activity ->
                     val view = findIsland(activity.window.decorView)!!
+                    val dp = view.resources.displayMetrics.density
+                    assertTrue("Return should start as a small dot (narrowest ${minWidth / dp} dp)", minWidth <= 40f * dp)
+                    assertFalse("The island went invisible during its return", hidden)
                     assertFalse(view.isAbsorbing)
                     assertNull("Temporary card was retained", field<Bitmap?>(view, "morphCard"))
                     assertEquals(Presentation.COMPACT, view.presentation)
-                    assertEquals(232f * view.resources.displayMetrics.density, field<RectF>(view, "rect").width(), 1f)
+                    assertEquals(232f * dp, field<RectF>(view, "rect").width(), 1f)
+                    assertTrue(maxWidth >= 230f * dp)
                     view.show(music, Presentation.COMPACT, absorb = true)
                     view.cancelAppMorph()
                     assertFalse(view.isAbsorbing); assertNull(field<Bitmap?>(view, "morphCard"))
