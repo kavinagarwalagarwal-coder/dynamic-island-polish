@@ -475,6 +475,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // Returning from an app is animated by the island itself (see IslandView.playReturn). The
         // old SwiftUI stand-in showed a plain black pill first and then swapped to the real island.
         if (absorb) {
+            android.util.Log.i("IslandHandoff", "Native return started")
             removeSwiftMorph()
             handler.removeCallbacks(restoreTouchAfterReturn)
             handler.postDelayed(restoreTouchAfterReturn, 450L)

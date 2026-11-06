@@ -597,7 +597,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     private fun playReturn(spec: Spec, p: Presentation) {
-        android.util.Log.i("IslandHandoff", "Native return started")
         removeCallbacks(introWiden)
         absorbS.snap(0f); morphCard = null; softMorphCard = null
         alpha = 1f
