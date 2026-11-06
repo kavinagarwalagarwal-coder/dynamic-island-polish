@@ -120,11 +120,13 @@ object IslandBus {
             ongoing[activity.key] = activity
         }
         listener?.onActivity(activity)
+        if (activity.mode == IslandMode.MUSIC) MusicCenter.fromIsland(activity)
     }
 
     fun remove(key: String) = main.post {
         ongoing.remove(key)
         listener?.onRemoved(key)
+        MusicCenter.removedFromIsland(key)
     }
 
     fun latestOngoing(): LiveActivity? = ongoing.values.lastOrNull()

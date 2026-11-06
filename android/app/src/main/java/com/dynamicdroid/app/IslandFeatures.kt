@@ -29,6 +29,8 @@ data class IslandFeatureSet(
     val idlePill: Boolean = false,
     /** Step aside for Shorts, Reels, full-screen players and photo viewers, not just true fullscreen. */
     val hideForMedia: Boolean = true,
+    /** Music in the island as a spinning, rippling record of dots (Dot music) instead of plain art. */
+    val dotMusic: Boolean = true,
     /** Off by default: it takes over from the phone's own pop-ups. */
     val hidePhonePopups: Boolean = false,
     val messagesMediumFirst: Boolean = true,
@@ -81,6 +83,7 @@ object IslandFeatures {
             artworkBackdrop = p.getBoolean("artwork_backdrop", d.artworkBackdrop),
             idlePill = p.getBoolean("idle_pill", d.idlePill),
             hideForMedia = p.getBoolean("hide_for_media", d.hideForMedia),
+            dotMusic = p.getBoolean("dot_music", d.dotMusic),
             hidePhonePopups = p.getBoolean("hide_phone_popups", d.hidePhonePopups),
             messagesMediumFirst = p.getBoolean("messages_medium", d.messagesMediumFirst),
             shortCompact = p.getBoolean("short_compact", d.shortCompact),

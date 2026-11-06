@@ -12,6 +12,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Optional: the dot player follows the music's real beat. Nothing is ever recorded. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+    <uses-feature android:name="android.software.live_wallpaper" android:required="false" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- Headphones and Bluetooth-lost islands: connection broadcasts only, no scanning. -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
@@ -83,5 +87,53 @@
                 android:name="android.accessibilityservice"
                 android:resource="@xml/island_accessibility" />
         </service>
+        <!-- Dot music: full-screen player, widgets, live wallpaper and its Quick Settings tile. -->
+        <activity
+            android:name=".DotPlayerActivity"
+            android:exported="false"
+            android:launchMode="singleTask"
+            android:taskAffinity="com.dynamicdroid.app.dots"
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" />
+
+        <service
+            android:name=".DotWallpaper"
+            android:exported="true"
+            android:label="@string/dot_wallpaper_name"
+            android:permission="android.permission.BIND_WALLPAPER">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data android:name="android.service.wallpaper" android:resource="@xml/dot_wallpaper" />
+        </service>
+
+        <service
+            android:name=".DotTile"
+            android:exported="true"
+            android:icon="@drawable/dot_record"
+            android:label="@string/tile_label"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <receiver android:name=".WidgetActionReceiver" android:exported="false" />
+
+        <receiver android:name=".StageDotWidget" android:exported="false" android:label="@string/widget_stage_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/dot_widget_stage" />
+        </receiver>
+        <receiver android:name=".MediumDotWidget" android:exported="false" android:label="@string/widget_medium_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/dot_widget_medium" />
+        </receiver>
+        <receiver android:name=".SmallDotWidget" android:exported="false" android:label="@string/widget_small_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/dot_widget_small" />
+        </receiver>
+        <receiver android:name=".WideDotWidget" android:exported="false" android:label="@string/widget_wide_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/dot_widget_wide" />
+        </receiver>
     </application>
 </manifest>

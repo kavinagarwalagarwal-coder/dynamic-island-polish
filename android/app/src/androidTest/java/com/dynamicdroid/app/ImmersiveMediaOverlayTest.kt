@@ -54,7 +54,14 @@ class ImmersiveMediaOverlayTest {
                         ?.get(service()) is IslandView && IslandBus.listener != null
                 })
                 Thread.sleep(1_000)
+                // The emulator sometimes shows a stray system dialog ("android"); clear it so the
+                // video is the window in front, and give it a second try if one pops up again.
+                shell("am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS")
                 shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind video")
+                if (!waitFor(8_000) { immersive() }) {
+                    shell("am broadcast -a android.intent.action.CLOSE_SYSTEM_DIALOGS")
+                    shell("am start -n com.dynamicdroid.fixture/.FixtureActivity --es kind video")
+                }
                 if (!waitFor(8_000) { immersive() })
                     fail("A full-screen video should hide the island: " + IslandAccessibilityService.instance?.mediaDebug)
                 shell("input keyevent KEYCODE_HOME")
