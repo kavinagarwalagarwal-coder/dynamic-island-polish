@@ -126,19 +126,19 @@ class DotMusicTest {
             val calm = IslandDots(9)
             calm.prepare(cover(Color.rgb(200, 40, 90)), mono = true, animate = false)
             calm.step(1f / 60f, playing = false, spectrum = null, reduceMotion = false)
-            fun bright(d: IslandDots): Int {
+            fun bright(d: IslandDots): Long {
                 val bmp = Bitmap.createBitmap(360, 90, Bitmap.Config.ARGB_8888)
                 field.draw(android.graphics.Canvas(bmp), paint, 0f, 0f, 360f, 90f, 6f, d, true, 120,
                     peak = 255, ox = 30f, oy = 45f, hole = 22f)
                 val p = IntArray(360 * 90).also { bmp.getPixels(it, 0, 360, 0, 0, 360, 90) }
                 assertTrue("Record clearing should stay empty", (0 until 6).all { dy -> Color.alpha(p[(42 + dy) * 360 + 30]) == 0 })
-                return p.count { Color.alpha(it) > 200 }
+                return p.sumOf { Color.alpha(it).toLong() }
             }
             val before = bright(calm)
             calm.ripple(1f)
             repeat(12) { calm.step(1f / 60f, playing = false, spectrum = null, reduceMotion = false) }
             val during = bright(calm)
-            assertTrue("Ripple should light the field ($before → $during)", during > before + 400)
+            assertTrue("Ripple should light the field ($before → $during)", during > before * 13 / 10)
         }
     }
 
