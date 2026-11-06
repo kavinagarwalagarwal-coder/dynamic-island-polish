@@ -37,12 +37,25 @@ class IslandNotificationListener : NotificationListenerService() {
     private var artBitmap: Bitmap? = null
     private var artAccent: Int? = null
 
-    private val publishMedia = Runnable { publishCurrentMedia() }
+    private val publishMedia = Runnable { publishPending = false; publishCurrentMedia() }
+    private var publishPending = false
+    // What the island last showed, so position-only chatter isn't re-sent.
+    private var lastPublished: LiveActivity? = null
+    // Artwork from a URI is decoded off the main thread; this is the track it's for.
+    private var artLoading: String? = null
+    private val artWorker by lazy {
+        android.os.HandlerThread("island-art").apply { start() }.let { Handler(it.looper) }
+    }
 
     private val controllerCallback = object : MediaController.Callback() {
         override fun onMetadataChanged(metadata: MediaMetadata?) = schedulePublish()
-        override fun onPlaybackStateChanged(state: PlaybackState?) = schedulePublish()
+        override fun onPlaybackStateChanged(state: PlaybackState?) {
+            // Play, pause and skips show at once; everything else is batched.
+            val playing = state?.state == PlaybackState.STATE_PLAYING || state?.state == PlaybackState.STATE_BUFFERING
+            if (lastPublished?.isPlaying != playing) publishNow() else schedulePublish()
+        }
         override fun onSessionDestroyed() {
+            lastPublished = null
             mediaNotification?.key?.let(IslandBus::remove)
             setController(null)
             mediaNotification = null
@@ -89,6 +102,7 @@ class IslandNotificationListener : NotificationListenerService() {
             schedulePublish()
             return
         }
+
 
         val appLabel = AppStyle.label(this, sbn.packageName)
         val clockApp = sbn.packageName.contains("clock", true) || appLabel.contains("clock", true) || appLabel.contains("timer", true)
@@ -208,6 +222,7 @@ class IslandNotificationListener : NotificationListenerService() {
         lastMessageText.remove(sbn.key)
         IslandBus.remove(sbn.key)
         if (sbn.key == mediaNotification?.key) {
+            lastPublished = null
             mediaNotification = null
             setController(null)
         }
@@ -224,6 +239,7 @@ class IslandNotificationListener : NotificationListenerService() {
         setController(null)
         IslandBus.mediaControl = null
         main.removeCallbacksAndMessages(null)
+        runCatching { artWorker.looper.quitSafely() }
         super.onDestroy()
     }
 
@@ -244,9 +260,19 @@ class IslandNotificationListener : NotificationListenerService() {
     // ---------------------------------------------------------------- media
 
     private fun schedulePublish() {
-        // Players fire bursts of callbacks; coalesce them so the island updates once.
+        // Players fire bursts of callbacks; coalesce them so the island updates once. The timer
+        // is not restarted by later callbacks: streaming players (Bloomee, other just_audio and
+        // ExoPlayer apps) report buffering progress many times a second, and restarting the wait
+        // on each one used to hold the island back until the stream went quiet.
+        if (publishPending) return
+        publishPending = true
+        main.postDelayed(publishMedia, 50L)
+    }
+
+    private fun publishNow() {
         main.removeCallbacks(publishMedia)
-        main.postDelayed(publishMedia, 60L)
+        publishPending = false
+        publishCurrentMedia()
     }
 
     private fun handleMedia(command: String, position: Long?): Boolean {
@@ -287,7 +313,7 @@ class IslandNotificationListener : NotificationListenerService() {
 
     private fun publishCurrentMedia() {
         val sbn = mediaNotification ?: return
-        if (!IslandCustomization.allowed(this, sbn.packageName)) { IslandBus.remove(sbn.key); return }
+        if (!IslandCustomization.allowed(this, sbn.packageName)) { lastPublished = null; IslandBus.remove(sbn.key); return }
         val n = sbn.notification
         val extras = n.extras
         val metadata = controller?.metadata
@@ -301,15 +327,36 @@ class IslandNotificationListener : NotificationListenerService() {
         val state = controller?.playbackState
         val duration = metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION)?.takeIf { it > 0L } ?: 0L
 
-        // Artwork + its colour only change with the track, so cache them.
+        // Artwork + its colour only change with the track, so cache them. A bitmap the player
+        // hands over is used straight away; one behind a URI is decoded on a worker thread so
+        // the island never waits on another app's storage.
         val key = "$title|$artist"
         if (key != artKey || artBitmap == null) {
+            if (key != artKey) { artBitmap = null; artAccent = null }
             artKey = key
-            artBitmap = mediaArtwork(metadata, n)
-            artAccent = artBitmap?.let(AppStyle::fromBitmap)
+            val direct = mediaArtworkInMemory(metadata)
+            if (direct != null) {
+                artBitmap = direct
+                artAccent = AppStyle.fromBitmap(direct)
+            } else if (artLoading != key) {
+                artLoading = key
+                val uriMeta = metadata
+                artWorker.post {
+                    val art = artworkFromUri(uriMeta)?.let(::shrink) ?: largeIcon(n)?.let(::shrink)
+                    val accent = art?.let(AppStyle::fromBitmap)
+                    main.post {
+                        if (artLoading == key) artLoading = null
+                        if (artKey == key && art != null && artBitmap == null) {
+                            artBitmap = art
+                            artAccent = accent
+                            publishNow()
+                        }
+                    }
+                }
+            }
         }
 
-        IslandBus.post(LiveActivity(
+        val next = LiveActivity(
             key = sbn.key,
             packageName = sbn.packageName,
             mode = IslandMode.MUSIC,
@@ -328,25 +375,40 @@ class IslandNotificationListener : NotificationListenerService() {
             playbackSpeed = state?.playbackSpeed?.takeIf { it > 0f } ?: 1f,
             durationMs = duration,
             hasMediaSession = controller != null,
-        ))
+        )
+        if (sameForIsland(lastPublished, next)) return
+        lastPublished = next
+        IslandBus.post(next)
+    }
+
+    /**
+     * True when [b] would show the same thing as [a]: same song, state, cover and controls, with
+     * the position where the running clock already puts it (players re-send it constantly).
+     */
+    private fun sameForIsland(a: LiveActivity?, b: LiveActivity): Boolean {
+        if (a == null || IslandBus.allOngoing().none { it.key == b.key } || a.key != b.key || a.title != b.title || a.subtitle != b.subtitle || a.isPlaying != b.isPlaying ||
+            a.artwork !== b.artwork || a.durationMs != b.durationMs || a.playbackSpeed != b.playbackSpeed ||
+            a.accent != b.accent || a.actions.size != b.actions.size || a.contentIntent != b.contentIntent) return false
+        val expected = a.positionMs + if (a.isPlaying) ((b.positionUpdatedAt - a.positionUpdatedAt) * a.playbackSpeed).toLong() else 0L
+        return kotlin.math.abs(expected - b.positionMs) < 700L
     }
 
     private fun largeIcon(n: Notification): Bitmap? = runCatching {
         n.getLargeIcon()?.loadDrawable(this)?.toBitmap(160, 160)
     }.getOrNull()
 
-    private fun mediaArtwork(metadata: MediaMetadata?, n: Notification): Bitmap? {
+    private fun mediaArtworkInMemory(metadata: MediaMetadata?): Bitmap? {
         val raw = metadata?.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
             ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_ART)
             ?: metadata?.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
-            ?: artworkFromUri(metadata)
-            ?: largeIcon(n)
             ?: return null
-        return runCatching {
-            val soft = if (raw.config == Bitmap.Config.HARDWARE) raw.copy(Bitmap.Config.ARGB_8888, false) else raw
-            if (soft.width > 320 || soft.height > 320) Bitmap.createScaledBitmap(soft, 320, 320, true) else soft
-        }.getOrNull()
+        return shrink(raw)
     }
+
+    private fun shrink(raw: Bitmap): Bitmap? = runCatching {
+        val soft = if (raw.config == Bitmap.Config.HARDWARE) raw.copy(Bitmap.Config.ARGB_8888, false) else raw
+        if (soft.width > 320 || soft.height > 320) Bitmap.createScaledBitmap(soft, 320, 320, true) else soft
+    }.getOrNull()
 
     private fun artworkFromUri(metadata: MediaMetadata?): Bitmap? {
         val uriText = metadata?.getString(MediaMetadata.METADATA_KEY_ALBUM_ART_URI)
