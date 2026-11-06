@@ -58,6 +58,8 @@ class IslandDots(private val n: Int) {
 
     private val bands = 24
     private val ring = FloatArray(bands)
+    // The waveform's columns, eased separately from the ring: quick to rise, slow to fall.
+    private val meter = FloatArray(METER_COLS)
 
     /** Sets the cover. A new song (not the first) makes the record burst and rebuild. */
     fun prepare(art: Bitmap?, mono: Boolean, animate: Boolean) {
@@ -179,6 +181,22 @@ class IslandDots(private val n: Int) {
             }
         }
         beatGlow = max(0f, beatGlow - dt * 2.2f)
+
+        // Each waveform column listens to a slice of the ring (averaged, so it doesn't flicker)
+        // and gets a share of the beat; middle columns reach higher, like a voice.
+        val since = t - lastBeat
+        val kick = if (playing && !reduceMotion) exp(-since * 7f) * 0.35f else 0f
+        for (c in 0 until METER_COLS) {
+            val from = c * bands / METER_COLS
+            val to = (c + 1) * bands / METER_COLS
+            var v = 0f
+            for (b in from until to) v += ring[b]
+            v /= (to - from)
+            val shape = 0.62f + 0.38f * sin(PI.toFloat() * (c + 0.5f) / METER_COLS)
+            val target = if (playing) ((v * 1.15f + kick) * shape).coerceIn(0f, 1f) else 0f
+            val rate = if (target > meter[c]) 16f else 4.5f
+            meter[c] += (target - meter[c]) * min(1f, dt * rate)
+        }
     }
 
     /** Seconds since this started; the dot field breathes on the same clock. */
@@ -254,26 +272,37 @@ class IslandDots(private val n: Int) {
     }
 
     /**
-     * A small dot equaliser ([cols] columns of [rows] dots) in the box at ([left], [cy]): the
-     * island's music meter in dots. Bottom dots stay lit; the rest follow the ring's bands.
+     * The island's waveform in dots: [cols] columns of up to [rows] dots (odd) centred on [cy] in
+     * the box from [left], [w] by [h]. Each column grows out from its middle dot both ways, and the
+     * dot at its tip swells and fades in smoothly rather than popping on, so the shape reads as a
+     * waveform and moves fluidly. [energy] (0 paused .. 1 playing) settles it to a row of dots.
      */
     fun drawMeter(canvas: Canvas, paint: Paint, left: Float, cy: Float, w: Float, h: Float, cols: Int, rows: Int,
                   color: Int, energy: Float, alpha: Int) {
         val px = w / cols
-        val py = h / rows
-        val dot = min(px, py) * 0.36f
+        val half = rows / 2
+        val py = h / max(1, rows - 1)
+        val dot = min(px * 0.34f, py * 0.42f)
+        val e = energy.coerceIn(0f, 1f)
+        paint.color = color
         for (c in 0 until cols) {
-            val level = ring[(c * 5 + 3) % bands] * energy
-            val lit = 1 + (level * (rows - 1) + 0.4f).toInt().coerceAtMost(rows - 1)
-            for (r in 0 until rows) {
-                paint.color = color
-                paint.alpha = (alpha * if (r < lit) 1f else 0.18f).toInt()
-                canvas.drawCircle(left + (c + .5f) * px, cy + h / 2f - (r + .5f) * py, dot, paint)
+            val level = meter[min(METER_COLS - 1, c * METER_COLS / cols)] * e
+            val reach = level * half
+            val x = left + (c + .5f) * px
+            paint.alpha = alpha
+            canvas.drawCircle(x, cy, dot, paint)
+            for (k in 1..half) {
+                val f = (reach - (k - 1)).coerceIn(0f, 1f)
+                if (f < 0.02f) break
+                val r = dot * (0.35f + 0.65f * f)
+                paint.alpha = (alpha * f).toInt()
+                canvas.drawCircle(x, cy - k * py, r, paint)
+                canvas.drawCircle(x, cy + k * py, r, paint)
             }
         }
     }
 
-    private companion object { const val RIPPLE_LIFE = 1.1f }
+    private companion object { const val RIPPLE_LIFE = 1.1f; const val METER_COLS = 8 }
 
     private fun rand(i: Int): Float {
         var h = i * 374761393 + 668265263
