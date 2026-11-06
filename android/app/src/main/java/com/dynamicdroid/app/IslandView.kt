@@ -161,7 +161,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         compactDots.prepare(a.artwork, dotMono, animate = changed)
         cardDots.prepare(a.artwork, dotMono, animate = changed)
         dotField.prepare(a.artwork, animate = changed)
-        if (changed && !reduceMotion) cardDots.ripple(1.3f)
+        if (changed && !reduceMotion) { cardDots.ripple(1.3f); compactDots.ripple(1.3f) }
         if (now == dotsAt) return
         val dt = if (dotsAt == 0L) 1f / 60f else ((now - dotsAt) / 1000f).coerceIn(0f, 0.1f)
         dotsAt = now
@@ -824,7 +824,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             // The small island's waveform reads fine at 30 fps; the open card's progress bar gets 60.
             a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else 33L
             // A tap's ripple (or a burst between songs) finishes even while paused.
-            usesDots(a) && cardDots.beatGlow > 0.01f -> 16L
+            usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling) -> 16L
             a.mode == IslandMode.CALL -> 33L
             a.mode == IslandMode.ALARM -> 33L
             a.clockBaseElapsed != null && a.pausedTimerMs == null -> {
@@ -1624,10 +1624,19 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (show < 0.01f || bodyAlpha < 2f) return
         advanceDots(a)
         val open = expandedA.value.coerceIn(0f, 1f)
-        val strength = (0.62f - 0.22f * open) * show
-        val pitch = dp(5f + 1.5f * open)
+        val strength = (0.6f - 0.24f * open) * show
+        val pitch = dp(4.5f + 1.8f * open)
+        // Ripples start at the record (left of the small island, top-left of the open card), and
+        // the field is carved away around it so the record sits in its own clearing.
+        val compactX = rect.left + dp(7f) + dp(11f)
+        val compactY = rect.centerY()
+        val cardX = rect.left + dp(22f) + dp(29f)
+        val cardY = rect.top + dp(22f) + dp(29f)
+        val ox = compactX + (cardX - compactX) * open
+        val oy = compactY + (cardY - compactY) * open
+        val hole = dp(14.5f + 18.5f * open)
         dotField.draw(canvas, fillPaint, rect.left, rect.top, rect.right, rect.bottom, pitch, cardDots, a.isPlaying,
-            (bodyAlpha * strength).toInt())
+            (bodyAlpha * strength).toInt(), peak = (bodyAlpha * 0.95f * show).toInt(), ox = ox, oy = oy, hole = hole)
     }
 
     private fun drawArtBackdrop(canvas: Canvas, bodyAlpha: Float) {
@@ -2611,7 +2620,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                                 positionUpdatedAt = SystemClock.elapsedRealtime(),
                             )
                             callbacks?.onMedia(a, IslandBus.MEDIA_TOGGLE)
-                            if (usesDots(a)) cardDots.ripple(1f)
+                            if (usesDots(a)) { cardDots.ripple(1f); compactDots.ripple(1f) }
                             kick()
                         }
                         else -> callbacks?.onOpen(a)
