@@ -484,6 +484,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         mediaActions = next?.let { activity -> IslandCustomization.mediaSelection(context, activity.packageName)
             ?: setOf(IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_TOGGLE, IslandBus.MEDIA_NEXT, IslandBus.MEDIA_SEEK) }
             ?: setOf(IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_TOGGLE, IslandBus.MEDIA_NEXT, IslandBus.MEDIA_SEEK)
+        // Appearing out of nothing (no resting pill on screen): grow out of the camera instead of
+        // fading in a shape left over from whatever was shown last.
+        val fromNothing = next != null && presenceS.value < 0.05f
         presenceS.target = if (next != null || features.idlePill) 1f else 0f
         updateArtBackdrop(next)
         presentation = p
@@ -505,11 +508,22 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (isAbsorbing && (next?.key != old?.key || p != Presentation.COMPACT)) {
             absorbS.snap(0f); morphCard = null; softMorphCard = null
         }
-        if (absorb && next != null && !reduceMotion) {
-            // Back from the app: the island grows out of the camera as one smooth motion, a dot
-            // that pops round and stretches into the pill with its content fading in, the same
-            // as waking the phone but quicker. No black stand-in shape, no swap halfway through.
+        if ((absorb || fromNothing) && next != null && !reduceMotion) {
+            // Back from an app, or something new with nothing on screen: the island grows out of
+            // the camera as one smooth motion, a dot that pops round and stretches into the pill
+            // with its content fading in once there's room. No stand-in shape, no swap midway.
             playReturn(spec, p)
+            return
+        }
+        if (next == null && !features.idlePill && !reduceMotion && old != null) {
+            // Leaving: shrink back into the camera while fading, the reverse of appearing.
+            val d = dp(12f)
+            widthS.target = d; heightS.target = d; radiusS.target = d / 2f
+            centerS.target = cameraCenter(); topS.target = baseTop + dp(8f)
+            absorbS.target = 0f
+            setContentTargets(p)
+            settled = false
+            kick()
             return
         }
         widthS.target = spec.w
@@ -594,6 +608,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         postDelayed(introWiden, INTRO_HOLD_MS)
         settled = false
         kick()
+    }
+
+    /** 0 while the shape is under ~70% of where it's heading, easing to 1 by ~92%. */
+    private fun roomFor(now: Float, target: Float): Float {
+        if (target <= 1f) return 1f
+        val k = ((now / target - 0.7f) / 0.22f).coerceIn(0f, 1f)
+        return k * k * (3f - 2f * k)
     }
 
     private fun playReturn(spec: Spec, p: Presentation) {
@@ -935,7 +956,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val conceal = concealS.value.coerceIn(0f, 1f)
         if (conceal < 0.01f) return
         val layered = conceal < 0.995f
-        if (layered) canvas.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), (conceal * 255).toInt())
+        if (layered) {
+            canvas.saveLayerAlpha(0f, 0f, width.toFloat(), height.toFloat(), (conceal * 255).toInt())
+            // Hiding for a video or photo and coming back: the island sinks into the camera and
+            // rises out of it, rather than only fading.
+            if (!reduceMotion) {
+                val k = 0.8f + 0.2f * conceal
+                canvas.scale(k, k, cameraCenter() * fit.scale, rect.top * fit.scale)
+            }
+        }
         // Lock screen: the whole island renders in grey until unlock.
         val dimmed = lockDim
         if (dimmed) canvas.saveLayer(0f, 0f, width.toFloat(), height.toFloat(), dimPaint)
@@ -966,7 +995,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             rect.set(appMorph.left, appMorph.top, appMorph.left + appMorph.width, appMorph.top + appMorph.height)
             r = appMorph.radius
         }
-        val reveal = if (isAbsorbing) appMorph.reveal else 1f
+        // Content waits for the shape to make room, so it never shows squashed or clipped while
+        // the island grows (appearing, widening, opening) and leaves before it shrinks.
+        val room = if (isAbsorbing) 1f else min(roomFor(rect.width(), widthS.target), roomFor(rect.height(), heightS.target))
+        val reveal = (if (isAbsorbing) appMorph.reveal else 1f) * room
 
         val bodyAlpha = (255 * presenceS.value.coerceIn(0f, 1f) * min(1f, intro * 2.5f)).toInt()
         drawSecondary(canvas, intro * reveal)
@@ -986,7 +1018,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             liquidGlass.draw(canvas, wallpaperStage, rect, r, bodyAlpha, wallpaperSkin,
                 resizing = shapeSprings.any { !it.isAtRest } || !pressS.isAtRest || !stretchS.isAtRest)
         }
-        if (usesDots(a)) drawDotField(canvas, a, bodyAlpha * (1f - absorb)) else drawArtBackdrop(canvas, bodyAlpha * (1f - absorb))
+        val backdrop = bodyAlpha * (1f - absorb) * (0.25f + 0.75f * room)
+        if (usesDots(a)) drawDotField(canvas, a, backdrop) else drawArtBackdrop(canvas, backdrop)
 
         val ea = expandedA.value.coerceIn(0f, 1f) * reveal
         val ca = compactA.value.coerceIn(0f, 1f) * reveal
