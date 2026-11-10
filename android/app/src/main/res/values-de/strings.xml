@@ -347,4 +347,18 @@
     <string name="action_previous">Vorheriger Song</string>
     <string name="dot_island">Punkte in der Insel</string>
     <string name="dot_island_note">Während Musik läuft, wird das Albumcover der Insel zu einer kleinen drehenden Punkt-Schallplatte und die Welle zu einem Punkt-Equalizer. Öffne die Karte für die große Platte: Sie wellt sich im Takt in einem Ring hüpfender Punkte und zerspringt beim Songwechsel ins nächste Cover.</string>
+    <string name="feature_show_music">Musik</string>
+    <string name="feature_show_calls">Anrufe</string>
+    <string name="feature_calls_fullscreen">Anrufe über Vollbild-Apps</string>
+    <string name="feature_calls_fullscreen_note">Nur im Hochformat. Im Querformat (Spiele, Filme) verdecken Anrufe nie den Bildschirm; das Anruf-Pop-up des Telefons übernimmt.</string>
+    <string name="feature_show_messages">Benachrichtigungen</string>
+    <string name="feature_show_messages_note">Aus behält die Benachrichtigungs-Pop-ups des Telefons.</string>
+    <string name="feature_show_timers">Timer und Stoppuhren</string>
+    <string name="feature_show_navigation">Navigation</string>
+    <string name="feature_show_charging">Laden</string>
+    <string name="feature_glow_open">Leuchten nur wenn geöffnet</string>
+    <string name="feature_camera_fade">In die Kamera überblenden</string>
+    <string name="feature_camera_fade_note">Inhalte werden um das Kameraloch sanft schwarz, damit nichts dahinter verschwindet.</string>
+    <string name="feature_landscape">Durchsichtig im Querformat</string>
+    <string name="feature_landscape_note">Ohne Kamera zum Verdecken lässt die Insel Spiele und Videos durchscheinen.</string>
 </resources>

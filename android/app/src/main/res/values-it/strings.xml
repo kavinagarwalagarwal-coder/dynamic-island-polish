@@ -347,4 +347,18 @@
     <string name="action_previous">Brano precedente</string>
     <string name="dot_island">Punti nell\'isola</string>
     <string name="dot_island_note">Mentre suona la musica, la copertina dell\'isola diventa un piccolo disco di punti che gira e l\'onda un equalizzatore a punti. Apri la scheda per il disco grande: ondeggia a ritmo dentro un anello di punti che rimbalzano ed esplode nella copertina successiva al cambio di brano.</string>
+    <string name="feature_show_music">Musica</string>
+    <string name="feature_show_calls">Chiamate</string>
+    <string name="feature_calls_fullscreen">Chiamate sopra app a schermo intero</string>
+    <string name="feature_calls_fullscreen_note">Solo in verticale. In orizzontale (giochi, film) le chiamate non coprono mai lo schermo; ci pensa il pop-up di chiamata del telefono.</string>
+    <string name="feature_show_messages">Notifiche</string>
+    <string name="feature_show_messages_note">Disattivato mantiene i pop-up di notifica del telefono.</string>
+    <string name="feature_show_timers">Timer e cronometri</string>
+    <string name="feature_show_navigation">Navigazione</string>
+    <string name="feature_show_charging">Ricarica</string>
+    <string name="feature_glow_open">Bagliore solo da aperta</string>
+    <string name="feature_camera_fade">Sfuma nella fotocamera</string>
+    <string name="feature_camera_fade_note">Il contenuto si scurisce dolcemente verso il nero attorno alla fotocamera, così nulla resta nascosto dietro.</string>
+    <string name="feature_landscape">Trasparente in orizzontale</string>
+    <string name="feature_landscape_note">Senza fotocamera da coprire, l\'isola lascia vedere giochi e video.</string>
 </resources>

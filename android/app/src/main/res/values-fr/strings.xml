@@ -347,4 +347,18 @@
     <string name="action_previous">Morceau précédent</string>
     <string name="dot_island">Points dans l\'îlot</string>
     <string name="dot_island_note">Pendant la musique, la pochette de l\'îlot devient un petit disque de points qui tourne et l\'onde un égaliseur de points. Ouvrez la carte pour le grand disque : il ondule sur le rythme dans un anneau de points rebondissants, et éclate en la pochette suivante au changement de morceau.</string>
+    <string name="feature_show_music">Musique</string>
+    <string name="feature_show_calls">Appels</string>
+    <string name="feature_calls_fullscreen">Appels par-dessus le plein écran</string>
+    <string name="feature_calls_fullscreen_note">En portrait seulement. En paysage (jeux, films), les appels ne couvrent jamais l\'écran ; la fenêtre d\'appel du téléphone s\'en charge.</string>
+    <string name="feature_show_messages">Notifications</string>
+    <string name="feature_show_messages_note">Désactivé garde les fenêtres de notification du téléphone.</string>
+    <string name="feature_show_timers">Minuteurs et chronomètres</string>
+    <string name="feature_show_navigation">Navigation</string>
+    <string name="feature_show_charging">Charge</string>
+    <string name="feature_glow_open">Halo seulement une fois ouverte</string>
+    <string name="feature_camera_fade">Fondu dans la caméra</string>
+    <string name="feature_camera_fade_note">Le contenu s\'assombrit doucement vers le noir autour de la caméra, rien ne se cache derrière.</string>
+    <string name="feature_landscape">Transparente en paysage</string>
+    <string name="feature_landscape_note">Sans caméra à masquer, l\'île laisse voir jeux et vidéos.</string>
 </resources>

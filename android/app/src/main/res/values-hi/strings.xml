@@ -347,4 +347,18 @@
     <string name="action_previous">पिछला गाना</string>
     <string name="dot_island">आइलैंड में डॉट्स</string>
     <string name="dot_island_note">म्यूज़िक चलते समय आइलैंड की एल्बम आर्ट डॉट्स का छोटा घूमता रिकॉर्ड और वेवफ़ॉर्म डॉट इक्वलाइज़र बन जाता है। बड़े रिकॉर्ड के लिए कार्ड खोलें: यह उछलते डॉट्स की रिंग में बीट पर लहराता है, और गाना बदलने पर बिखरकर नए कवर में बदल जाता है।</string>
+    <string name="feature_show_music">संगीत</string>
+    <string name="feature_show_calls">कॉल</string>
+    <string name="feature_calls_fullscreen">फ़ुलस्क्रीन ऐप्स पर कॉल</string>
+    <string name="feature_calls_fullscreen_note">सिर्फ़ पोर्ट्रेट में। लैंडस्केप (गेम, फ़िल्में) में कॉल स्क्रीन नहीं ढकती; फ़ोन का अपना कॉल पॉप-अप उन्हें संभालता है।</string>
+    <string name="feature_show_messages">नोटिफ़िकेशन</string>
+    <string name="feature_show_messages_note">बंद करने पर फ़ोन के अपने नोटिफ़िकेशन पॉप-अप रहते हैं।</string>
+    <string name="feature_show_timers">टाइमर और स्टॉपवॉच</string>
+    <string name="feature_show_navigation">नेविगेशन</string>
+    <string name="feature_show_charging">चार्जिंग</string>
+    <string name="feature_glow_open">ग्लो सिर्फ़ खुलने पर</string>
+    <string name="feature_camera_fade">कैमरे में घुलना</string>
+    <string name="feature_camera_fade_note">कैमरा होल के आसपास कंटेंट धीरे-धीरे काला हो जाता है, ताकि उसके पीछे कुछ न छिपे।</string>
+    <string name="feature_landscape">लैंडस्केप में पारदर्शी</string>
+    <string name="feature_landscape_note">ढकने को कैमरा न होने पर आइलैंड गेम और वीडियो को दिखने देता है।</string>
 </resources>

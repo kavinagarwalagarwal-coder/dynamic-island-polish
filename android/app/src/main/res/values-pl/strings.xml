@@ -347,4 +347,18 @@
     <string name="action_previous">Poprzedni utwór</string>
     <string name="dot_island">Kropki na wyspie</string>
     <string name="dot_island_note">Gdy gra muzyka, okładka na wyspie zmienia się w małą obracającą się płytę z kropek, a fala w korektor z kropek. Otwórz kartę, by zobaczyć dużą płytę: faluje w rytm w pierścieniu skaczących kropek i rozpryskuje się w kolejną okładkę przy zmianie utworu.</string>
+    <string name="feature_show_music">Muzyka</string>
+    <string name="feature_show_calls">Połączenia</string>
+    <string name="feature_calls_fullscreen">Połączenia nad aplikacjami pełnoekranowymi</string>
+    <string name="feature_calls_fullscreen_note">Tylko w pionie. W poziomie (gry, filmy) połączenia nigdy nie zasłaniają ekranu; obsługuje je okienko połączenia telefonu.</string>
+    <string name="feature_show_messages">Powiadomienia</string>
+    <string name="feature_show_messages_note">Wyłączone zostawia wyskakujące powiadomienia telefonu.</string>
+    <string name="feature_show_timers">Minutniki i stopery</string>
+    <string name="feature_show_navigation">Nawigacja</string>
+    <string name="feature_show_charging">Ładowanie</string>
+    <string name="feature_glow_open">Poświata tylko po otwarciu</string>
+    <string name="feature_camera_fade">Przejście w aparat</string>
+    <string name="feature_camera_fade_note">Treść płynnie ciemnieje do czerni wokół otworu aparatu, więc nic się za nim nie chowa.</string>
+    <string name="feature_landscape">Przezroczysta w poziomie</string>
+    <string name="feature_landscape_note">Bez aparatu do zakrycia wyspa pokazuje gry i filmy pod spodem.</string>
 </resources>

@@ -347,4 +347,18 @@
     <string name="action_previous">Música anterior</string>
     <string name="dot_island">Pontos na ilha</string>
     <string name="dot_island_note">Enquanto toca música, a capa da ilha vira um pequeno disco de pontos girando e a onda vira um equalizador de pontos. Abra o cartão para o disco maior: ele ondula na batida dentro de um anel de pontos saltitantes e explode na próxima capa quando a música muda.</string>
+    <string name="feature_show_music">Música</string>
+    <string name="feature_show_calls">Chamadas</string>
+    <string name="feature_calls_fullscreen">Chamadas sobre apps em tela cheia</string>
+    <string name="feature_calls_fullscreen_note">Só na vertical. Na horizontal (jogos, filmes) as chamadas nunca cobrem a tela; o pop-up do telefone cuida delas.</string>
+    <string name="feature_show_messages">Notificações</string>
+    <string name="feature_show_messages_note">Desligado mantém os pop-ups de notificação do telefone.</string>
+    <string name="feature_show_timers">Timers e cronômetros</string>
+    <string name="feature_show_navigation">Navegação</string>
+    <string name="feature_show_charging">Carregamento</string>
+    <string name="feature_glow_open">Brilho só quando aberta</string>
+    <string name="feature_camera_fade">Esmaecer na câmera</string>
+    <string name="feature_camera_fade_note">O conteúdo escurece suavemente até o preto ao redor da câmera, para nada ficar escondido atrás dela.</string>
+    <string name="feature_landscape">Translúcida na horizontal</string>
+    <string name="feature_landscape_note">Sem câmera para cobrir, a ilha deixa jogos e vídeos aparecerem.</string>
 </resources>

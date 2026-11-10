@@ -698,6 +698,13 @@ class MainActivity : AppCompatActivity() {
 
         section(R.string.features_islands, first = true)
         column.addView(label(getString(R.string.features_islands_note), 14f, NothingStyle.muted), row(-2).apply { topMargin = dp(8) })
+        toggle(R.string.feature_show_music, "show_music", features.music)
+        toggle(R.string.feature_show_calls, "show_calls", features.calls)
+        toggle(R.string.feature_calls_fullscreen, "calls_over_fullscreen", features.callsOverFullscreen, R.string.feature_calls_fullscreen_note)
+        toggle(R.string.feature_show_messages, "show_messages", features.messages, R.string.feature_show_messages_note)
+        toggle(R.string.feature_show_timers, "show_timers", features.timers)
+        toggle(R.string.feature_show_navigation, "show_navigation", features.navigation)
+        toggle(R.string.feature_show_charging, "show_charging", features.charging)
         toggle(R.string.feature_volume, "volume", features.volume, R.string.feature_volume_note)
         toggle(R.string.feature_headphones, "headphones", features.headphones, R.string.feature_headphones_note) { on ->
             if (on) requestBluetoothIfNeeded()
@@ -732,6 +739,9 @@ class MainActivity : AppCompatActivity() {
         toggle(R.string.feature_corners, "phone_corners", features.phoneCorners)
         toggle(R.string.feature_bubbles, "coloured_bubbles", features.colouredBubbles, R.string.feature_bubbles_note)
         toggle(R.string.feature_glow, "edge_glow", features.edgeGlow, R.string.feature_glow_note)
+        toggle(R.string.feature_glow_open, "glow_open_only", features.glowOpenOnly)
+        toggle(R.string.feature_camera_fade, "camera_fade", features.cameraFade, R.string.feature_camera_fade_note)
+        toggle(R.string.feature_landscape, "landscape_see_through", features.landscapeSeeThrough, R.string.feature_landscape_note)
         toggle(R.string.feature_full_width, "full_width_open", features.fullWidthOpen, R.string.feature_full_width_note)
         toggle(R.string.feature_art_backdrop, "artwork_backdrop", features.artworkBackdrop, R.string.feature_art_backdrop_note)
         toggle(R.string.feature_idle_pill, "idle_pill", features.idlePill, R.string.feature_idle_pill_note)

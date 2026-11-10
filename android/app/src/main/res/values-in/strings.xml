@@ -347,4 +347,18 @@
     <string name="action_previous">Lagu sebelumnya</string>
     <string name="dot_island">Titik di pulau</string>
     <string name="dot_island_note">Saat musik diputar, sampul album di pulau menjadi piringan titik kecil yang berputar dan gelombang menjadi ekualiser titik. Buka kartu untuk piringan besar: beriak mengikuti ketukan di dalam cincin titik yang memantul, dan pecah menjadi sampul berikutnya saat lagu berganti.</string>
+    <string name="feature_show_music">Musik</string>
+    <string name="feature_show_calls">Panggilan</string>
+    <string name="feature_calls_fullscreen">Panggilan di atas aplikasi layar penuh</string>
+    <string name="feature_calls_fullscreen_note">Hanya potret. Dalam lanskap (game, film) panggilan tak pernah menutupi layar; pop-up panggilan ponsel yang menanganinya.</string>
+    <string name="feature_show_messages">Notifikasi</string>
+    <string name="feature_show_messages_note">Nonaktif mempertahankan pop-up notifikasi ponsel.</string>
+    <string name="feature_show_timers">Timer dan stopwatch</string>
+    <string name="feature_show_navigation">Navigasi</string>
+    <string name="feature_show_charging">Pengisian daya</string>
+    <string name="feature_glow_open">Cahaya hanya saat terbuka</string>
+    <string name="feature_camera_fade">Memudar ke kamera</string>
+    <string name="feature_camera_fade_note">Konten menggelap halus menjadi hitam di sekitar lubang kamera, jadi tak ada yang tersembunyi di baliknya.</string>
+    <string name="feature_landscape">Tembus pandang saat lanskap</string>
+    <string name="feature_landscape_note">Tanpa kamera untuk ditutupi, pulau memperlihatkan game dan video.</string>
 </resources>

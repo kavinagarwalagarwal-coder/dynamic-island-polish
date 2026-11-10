@@ -428,7 +428,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     private fun render(absorb: Boolean = false) {
         val view = island ?: return
-        var t = transient
+        val features = IslandFeatures.read(this)
+        var t = transient?.takeIf { features.shows(it.mode) }
         handler.removeCallbacks(checkCompletion)
         var nextDeadline: Long? = null
         for (candidate in activities.all()) {
@@ -456,7 +457,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // A running timer remains visible beside other activities, including while Clock is open.
         val quiet = IslandCustomization.quietNow(this)
         val (o, secondary) = activities.pair {
-            IslandCustomization.allowed(this, it.packageName) &&
+            features.shows(it.mode) && IslandCustomization.allowed(this, it.packageName) &&
                 (it.mode == IslandMode.TIMER || it.packageName != foregroundPkg)
         }
         ongoing = o
@@ -471,7 +472,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             o != null -> o to presentation
             else -> null to Presentation.IDLE
         }
-        // Calls stay visible even over fullscreen video; everything else steps aside.
         // Returning from an app is animated by the island itself (see IslandView.playReturn). The
         // old SwiftUI stand-in showed a plain black pill first and then swapped to the real island.
         if (absorb) {
@@ -480,7 +480,11 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             handler.removeCallbacks(restoreTouchAfterReturn)
             handler.postDelayed(restoreTouchAfterReturn, 450L)
         }
-        val concealed = (fullscreen || immersiveMedia) && a?.mode != IslandMode.CALL && a?.mode != IslandMode.ALARM && a?.mode != IslandMode.VOLUME
+        // Calls may show over fullscreen apps in portrait, if wanted; in landscape (games, films)
+        // they never do: the phone's own call screen or pop-up handles them.
+        val landscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val callShows = a?.mode == IslandMode.CALL && features.callsOverFullscreen && !landscape
+        val concealed = (fullscreen || immersiveMedia) && !callShows && a?.mode != IslandMode.ALARM && a?.mode != IslandMode.VOLUME
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
         params?.let { lp ->
@@ -588,6 +592,11 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     override fun onActivity(activity: LiveActivity) {
+        // Kinds of activity the user turned off stay with the phone's own UI (pop-ups included).
+        if (!IslandFeatures.read(this).shows(activity.mode)) {
+            if (transient?.key == activity.key || activities.all().any { it.key == activity.key }) onRemoved(activity.key)
+            return
+        }
         if (activity.isTransient) {
             // A different message (or system island) replaces the current one at medium size.
             if (activity.key != transient?.key) transientExpanded = false
