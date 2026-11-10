@@ -139,6 +139,17 @@ class DotMusicTest {
             repeat(12) { calm.step(1f / 60f, playing = false, spectrum = null, reduceMotion = false) }
             val during = bright(calm)
             assertTrue("Ripple should light the field ($before → $during)", during > before * 13 / 10)
+
+            // A touch ripples out from the finger, not from the record.
+            val touch = IslandDots(9)
+            touch.prepare(cover(Color.rgb(200, 40, 90)), mono = true, animate = false)
+            touch.step(1f / 60f, playing = false, spectrum = null, reduceMotion = false)
+            touch.ripple(1f, 300f, 45f)
+            repeat(12) { touch.step(1f / 60f, playing = false, spectrum = null, reduceMotion = false) }
+            val reach = 333f
+            val ring = touch.light(300f - 0.25f * reach, 45f, 30f, 45f, reach)
+            val atRecord = touch.light(30f, 45f, 30f, 45f, reach)
+            assertTrue("Touch ripple should ring round the finger ($ring vs $atRecord)", ring > 0.5f && atRecord < 0.05f)
         }
     }
 

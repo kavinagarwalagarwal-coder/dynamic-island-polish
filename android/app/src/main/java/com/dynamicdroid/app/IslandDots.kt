@@ -47,6 +47,9 @@ class IslandDots(private val n: Int) {
     private var t = 0f
     private val rippleT = FloatArray(4) { -10f }
     private val rippleS = FloatArray(4)
+    // Where a ripple started, in the island's pixels; NaN = from the record.
+    private val rippleX = FloatArray(4) { Float.NaN }
+    private val rippleY = FloatArray(4) { Float.NaN }
     private var nextRipple = 0
     private var lastBeat = 0f
     private var lastHeard = -10f
@@ -105,9 +108,11 @@ class IslandDots(private val n: Int) {
      * A ripple from the centre, like tapping play: a bright ring runs out across the record and
      * the island, and the record's dots get a small outward kick that springs back.
      */
-    fun ripple(strength: Float) {
+    fun ripple(strength: Float, x: Float = Float.NaN, y: Float = Float.NaN) {
         rippleT[nextRipple] = t
         rippleS[nextRipple] = strength
+        rippleX[nextRipple] = x
+        rippleY[nextRipple] = y
         nextRipple = (nextRipple + 1) % rippleT.size
         beatGlow = max(beatGlow, strength)
         if (!ready) return
@@ -207,17 +212,47 @@ class IslandDots(private val n: Int) {
      * corner), 0..~1.3: a narrow ring of light that runs outward and fades, so the dot field
      * ripples in step with the record.
      */
-    fun light(dist: Float): Float {
+    fun light(dist: Float): Float = light(Float.NaN, Float.NaN, 0f, 0f, 1f, dist)
+
+    /**
+     * The same for a dot at ([px], [py]): ripples from the record are measured from ([ox], [oy]),
+     * ones from a touch from where the finger landed; [reach] turns pixels into 0..1.
+     */
+    fun light(px: Float, py: Float, ox: Float, oy: Float, reach: Float, recordDist: Float = Float.NaN): Float {
         var k = 0f
         for (j in rippleT.indices) {
             val age = t - rippleT[j]
             if (age < 0f || age > RIPPLE_LIFE) continue
+            val dist = if (rippleX[j].isNaN()) {
+                if (recordDist.isNaN()) { val dx = px - ox; val dy = py - oy; sqrt(dx * dx + dy * dy) / reach } else recordDist
+            } else { val dx = px - rippleX[j]; val dy = py - rippleY[j]; sqrt(dx * dx + dy * dy) / reach }
             val front = age * 1.25f - dist
-            if (front > 0.2f || front < -0.2f) continue
+            if (front > 0.22f || front < -0.22f) continue
             val fade = 1f - age / RIPPLE_LIFE
-            k = max(k, rippleS[j] * exp(-front * front / (2f * 0.0035f)) * sqrt(fade))
+            k = max(k, rippleS[j] * exp(-front * front / (2f * 0.0045f)) * sqrt(fade))
         }
         return k
+    }
+
+    /**
+     * How far the ripples push a dot at ([px], [py]) away from their source, as a fraction of a
+     * cell, written to [out] (x, y). Like the full player, dots are shoved outward as a ring passes.
+     */
+    fun push(px: Float, py: Float, ox: Float, oy: Float, reach: Float, out: FloatArray) {
+        out[0] = 0f; out[1] = 0f
+        for (j in rippleT.indices) {
+            val age = t - rippleT[j]
+            if (age < 0f || age > RIPPLE_LIFE) continue
+            val sx = if (rippleX[j].isNaN()) ox else rippleX[j]
+            val sy = if (rippleY[j].isNaN()) oy else rippleY[j]
+            val dx = px - sx; val dy = py - sy
+            val d = sqrt(dx * dx + dy * dy)
+            if (d < 0.5f) continue
+            val front = age * 1.25f - d / reach
+            if (front > 0.22f || front < -0.22f) continue
+            val e = rippleS[j] * exp(-front * front / (2f * 0.0045f)) * (1f - age / RIPPLE_LIFE)
+            out[0] += dx / d * e; out[1] += dy / d * e
+        }
     }
 
     /** True while any ripple is still crossing the island. */
@@ -331,6 +366,7 @@ class IslandDots(private val n: Int) {
  * The cover is reduced once per song to a small brightness map; each frame only looks values up.
  */
 class IslandDotField {
+    private val shove = FloatArray(2)
     private val size = 40
     // Halftone coverage (0..1) per cell, already shaped by the contrast curve.
     private val cov = FloatArray(size * size)
@@ -417,15 +453,16 @@ class IslandDotField {
                     fade = k * k * (3f - 2f * k)
                 }
                 val dist = d / reach
-                val lit = if (rippling) min(1f, dots.light(dist)) else 0f
+                val lit = if (rippling) min(1f, dots.light(px, py, ox, oy, reach, dist)) else 0f
                 var rad = pitch * (0.07f + 0.31f * c) * (1f + breathe * sin(time * 1.8f - dist * 6f))
                 var a = alpha * (0.12f + 0.88f * c)
                 var y = py
                 if (lit > 0.01f) {
                     rad *= 1f + 1.2f * lit
                     a += (peak - a) * lit
-                    // The ring pushes dots outward a touch as it passes.
-                    if (d > 1f) { val push = 0.35f * pitch * lit / d; px += dx * push; y += dy * push }
+                    // The ring shoves dots outward as it passes, like the full player.
+                    dots.push(px, py, ox, oy, reach, shove)
+                    px += shove[0] * pitch * 0.6f; y += shove[1] * pitch * 0.6f
                 }
                 a *= fade
                 if (a < 3f) continue

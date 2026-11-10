@@ -2522,6 +2522,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     a.durationMs > 0L && abs(e.y - barY) < dp(16f) &&
                     e.x >= barLeft - dp(12f) && e.x <= barRight + dp(12f)
                 if (seeking) seekFraction = fractionAt(e.x)
+                // Touching the dots ripples them out from your finger, as in the full player.
+                if (a != null && usesDots(a) && !reduceMotion && !touchingSecondary) { cardDots.ripple(0.9f, e.x, e.y); kick() }
                 // Only the slider row drags; the ringer buttons below it are taps.
                 volumeDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.VOLUME &&
                     e.y < rect.top + dp(VOLUME_HEIGHT_DP) + dp(2f)
