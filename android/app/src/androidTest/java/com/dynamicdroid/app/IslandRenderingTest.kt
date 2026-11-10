@@ -222,8 +222,12 @@ class IslandRenderingTest {
                     val view = findIsland(activity.window.decorView)!!
                     view.setSecondary(timer); view.show(music, Presentation.COMPACT)
                     var index = 0
+                    // Draw every frame ourselves: on a slow emulator the window may skip frames, and the
+                    // neck only exists while a frame is being drawn.
+                    val probe = Bitmap.createBitmap(view.width, (90 * view.resources.displayMetrics.density).toInt(), Bitmap.Config.ARGB_8888)
                     val callback = object : android.view.Choreographer.FrameCallback {
                         override fun doFrame(time: Long) {
+                            view.draw(android.graphics.Canvas(probe))
                             connected = connected || !field<android.graphics.Path>(view, "dropNeck").isEmpty
                             val g = field<IslandDropGeometry>(view, "dropGeometry")
                             dropped = dropped || g.centerY > view.resources.displayMetrics.density * 28f
