@@ -1138,7 +1138,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             }
             IslandMode.MUSIC -> if (usesDots(a)) {
                 advanceDots(a)
-                compactDots.drawMeter(canvas, fillPaint, center - dp(9f), cy - dp(7f), dp(18f), dp(14f), 3, 3,
+                compactDots.drawMeter(canvas, fillPaint, center - dp(9f), cy, dp(18f), dp(14f), 3, 7,
                     userAccent ?: waveColor, if (a.isPlaying) 1f else 0f, alpha)
             } else drawWave(canvas, center - dp(9f), cy, dp(18f), dp(14f), userAccent ?: waveColor, a.isPlaying, alpha)
             IslandMode.CALL -> drawPhone(canvas, center, cy, dp(18f), alpha, false)
@@ -1334,7 +1334,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         when (a.mode) {
             IslandMode.MUSIC -> {
                 // Artwork and waveform flank the camera, matching the SwiftUI compact layout.
-                if (usesDots(a)) compactDots.drawMeter(canvas, fillPaint, right - dp(20f), cy - dp(8f), dp(20f), dp(16f), 4, 3,
+                if (usesDots(a)) compactDots.drawMeter(canvas, fillPaint, right - dp(22f), cy, dp(22f), dp(17f), 4, 7,
                     userAccent ?: waveColor, waveS.value, alpha)
                 else drawWave(canvas, right - dp(20f), cy, dp(20f), dp(14f), userAccent ?: waveColor, waveS.value, alpha)
             }
@@ -1378,7 +1378,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         musicArtHit.set(l - dp(6f), t - dp(6f), l + art + dp(6f), t + art + dp(6f))
         val tx = l + art + dp(14f)
         val waveW = dp(24f)
-        if (usesDots(a)) cardDots.drawMeter(canvas, fillPaint, rr - waveW, t + dp(11f), waveW, dp(18f), 4, 4,
+        if (usesDots(a)) cardDots.drawMeter(canvas, fillPaint, rr - waveW, t + dp(20f), waveW, dp(20f), 5, 7,
             userAccent ?: waveColor, waveS.value, alpha)
         else drawWave(canvas, rr - waveW, t + dp(20f), waveW, dp(18f), userAccent ?: waveColor, waveS.value, alpha)
         text(canvas, a.title, tx, t + dp(25f), rr - waveW - dp(12f) - tx, titlePaint, Color.WHITE, alpha)
@@ -2278,8 +2278,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         drawWave(canvas, left, cy, w, maxH, color, if (active) 1f else 0f, alpha)
 
     /**
-     * Five bars breathing on two slow, offset sines. [energy] eases them between still dots (0)
-     * and full motion (1), so play and pause fade rather than snap.
+     * Five bars, mirrored round [cy], tallest in the middle. Each follows two slow, offset sines
+     * plus a soft pulse, so they sway together like a voice rather than jitter. [energy] eases
+     * them between still dots (0) and full motion (1), so play and pause fade rather than snap.
      */
     private fun drawWave(canvas: Canvas, left: Float, cy: Float, w: Float, maxH: Float, color: Int, energy: Float, alpha: Int) {
         val bars = 5
@@ -2287,9 +2288,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fillPaint.color = withAlpha(color, alpha)
         val t = SystemClock.uptimeMillis() / 1000f
         val e = energy.coerceIn(0f, 1f)
+        val pulse = .5f + .5f * sin(t * 6.1f)
         for (i in 0 until bars) {
-            val phase = .5f + .3f * sin(t * (4.2f + i * .9f) + i * 1.7f) + .2f * sin(t * (2.3f + i * .5f) + i * .6f)
-            val h = bw + (maxH * (.3f + .7f * phase) - bw) * e
+            val shape = .55f + .45f * sin(PI.toFloat() * (i + .5f) / bars)
+            val sway = .5f + .28f * sin(t * (3.1f + i * .37f) + i * 1.3f) + .22f * sin(t * (1.7f + i * .23f) - i * .8f)
+            val level = (shape * (.35f + .5f * sway + .15f * pulse)).coerceIn(0f, 1f)
+            val h = bw + (maxH * level - bw) * e
             val x = left + i * bw * 2
             canvas.drawRoundRect(x, cy - h / 2, x + bw, cy + h / 2, bw / 2, bw / 2, fillPaint)
         }
