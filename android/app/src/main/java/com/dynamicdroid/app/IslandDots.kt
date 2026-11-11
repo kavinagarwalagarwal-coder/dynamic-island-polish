@@ -516,7 +516,7 @@ class IslandDotField {
                        hole: Float, scale: Float): Bitmap? {
         val bw = (w * scale).toInt().coerceAtLeast(1)
         val bh = (h * scale).toInt().coerceAtLeast(1)
-        val bitmap = runCatching { Bitmap.createBitmap(bw, bh, Bitmap.Config.ALPHA_8) }.getOrNull() ?: return null
+        val bitmap = runCatching { Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888) }.getOrNull() ?: return null
         val canvas = Canvas(bitmap)
         canvas.scale(scale, scale)
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
