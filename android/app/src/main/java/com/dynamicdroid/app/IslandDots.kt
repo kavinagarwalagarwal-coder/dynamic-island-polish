@@ -29,6 +29,9 @@ class IslandDots(private val n: Int) {
     private val alive = BooleanArray(count)
     private val homeR = FloatArray(count)
     private val homeA = FloatArray(count)
+    // Home position as x/y (cells from the centre), so spinning is a rotation, not trig per dot.
+    private val homeX = FloatArray(count)
+    private val homeY = FloatArray(count)
     private val lumFrom = FloatArray(count)
     private val lumTo = FloatArray(count)
     private val colFrom = IntArray(count)
@@ -81,6 +84,8 @@ class IslandDots(private val n: Int) {
             alive[i] = d <= half - .15f && d >= n * 0.08f
             homeR[i] = d
             homeA[i] = atan2(dy, dx)
+            homeX[i] = dx
+            homeY[i] = dy
             val c = sampled?.get(i) ?: Color.rgb(90, 90, 90)
             val lum = if (sampled == null) 0.3f + 0.25f * (1f - d / half) else DotArt.luminance(c)
             val color = if (mono || sampled == null) Color.WHITE else DotArt.vivid(c)
@@ -219,11 +224,12 @@ class IslandDots(private val n: Int) {
      * The same for a dot at ([px], [py]): ripples from the record are measured from ([ox], [oy]),
      * ones from a touch from where the finger landed; [reach] turns pixels into 0..1.
      */
-    fun light(px: Float, py: Float, ox: Float, oy: Float, reach: Float, recordDist: Float = Float.NaN): Float {
+    fun light(px: Float, py: Float, ox: Float, oy: Float, reach: Float, recordDist: Float = Float.NaN,
+              minStrength: Float = 0f): Float {
         var k = 0f
         for (j in rippleT.indices) {
             val age = t - rippleT[j]
-            if (age < 0f || age > RIPPLE_LIFE) continue
+            if (age < 0f || age > RIPPLE_LIFE || rippleS[j] < minStrength) continue
             val dist = if (rippleX[j].isNaN()) {
                 if (recordDist.isNaN()) { val dx = px - ox; val dy = py - oy; sqrt(dx * dx + dy * dy) / reach } else recordDist
             } else { val dx = px - rippleX[j]; val dy = py - rippleY[j]; sqrt(dx * dx + dy * dy) / reach }
@@ -239,11 +245,11 @@ class IslandDots(private val n: Int) {
      * How far the ripples push a dot at ([px], [py]) away from their source, as a fraction of a
      * cell, written to [out] (x, y). Like the full player, dots are shoved outward as a ring passes.
      */
-    fun push(px: Float, py: Float, ox: Float, oy: Float, reach: Float, out: FloatArray) {
+    fun push(px: Float, py: Float, ox: Float, oy: Float, reach: Float, out: FloatArray, minStrength: Float = 0f) {
         out[0] = 0f; out[1] = 0f
         for (j in rippleT.indices) {
             val age = t - rippleT[j]
-            if (age < 0f || age > RIPPLE_LIFE) continue
+            if (age < 0f || age > RIPPLE_LIFE || rippleS[j] < minStrength) continue
             val sx = if (rippleX[j].isNaN()) ox else rippleX[j]
             val sy = if (rippleY[j].isNaN()) oy else rippleY[j]
             val dx = px - sx; val dy = py - sy
@@ -267,11 +273,11 @@ class IslandDots(private val n: Int) {
      * each record ripple's ring distance (0..1+) and returns how many; -1 if a touch ripple is
      * live (its rings aren't centred on the record, so nothing can be skipped).
      */
-    fun recordFronts(fronts: FloatArray): Int {
+    fun recordFronts(fronts: FloatArray, minStrength: Float = 0f): Int {
         var n = 0
         for (j in rippleT.indices) {
             val age = t - rippleT[j]
-            if (age < 0f || age > RIPPLE_LIFE) continue
+            if (age < 0f || age > RIPPLE_LIFE || rippleS[j] < minStrength) continue
             if (!rippleX[j].isNaN()) return -1
             fronts[n++] = age * 1.25f
         }
@@ -279,29 +285,44 @@ class IslandDots(private val n: Int) {
     }
 
     /** The record, [radius] pixels, centred on ([cx], [cy]). */
+    // Per-frame ripple fronts for the record, so each dot checks a few numbers instead of
+    // working every ripple out again.
+    private val liveFront = FloatArray(4)
+    private val liveGain = FloatArray(4)
+
     fun drawRecord(canvas: Canvas, paint: Paint, cx: Float, cy: Float, radius: Float, playing: Boolean, alpha: Int) {
         if (!ready) return
         val cell = radius * 2f / n
         val m = ease(mix)
         val dim = if (playing) 1f else 0.6f
+        var live = 0
+        for (j in rippleT.indices) {
+            val age = t - rippleT[j]
+            if (age < 0f || age > RIPPLE_LIFE) continue
+            liveFront[live] = age * n * 1.1f
+            liveGain[live] = rippleS[j] * (1f - age / RIPPLE_LIFE)
+            live++
+        }
+        val cs = cos(spin) * cell
+        val sn = sin(spin) * cell
+        val breathe = if (playing) 0.07f else 0.02f
+        val phase = t * 1.8f
         for (i in 0 until count) {
             if (!alive[i]) continue
-            val a = homeA[i] + spin
-            val r0 = homeR[i] * cell
-            val x = cx + r0 * cos(a) + ox[i] * cell
-            val y = cy + r0 * sin(a) + oy[i] * cell
+            val x = cx + homeX[i] * cs - homeY[i] * sn + ox[i] * cell
+            val y = cy + homeX[i] * sn + homeY[i] * cs + oy[i] * cell
             val lum = lumFrom[i] + (lumTo[i] - lumFrom[i]) * m
             var r = max(DotArt.halftoneRadius(lum, cell), cell * 0.16f)
-            r *= 1f + (if (playing) 0.07f else 0.02f) * sin(t * 1.8f - homeR[i] * 0.45f)
+            r *= 1f + breathe * sin(phase - homeR[i] * 0.45f)
             var lit = 0f
-            for (j in rippleT.indices) {
-                val age = t - rippleT[j]
-                if (age < 0f || age > RIPPLE_LIFE) continue
-                val front = age * n * 1.1f - homeR[i]
-                lit = max(lit, rippleS[j] * exp(-front * front / 1.6f) * (1f - age / RIPPLE_LIFE))
+            for (k in 0 until live) {
+                val front = liveFront[k] - homeR[i]
+                if (front > 3.5f || front < -3.5f) continue
+                lit = max(lit, liveGain[k] * exp(-front * front / 1.6f))
             }
             r = min(r * (1f + 0.9f * lit), cell * 0.62f)
-            paint.color = blend(blend(colFrom[i], colTo[i], m), Color.WHITE, min(1f, lit * 0.8f))
+            val base = if (m >= 1f) colTo[i] else blend(colFrom[i], colTo[i], m)
+            paint.color = if (lit > 0.01f) blend(base, Color.WHITE, min(1f, lit * 0.8f)) else base
             paint.alpha = (alpha * min(1f, dim + lit)).toInt().coerceIn(0, 255)
             canvas.drawCircle(x, y, r, paint)
         }
@@ -317,11 +338,12 @@ class IslandDots(private val n: Int) {
             val a = b * 2f * PI.toFloat() / bands - PI.toFloat() / 2 + spin * 0.25f
             val level = ring[b]
             val lit = 1 + (level * (stack - 1) + 0.35f).toInt().coerceAtMost(stack - 1)
+            val ca = cos(a); val sa = sin(a)
             for (s in 0 until lit) {
                 val rr = inner + s * pitch
                 paint.color = if (s == lit - 1 && level > 0.62f) accent else Color.WHITE
                 paint.alpha = ((if (playing) 0.85f else 0.3f) * alpha * (1f - s * 0.2f)).toInt().coerceIn(0, 255)
-                canvas.drawCircle(cx + rr * cos(a), cy + rr * sin(a), dot * (1f - s * 0.12f), paint)
+                canvas.drawCircle(cx + rr * ca, cy + rr * sa, dot * (1f - s * 0.12f), paint)
             }
         }
     }
@@ -528,6 +550,7 @@ class IslandDotField {
     }
 
     private companion object {
+        const val FIELD_RIPPLE_MIN = 0.8f
         val worker: java.util.concurrent.ExecutorService = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
             Thread(r, "island-dots").apply { isDaemon = true; priority = Thread.NORM_PRIORITY - 1 }
         }
@@ -555,6 +578,9 @@ class IslandDotField {
     fun drawRipples(canvas: Canvas, paint: Paint, layer: Layer, left: Float, top: Float,
                     dots: IslandDots, ox: Float, oy: Float, reach: Float, peak: Int) {
         if (layer.bitmap == null || peak <= 2 || !dots.rippling) return
+        // Across the whole island only the strong beats ripple (taps, song changes, the
+        // downbeats); every beat still pulses the record itself.
+        val strong = FIELD_RIPPLE_MIN
         val w = layer.w; val h = layer.h; val pitch = layer.pitch
         val (cols, rows, side) = cells(w, h, pitch)
         val gx = left + (w - (cols - 1) * pitch) / 2f
@@ -563,7 +589,8 @@ class IslandDotField {
         val v0 = (side - h) / 2f / side
         val holeX = left + layer.holeX; val holeY = top + layer.holeY
         val holeOut2 = (layer.hole * 1.3f).let { it * it }
-        val count = dots.recordFronts(fronts)
+        val count = dots.recordFronts(fronts, strong)
+        if (count == 0) return
         paint.color = Color.WHITE
         for (yy in 0 until rows) {
             val py = gy + yy * pitch
@@ -574,16 +601,16 @@ class IslandDotField {
                 if (count >= 0) {
                     // Most dots are nowhere near a ring: skip them with one comparison each.
                     var near = false
-                    for (k in 0 until count) if (abs(fronts[k] - dist) < 0.2f) { near = true; break }
+                    for (k in 0 until count) if (abs(fronts[k] - dist) < 0.17f) { near = true; break }
                     if (!near) continue
                 }
-                val lit = min(1f, dots.light(px, py, ox, oy, reach, dist))
+                val lit = min(1f, dots.light(px, py, ox, oy, reach, dist, strong))
                 if (lit < 0.06f) continue
                 val hx = px - holeX; val hy = py - holeY
                 if (hx * hx + hy * hy < holeOut2) continue
                 val c = coverage(u0 + (px - left) / side, v0 + (py - top) / side)
                 val rad = min(pitch * (0.07f + 0.31f * c) * (1f + 1.2f * lit), pitch * 0.55f)
-                dots.push(px, py, ox, oy, reach, shove)
+                dots.push(px, py, ox, oy, reach, shove, strong)
                 paint.alpha = (peak * lit).toInt().coerceIn(0, 255)
                 canvas.drawCircle(px + shove[0] * pitch * 0.6f, py + shove[1] * pitch * 0.6f, rad, paint)
             }

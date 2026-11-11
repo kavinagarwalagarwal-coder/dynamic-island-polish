@@ -109,6 +109,8 @@ class IslandRenderingTest {
             scenario.onActivity { activity ->
                 val view = findIsland(activity.window.decorView)!!
                 val dp = view.resources.displayMetrics.density
+                // A strong beat (like a downbeat or a tap) to ripple across the whole island.
+                field<IslandDots>(view, "cardDots").ripple(1f)
                 var index = 0
                 val callback = object : android.view.Choreographer.FrameCallback {
                     override fun doFrame(time: Long) {
