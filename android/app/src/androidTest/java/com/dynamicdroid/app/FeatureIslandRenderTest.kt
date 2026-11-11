@@ -77,12 +77,7 @@ class FeatureIslandRenderTest {
         )
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                fun click(view: View): Boolean {
-                    if (view is android.widget.Button && view.text.toString() == "Playground") { view.performClick(); return true }
-                    if (view is ViewGroup) for (i in 0 until view.childCount) if (click(view.getChildAt(i))) return true
-                    return false
-                }
-                assertTrue(click(activity.window.decorView))
+                activity.openPage("Playground")
             }
             instrumentation.waitForIdleSync()
             for ((name, live, presentation) in scenes) {

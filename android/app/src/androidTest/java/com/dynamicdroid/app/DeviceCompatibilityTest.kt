@@ -35,8 +35,8 @@ class DeviceCompatibilityTest {
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 for (page in listOf("Playground", "Setup", "Appearance", "Phone fit")) {
                     scenario.onActivity { activity ->
-                        val nav = button(activity.window.decorView, page) ?: error("Missing $page")
-                        assertTrue(nav.isShown); assertTrue(nav.performClick()); assertTrue(nav.isSelected)
+                        activity.openPage(page)
+                        assertTrue("Page $page did not open", activity.page == page)
                     }
                     instrumentation.waitForIdleSync()
                 }

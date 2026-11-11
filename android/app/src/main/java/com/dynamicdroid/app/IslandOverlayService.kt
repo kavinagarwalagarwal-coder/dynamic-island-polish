@@ -43,15 +43,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private var windowManager: WindowManager? = null
     private var island: IslandView? = null
     private var params: WindowManager.LayoutParams? = null
-    private var morphOverlay: SwiftIslandMorphView? = null
-    private var morphOverlayManager: WindowManager? = null
-    private var swiftMorphActive = false
     private val handler = Handler(Looper.getMainLooper())
     private val restoreTouchAfterReturn = Runnable { render() }
-    private val finishSwiftMorph = Runnable {
-        removeSwiftMorph()
-        render()
-    }
 
     private var ongoing: LiveActivity? = null
     private val activities = ActivityShelf<LiveActivity>({ it.key }, {
@@ -410,7 +403,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     private fun detachWindow() {
         reply?.dismiss(notify = false)
-        removeSwiftMorph()
         island?.let { v -> runCatching { windowManager?.removeView(v) } }
         touchView?.let { v -> runCatching { windowManager?.removeView(v) } }
         touchView = null; touchParams = null; touchApplied.setEmpty()
@@ -472,11 +464,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             o != null -> o to presentation
             else -> null to Presentation.IDLE
         }
-        // Returning from an app is animated by the island itself (see IslandView.playReturn). The
-        // old SwiftUI stand-in showed a plain black pill first and then swapped to the real island.
+        // Returning from an app is animated by the island itself (see IslandView.playReturn).
         if (absorb) {
             android.util.Log.i("IslandHandoff", "Native return started")
-            removeSwiftMorph()
             handler.removeCallbacks(restoreTouchAfterReturn)
             handler.postDelayed(restoreTouchAfterReturn, 450L)
         }
@@ -488,7 +478,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
         params?.let { lp ->
-            val touchable = a != null && !concealed && !swiftMorphActive && !absorb && !view.isAbsorbing && !passingTouches
+            val touchable = a != null && !concealed && !absorb && !view.isAbsorbing && !passingTouches
             val isOff = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0
             if (touchable == isOff) {
                 lp.flags = if (touchable) lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
@@ -509,69 +499,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         view.show(a?.let { appTint(this, it) }, p, false)
         updateTouchWindow()
         syncDotBeat(a, p)
-    }
-
-    /**
-     * A short SwiftUI capsule entrance shares the native island's calibrated bounds.
-     * The launcher owns the outgoing app animation. Never overlay a second full-screen
-     * dashboard after Home: it looks like a detached, broken miniature app window.
-     */
-    private fun startSwiftMorph(activity: LiveActivity): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.P) return false
-        if (swiftMorphActive) return true
-        removeSwiftMorph()
-        val wm = windowManager ?: return false
-        val accessibility = IslandAccessibilityService.instance
-        val host: Context = accessibility ?: this
-        val bounds = island?.returnHandoffBounds(activity) ?: return false
-        val view = runCatching { SwiftIslandMorphView(host, bounds) }.getOrNull() ?: return false
-        val type = if (accessibility != null) WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-        else WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        val dm = resources.displayMetrics
-        val layout = WindowManager.LayoutParams(
-            dm.widthPixels,
-            (bounds.bottom + 16f * dm.density).toInt(),
-            type,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
-                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-            if (Build.VERSION.SDK_INT >= 30) {
-                setFitInsetsTypes(0)
-                setFitInsetsSides(0)
-            }
-            if (Build.VERSION.SDK_INT >= 28) {
-                layoutInDisplayCutoutMode = if (Build.VERSION.SDK_INT >= 30)
-                    WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
-                else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-            }
-        }
-        if (runCatching { wm.addView(view, layout) }.isFailure) return false
-        morphOverlay = view
-        morphOverlayManager = wm
-        swiftMorphActive = true
-        android.util.Log.i("IslandHandoff", "SwiftUI morph started")
-        handler.removeCallbacks(finishSwiftMorph)
-        val motionScale = runCatching {
-            Settings.Global.getFloat(contentResolver, Settings.Global.ANIMATOR_DURATION_SCALE, 1f)
-        }.getOrDefault(1f)
-        handler.postDelayed(finishSwiftMorph, if (motionScale == 0f) 240L else SWIFT_MORPH_DURATION_MS)
-        return true
-    }
-
-    private fun removeSwiftMorph() {
-        handler.removeCallbacks(finishSwiftMorph)
-        morphOverlay?.let { overlay -> runCatching { morphOverlayManager?.removeView(overlay) } }
-        morphOverlay = null
-        morphOverlayManager = null
-        val wasActive = swiftMorphActive
-        swiftMorphActive = false
-        if (wasActive) island?.finishReturnHandoff()
     }
 
     /** Messages can start as a medium island; everything else transient opens fully. */
@@ -679,10 +606,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // Use the unfiltered shelf: the owner was deliberately hidden while its app was open.
         val source = activities.pair().first?.takeIf { it.mode == IslandMode.MUSIC || it.mode == IslandMode.CALL }
         foregroundPkg = pkg
-        if (pkg !in homePackages) {
-            removeSwiftMorph()
-            island?.cancelAppMorph()
-        }
+        if (pkg !in homePackages) island?.cancelAppMorph()
         val unlocked = getSystemService(PowerManager::class.java)?.isInteractive == true &&
             getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false
         val morph = AppReturnPolicy.shouldMorph(source?.packageName, previous, pkg, pkg in homePackages,
@@ -962,7 +886,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         // Idle island: the window still spans the top for the next intro, so let touches
         // fall through to the app underneath instead of deadening that strip.
-        if ((a == null || view.isConcealed || swiftMorphActive) && lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
+        if ((a == null || view.isConcealed) && lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
             lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             changed = true
         }
@@ -1155,7 +1079,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         private const val DEVICE_TIMEOUT_MS = 3_600L
         private const val RINGER_TIMEOUT_MS = 2_000L
         private const val SENT_TIMEOUT_MS = 1_400L
-        private const val SWIFT_MORPH_DURATION_MS = 520L
         /** Lets the system's unlock animation finish so the intro is actually visible. */
         private const val UNLOCK_SETTLE_MS = 320L
     }

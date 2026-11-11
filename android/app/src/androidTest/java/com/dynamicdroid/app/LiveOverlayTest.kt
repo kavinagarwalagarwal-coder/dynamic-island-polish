@@ -94,19 +94,15 @@ class LiveOverlayTest {
                 await("Leaving the real player for Home did not bring the island back by itself") {
                     val service = IslandBus.listener as? IslandOverlayService ?: return@await false
                     val view = field<IslandView?>(service, "island") ?: return@await false
-                    // The island grows back in its own window: no black SwiftUI stand-in, never invisible.
-                    field<SwiftIslandMorphView?>(service, "morphOverlay") == null &&
-                        !field<Boolean>(service, "swiftMorphActive") &&
-                        view.alpha == 1f && view.activity?.mode == IslandMode.MUSIC
+                    // The island grows back in its own window, never invisible.
+                    view.alpha == 1f && view.activity?.mode == IslandMode.MUSIC
                 }
                 capture("live-app-to-island")
                 await("Return from the app did not settle into a touchable compact island") {
                     val service = IslandBus.listener as? IslandOverlayService ?: return@await false
                     val view = field<IslandView>(service, "island")
                     val window = field<android.view.WindowManager.LayoutParams>(service, "params")
-                    !field<Boolean>(service, "swiftMorphActive") &&
-                        field<SwiftIslandMorphView?>(service, "morphOverlay") == null &&
-                        view.activity?.mode == IslandMode.MUSIC &&
+                    view.activity?.mode == IslandMode.MUSIC &&
                         window.height < view.resources.displayMetrics.heightPixels / 2 &&
                         window.flags and android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0
                 }

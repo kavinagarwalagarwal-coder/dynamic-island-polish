@@ -95,14 +95,9 @@ def main():
     else:
         raise AssertionError("Main screen never showed 'Playground'; visible: " + ", ".join(l for l in labels if l)[:600])
     click("Playground")
-    click("Preview SwiftUI morph", scroll=True)
-    time.sleep(2)
+    time.sleep(1.5)
     check_crash()
-    assert "SwiftIslandMorphPreviewActivity" in adb("shell", "dumpsys", "activity", "activities"), "SwiftUI preview did not open"
-    assert adb("shell", "pidof", PACKAGE).strip(), "Optimized app stopped"
-    root = hierarchy()
-    assert any("close preview" in (node.get("text", "") + node.get("content-desc", "")).casefold() for node in root.iter("node")), "SwiftUI controls did not render"
-    click("Close preview")
+    assert adb("shell", "pidof", PACKAGE).strip(), "Optimized app stopped on the Playground"
     adb("shell", "pm", "grant", "com.dynamicdroid.fixture", "android.permission.POST_NOTIFICATIONS")
     adb("shell", "appops", "set", PACKAGE, "SYSTEM_ALERT_WINDOW", "allow")
     adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + PACKAGE + ".IslandNotificationListener")
@@ -124,7 +119,7 @@ def main():
     check_crash()
     assert adb("shell", "pidof", PACKAGE).strip() == before, "App restarted during the live handoff"
     assert "Native return started" in adb("logcat", "-d", "-s", "IslandHandoff:I"), "The island did not grow back after leaving the player"
-    print("Optimized standalone APK: SwiftUI preview and real player-to-Home return passed.")
+    print("Optimized standalone APK: Playground and real player-to-Home return passed.")
 
 try:
     main()

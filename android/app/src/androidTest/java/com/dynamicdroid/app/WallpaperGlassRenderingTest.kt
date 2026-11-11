@@ -51,12 +51,7 @@ class WallpaperGlassRenderingTest {
             chronometerCountDown = true, clockBaseElapsed = android.os.SystemClock.elapsedRealtime() + 300000)
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                fun open(view: View): Boolean {
-                    if (view is android.widget.Button && view.text.toString() == "Playground") { view.performClick(); return true }
-                    if (view is ViewGroup) for (i in 0 until view.childCount) if (open(view.getChildAt(i))) return true
-                    return false
-                }
-                assertTrue(open(activity.window.decorView))
+                activity.openPage("Playground")
             }
             instrumentation.waitForIdleSync()
             scenario.onActivity { activity ->

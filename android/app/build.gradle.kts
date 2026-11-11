@@ -77,9 +77,6 @@ dependencies {
     implementation("org.commonmark:commonmark-ext-gfm-strikethrough:0.28.0")
     implementation("org.jetbrains.kotlin:kotlin-reflect:2.3.10")
     implementation("io.coil-kt.coil3:coil-compose:3.4.0")
-    debugImplementation(fileTree(mapOf("dir" to "libs/debug", "include" to listOf("*.aar", "*.jar"))))
-    add("performanceImplementation", fileTree(mapOf("dir" to "libs/release", "include" to listOf("*.aar", "*.jar"), "exclude" to listOf("SkipUnit*.aar", "SkipUnit*.jar"))))
-    releaseImplementation(fileTree(mapOf("dir" to "libs/release", "include" to listOf("*.aar", "*.jar"))))
 
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")

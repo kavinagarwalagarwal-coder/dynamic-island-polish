@@ -5,59 +5,22 @@ on:
   pull_request:
     paths:
       - "android/**"
-      - "Sources/**"
-      - "Tests/**"
-      - "Package.swift"
       - ".github/workflows/build-android-apk.yml"
   push:
     branches: [main]
     paths:
       - "android/**"
-      - "Sources/**"
-      - "Package.swift"
       - ".github/workflows/build-android-apk.yml"
 
 permissions:
   contents: read
 
 jobs:
-  skip-export:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/cache@v4
-        id: skip-libraries
-        with:
-          path: android/app/libs
-          key: skip-libraries-v1-${{ runner.os }}-${{ hashFiles('Package.swift', 'Package.resolved', 'Sources/IslandMorphUI/**') }}
-      - name: Install Skip
-        if: steps.skip-libraries.outputs.cache-hit != 'true'
-        run: |
-          brew tap skiptools/skip
-          # Newer Homebrew ignores third-party taps until they're trusted.
-          brew trust skiptools/skip 2>/dev/null || true
-          brew install skip
-      - name: Export SwiftUI morph for Android
-        if: steps.skip-libraries.outputs.cache-hit != 'true'
-        run: |
-          skip export --project . --module IslandMorphUI --dir android/app/libs/debug --debug
-          skip export --project . --module IslandMorphUI --dir android/app/libs/release --release
-      - uses: actions/upload-artifact@v4
-        with:
-          name: islandmorph-android-libraries
-          path: android/app/libs/**
-
   build:
     runs-on: ubuntu-latest
-    needs: skip-export
 
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: islandmorph-android-libraries
-          path: android/app/libs
 
       - uses: actions/setup-java@v4
         with:
@@ -93,29 +56,11 @@ jobs:
           name: notification-fixture-apk
           path: android/notification-fixture/build/outputs/apk/debug/notification-fixture-debug.apk
 
-  swift:
-    runs-on: macos-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install Skip
-        run: |
-          brew tap skiptools/skip
-          # Newer Homebrew ignores third-party taps until they're trusted.
-          brew trust skiptools/skip 2>/dev/null || true
-          brew install skip
-      - name: Build SwiftUI source
-        run: swift test
-
   render:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: skip-export
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: islandmorph-android-libraries
-          path: android/app/libs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -161,17 +106,12 @@ jobs:
   compatibility:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: skip-export
     strategy:
       fail-fast: false
       matrix:
         api: [26, 30]
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: islandmorph-android-libraries
-          path: android/app/libs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
