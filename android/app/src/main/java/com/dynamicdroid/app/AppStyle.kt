@@ -11,6 +11,9 @@ object AppStyle {
     const val DEFAULT_ACCENT = 0xFF0A84FF.toInt()
     const val GREEN = 0xFF30D158.toInt()
     const val RED = 0xFFFF453A.toInt()
+    const val ORANGE = 0xFFFF9F0A.toInt()
+    const val BLUE = 0xFF64A8FF.toInt()
+    const val PURPLE = 0xFFB4A7FF.toInt()
 
     private val brand: Map<String, Int> = mapOf(
         "com.whatsapp" to 0xFF25D366,

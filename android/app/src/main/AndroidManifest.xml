@@ -110,6 +110,28 @@
             </intent-filter>
         </service>
 
+        <service
+            android:name=".IslandPauseTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_island"
+            android:label="@string/tile_pause"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
+        <service
+            android:name=".IslandShotTile"
+            android:exported="true"
+            android:icon="@drawable/ic_tile_shot"
+            android:label="@string/tile_shot"
+            android:permission="android.permission.BIND_QUICK_SETTINGS_TILE">
+            <intent-filter>
+                <action android:name="android.service.quicksettings.action.QS_TILE" />
+            </intent-filter>
+        </service>
+
         <receiver android:name=".WidgetActionReceiver" android:exported="false" />
 
         <receiver android:name=".StageDotWidget" android:exported="false" android:label="@string/widget_stage_name">

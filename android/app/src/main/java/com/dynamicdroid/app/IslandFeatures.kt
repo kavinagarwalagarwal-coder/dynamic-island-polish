@@ -4,6 +4,9 @@ import android.app.NotificationManager
 import android.content.Context
 
 enum class OutlineMode { OFF, EVENTS, ALWAYS }
+
+/** How the island's shape moves: liquid (default), bouncy like jelly, or smooth with no overshoot. */
+enum class MotionStyle { LIQUID, BOUNCY, SMOOTH }
 enum class HapticGesture { TAP, HOLD, SWIPE, UP }
 
 /**
@@ -63,6 +66,25 @@ data class IslandFeatureSet(
     val landscapeSeeThrough: Boolean = true,
     /** Content fades to black around the camera hole, so nothing sits behind it. */
     val cameraFade: Boolean = true,
+    val motion: MotionStyle = MotionStyle.LIQUID,
+    // Short notices for system events, each on its own switch.
+    val eventUnplugged: Boolean = true,
+    val eventLowBattery: Boolean = true,
+    val eventWifi: Boolean = true,
+    val eventAirplane: Boolean = true,
+    val eventUsb: Boolean = true,
+    val eventUnlock: Boolean = false,
+    val eventBrightness: Boolean = false,
+    val eventAlarmSet: Boolean = true,
+    val payments: Boolean = true,
+    /** The flashlight island while the torch is on. */
+    val torch: Boolean = true,
+    /** The sleep island in the 12 hours before an alarm. */
+    val sleep: Boolean = true,
+    /** Tapping the resting pill opens the time, date, battery and quick buttons. */
+    val homeCard: Boolean = true,
+    /** Swipe the small music island sideways to skip tracks. */
+    val swipeTracks: Boolean = true,
 ) {
     /** False when the user turned this kind of activity off. */
     fun shows(mode: IslandMode): Boolean = when (mode) {
@@ -77,6 +99,10 @@ data class IslandFeatureSet(
         IslandMode.VOLUME -> volume
         IslandMode.RINGER -> ringer
         IslandMode.DEVICE -> true
+        IslandMode.EVENT -> true
+        IslandMode.TORCH -> torch
+        IslandMode.SLEEP -> sleep
+        IslandMode.HOME -> homeCard
     }
 
     fun safe() = copy(compactHeightDp = compactHeightDp.coerceIn(MIN_COMPACT_DP, MAX_COMPACT_DP))
@@ -140,6 +166,21 @@ object IslandFeatures {
             callsOverFullscreen = p.getBoolean("calls_over_fullscreen", d.callsOverFullscreen),
             landscapeSeeThrough = p.getBoolean("landscape_see_through", d.landscapeSeeThrough),
             cameraFade = p.getBoolean("camera_fade", d.cameraFade),
+            motion = runCatching { MotionStyle.valueOf(p.getString("motion", d.motion.name) ?: d.motion.name) }
+                .getOrDefault(d.motion),
+            eventUnplugged = p.getBoolean("event_unplugged", d.eventUnplugged),
+            eventLowBattery = p.getBoolean("event_low_battery", d.eventLowBattery),
+            eventWifi = p.getBoolean("event_wifi", d.eventWifi),
+            eventAirplane = p.getBoolean("event_airplane", d.eventAirplane),
+            eventUsb = p.getBoolean("event_usb", d.eventUsb),
+            eventUnlock = p.getBoolean("event_unlock", d.eventUnlock),
+            eventBrightness = p.getBoolean("event_brightness", d.eventBrightness),
+            eventAlarmSet = p.getBoolean("event_alarm_set", d.eventAlarmSet),
+            payments = p.getBoolean("event_payments", d.payments),
+            torch = p.getBoolean("show_torch", d.torch),
+            sleep = p.getBoolean("show_sleep", d.sleep),
+            homeCard = p.getBoolean("home_card", d.homeCard),
+            swipeTracks = p.getBoolean("swipe_tracks", d.swipeTracks),
         ).safe()
     }
 
@@ -147,6 +188,12 @@ object IslandFeatures {
     fun setCompactHeight(context: Context, dp: Float) = p(context).edit()
         .putFloat("compact_height", dp.coerceIn(IslandFeatureSet.MIN_COMPACT_DP, IslandFeatureSet.MAX_COMPACT_DP)).apply()
     fun setOutline(context: Context, mode: OutlineMode) = p(context).edit().putString("outline", mode.name).apply()
+    fun setMotion(context: Context, style: MotionStyle) = p(context).edit().putString("motion", style.name).apply()
+
+    /** The island is paused (Quick Settings tile) until this wall-clock time; 0 = not paused. */
+    fun pausedUntil(context: Context) = p(context).getLong("paused_until", 0L)
+    fun setPausedUntil(context: Context, at: Long) = p(context).edit().putLong("paused_until", at).apply()
+    fun paused(context: Context) = System.currentTimeMillis() < pausedUntil(context)
 
     /** Do Not Disturb is on when anything other than "all" interruptions is allowed. */
     fun dndActive(context: Context): Boolean = runCatching {
@@ -158,6 +205,20 @@ object IslandFeatures {
 
 /** Platform-free rules for turning notification facts into island activities; unit tested. */
 object IslandSignals {
+    /** Wallets and payment apps whose "paid" notifications become a short Paid notice. */
+    private val payApps = setOf(
+        "com.google.android.apps.walletnfcrel", "com.samsung.android.spay", "com.samsung.android.samsungpay.gear",
+        "com.google.android.apps.nbu.paisa.user", "com.phonepe.app", "net.one97.paytm", "in.org.npci.upiapp",
+        "in.amazon.mShop.android.shopping", "com.mobikwik_new", "com.paypal.android.p2pmobile", "com.revolut.revolut",
+        "com.squareup.cash", "com.venmo",
+    )
+    private val paidWords = Regex(
+        "(paid|payment (?:successful|complete|done|sent)|sent ₹|sent \\$|you sent|money sent|transaction successful|" +
+            "debited|purchase approved|оплачено|оплата прошла)", RegexOption.IGNORE_CASE)
+
+    fun isPayment(pkg: String, title: String, text: String): Boolean =
+        pkg in payApps && paidWords.containsMatchIn("$title $text")
+
     private val snoozeWords = listOf("snooze")
     private val dismissWords = listOf("dismiss", "stop", "turn off", "cancel")
     private val answerWords = listOf("answer", "accept")
