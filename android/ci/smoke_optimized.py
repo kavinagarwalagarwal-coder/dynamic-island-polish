@@ -13,8 +13,16 @@ def adb(*args, timeout=25):
 
 def hierarchy():
     for attempt in range(3):
-        adb("shell", "uiautomator", "dump", "/sdcard/optimized-ui.xml")
-        root = ET.fromstring(adb("exec-out", "cat", "/sdcard/optimized-ui.xml"))
+        # A busy emulator sometimes writes an empty or partial dump: try again.
+        for _ in range(5):
+            try:
+                adb("shell", "uiautomator", "dump", "/sdcard/optimized-ui.xml")
+                root = ET.fromstring(adb("exec-out", "cat", "/sdcard/optimized-ui.xml"))
+                break
+            except (ET.ParseError, subprocess.SubprocessError):
+                time.sleep(1)
+        else:
+            raise AssertionError("uiautomator could not read the screen")
         labels = [node.get("text", "").casefold() for node in root.iter("node")]
         launcher_anr = any(("quickstep" in text or "launcher" in text) and
                            ("isn't responding" in text or "is not responding" in text)
