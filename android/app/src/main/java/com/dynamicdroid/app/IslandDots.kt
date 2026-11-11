@@ -31,6 +31,8 @@ class IslandDots(private val n: Int) {
     private val homeA = FloatArray(count)
     // Home position as x/y (cells from the centre), so spinning is a rotation, not trig per dot.
     private val homeX = FloatArray(count)
+    /** Halftone dot size for each dot's current cover brightness, per cell (pow is slow). */
+    private val radTo = FloatArray(count)
     private val homeY = FloatArray(count)
     private val lumFrom = FloatArray(count)
     private val lumTo = FloatArray(count)
@@ -93,6 +95,7 @@ class IslandDots(private val n: Int) {
             lumFrom[i] = if (!first) lumFrom[i] + (lumTo[i] - lumFrom[i]) * ease(mix) else lum
             colTo[i] = color
             lumTo[i] = lum
+            radTo[i] = DotArt.halftoneRadius(lum, 1f)
         }
         ready = true
         mix = if (first || !animate) 1f else 0f
@@ -311,8 +314,9 @@ class IslandDots(private val n: Int) {
             if (!alive[i]) continue
             val x = cx + homeX[i] * cs - homeY[i] * sn + ox[i] * cell
             val y = cy + homeX[i] * sn + homeY[i] * cs + oy[i] * cell
-            val lum = lumFrom[i] + (lumTo[i] - lumFrom[i]) * m
-            var r = max(DotArt.halftoneRadius(lum, cell), cell * 0.16f)
+            val frac = if (m >= 1f) radTo[i] else
+                DotArt.halftoneRadius(lumFrom[i] + (lumTo[i] - lumFrom[i]) * m, 1f)
+            var r = max(frac * cell, cell * 0.16f)
             r *= 1f + breathe * sin(phase - homeR[i] * 0.45f)
             var lit = 0f
             for (k in 0 until live) {
@@ -559,6 +563,7 @@ class IslandDotField {
 
     private val dst = android.graphics.RectF()
     private val fronts = FloatArray(4)
+    private var marks = BooleanArray(64)
 
     /** Blits [layer] with its top-left at ([left], [top]); [alpha] is the field's strength. */
     fun drawLayer(canvas: Canvas, paint: Paint, layer: Layer, left: Float, top: Float, alpha: Int) {
@@ -592,18 +597,38 @@ class IslandDotField {
         val count = dots.recordFronts(fronts, strong)
         if (count == 0) return
         paint.color = Color.WHITE
+        if (marks.size < cols) marks = BooleanArray(cols + 16)
+        val band = 0.17f * reach
         for (yy in 0 until rows) {
             val py = gy + yy * pitch
-            for (xx in 0 until cols) {
-                val px = gx + xx * pitch
-                val dx = px - ox; val dy = py - oy
-                val dist = sqrt(dx * dx + dy * dy) / reach
-                if (count >= 0) {
-                    // Most dots are nowhere near a ring: skip them with one comparison each.
-                    var near = false
-                    for (k in 0 until count) if (abs(fronts[k] - dist) < 0.17f) { near = true; break }
-                    if (!near) continue
+            val dy = py - oy
+            if (count >= 0) {
+                // Only the cells this row shares with a ring: work them out per row from the
+                // ring's radius instead of testing every dot on the island.
+                java.util.Arrays.fill(marks, 0, cols, false)
+                var any = false
+                for (k in 0 until count) {
+                    val r = fronts[k] * reach
+                    val outer = r + band
+                    if (abs(dy) >= outer) continue
+                    val inner = r - band
+                    val far = sqrt(outer * outer - dy * dy)
+                    val near = if (inner > abs(dy)) sqrt(inner * inner - dy * dy) else 0f
+                    for (side2 in 0..1) {
+                        val sign = if (side2 == 0) -1f else 1f
+                        val a0 = ox + sign * near; val a1 = ox + sign * far
+                        val from = ((min(a0, a1) - gx) / pitch).toInt().coerceAtLeast(0)
+                        val to = (kotlin.math.ceil((max(a0, a1) - gx) / pitch).toInt()).coerceAtMost(cols - 1)
+                        for (c in from..to) { marks[c] = true; any = true }
+                    }
                 }
+                if (!any) continue
+            }
+            for (xx in 0 until cols) {
+                if (count >= 0 && !marks[xx]) continue
+                val px = gx + xx * pitch
+                val dx = px - ox
+                val dist = sqrt(dx * dx + dy * dy) / reach
                 val lit = min(1f, dots.light(px, py, ox, oy, reach, dist, strong))
                 if (lit < 0.06f) continue
                 val hx = px - holeX; val hy = py - holeY
