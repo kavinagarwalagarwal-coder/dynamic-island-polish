@@ -256,11 +256,13 @@ class IslandAccessibilityService : AccessibilityService() {
             lineTo(x, 1f)
         }
         // The island's own window spans the top of the screen; let the swipe pass through it.
-        beforePopupSwipe?.invoke(450L)
+        // Give WindowManager time to apply that before the finger lands (slow phones relayout late),
+        // and keep it through a possible retry.
+        beforePopupSwipe?.invoke(POPUP_RETRY_MS + 500L)
         handler.postDelayed({
             dispatchGesture(GestureDescription.Builder()
                 .addStroke(GestureDescription.StrokeDescription(path, 0L, 120L)).build(), null, null)
-        }, 48L)
+        }, 140L)
     }
 
     /** Keys whose press we took, so their release is consumed too and never reaches the system. */
