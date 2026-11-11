@@ -342,7 +342,7 @@ class IslandAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val SYSTEM_UI = "com.android.systemui"
-        private const val POPUP_SEARCH_MS = 1500L
+        private const val POPUP_SEARCH_MS = 3500L
         private const val POPUP_RETRY_MS = 650L
         private const val CONTENT_CHECK_EVERY_MS = 1500L
         private const val MEDIA_NODE_LIMIT = 400
