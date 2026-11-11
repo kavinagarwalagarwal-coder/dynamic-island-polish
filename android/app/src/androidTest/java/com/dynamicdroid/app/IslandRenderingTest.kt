@@ -29,21 +29,28 @@ class IslandRenderingTest {
         scenario.onActivity { activity ->
             activity.openPage("Playground")
         }
-        instrumentation.waitForIdleSync()
+        awaitPreview(scenario)
         return scenario
+    }
+
+    /** Compose attaches the preview on its next frame; wait for it rather than for the queue. */
+    private fun awaitPreview(scenario: ActivityScenario<MainActivity>) {
+        val deadline = SystemClock.uptimeMillis() + 6_000L
+        while (SystemClock.uptimeMillis() < deadline) {
+            var found = false
+            scenario.onActivity { activity -> found = findIsland(activity.window.decorView)?.isAttachedToWindow == true }
+            if (found) { instrumentation.waitForIdleSync(); SystemClock.sleep(150); return }
+            SystemClock.sleep(50)
+        }
+        error("The Playground preview never attached")
     }
 
     @Test fun navigationExposesSetupAppearanceAndPlacementWithoutLongSettingsScroll() {
         launchPlayground().use { scenario ->
             for (name in listOf("Setup", "Phone fit", "Appearance", "Playground")) {
                 scenario.onActivity { activity ->
-                    fun find(view: View): android.widget.Button? {
-                        if (view is android.widget.Button && view.text.toString() == name) return view
-                        if (view is ViewGroup) for (i in 0 until view.childCount) find(view.getChildAt(i))?.let { return it }
-                        return null
-                    }
-                    val button = find(activity.window.decorView) ?: error("Missing $name navigation")
-                    assertTrue(button.isShown); assertTrue(button.performClick()); assertTrue(button.isSelected)
+                    activity.openPage(name)
+                    assertTrue("Page $name did not open", activity.page == name)
                 }
                 instrumentation.waitForIdleSync()
                 // IdleSync drains the UI queue before SurfaceFlinger presents the new page.

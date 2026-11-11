@@ -13,6 +13,18 @@ import org.junit.runner.RunWith
 @RunWith(AndroidJUnit4::class)
 class WallpaperGlassRenderingTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
+    /** Compose attaches the preview on its next frame; wait for it rather than for the queue. */
+    private fun awaitPreview(scenario: ActivityScenario<MainActivity>) {
+        val deadline = android.os.SystemClock.uptimeMillis() + 6_000L
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            var found = false
+            scenario.onActivity { activity -> found = find(activity.window.decorView)?.isAttachedToWindow == true }
+            if (found) { instrumentation.waitForIdleSync(); android.os.SystemClock.sleep(150); return }
+            android.os.SystemClock.sleep(50)
+        }
+        error("The Playground preview never attached")
+    }
+
     private fun find(view: View): IslandView? {
         if (view is IslandView) return view
         if (view is ViewGroup) for (i in 0 until view.childCount) find(view.getChildAt(i))?.let { return it }
@@ -53,7 +65,7 @@ class WallpaperGlassRenderingTest {
             scenario.onActivity { activity ->
                 activity.openPage("Playground")
             }
-            instrumentation.waitForIdleSync()
+            awaitPreview(scenario)
             scenario.onActivity { activity ->
                 val view = find(activity.window.decorView)!!
                 view.applyWallpaper(WallpaperStyle(enabled = true, strength = .65f), image)
