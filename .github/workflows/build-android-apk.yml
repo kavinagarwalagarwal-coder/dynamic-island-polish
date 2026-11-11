@@ -140,14 +140,25 @@ jobs:
       - uses: gradle/actions/setup-gradle@v5
         with:
           gradle-version: "8.13"
+      - name: Find the system image
+        id: img
+        # Newer SDK packages carry a minor version (android-37.0), older ones do not (android-30).
+        run: |
+          name=$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null \
+            | grep -oE "system-images;android-${{ matrix.api }}(\.[0-9]+)?;${{ matrix.target }};x86_64" | sort -V | tail -1)
+          level=$(echo "$name" | cut -d';' -f2 | sed 's/^android-//')
+          echo "Using ${name:-${{ matrix.api }}} (level ${level:-${{ matrix.api }}})"
+          echo "level=${level:-${{ matrix.api }}}" >> "$GITHUB_OUTPUT"
       - name: Enable emulator acceleration
         run: sudo chmod 666 /dev/kvm
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: ${{ matrix.api }}
+          api-level: ${{ steps.img.outputs.level }}
           target: ${{ matrix.target }}
           arch: x86_64
           profile: pixel_2
+          # Android 17 images need at least 4 GB.
+          ram-size: 4096M
           disable-animations: false
           script: gradle --no-daemon -p android :app:connected${{ matrix.flavor }}DebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.dynamicdroid.app.DeviceCompatibilityTest
       - uses: actions/upload-artifact@v6
@@ -180,15 +191,25 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
+      - name: Find the system image
+        id: img
+        # Newer SDK packages carry a minor version (android-37.0), older ones do not (android-30).
+        run: |
+          name=$("$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --list 2>/dev/null \
+            | grep -oE "system-images;android-${{ matrix.api }}(\.[0-9]+)?;${{ matrix.target }};x86_64" | sort -V | tail -1)
+          level=$(echo "$name" | cut -d';' -f2 | sed 's/^android-//')
+          echo "Using ${name:-${{ matrix.api }}} (level ${level:-${{ matrix.api }}})"
+          echo "level=${level:-${{ matrix.api }}}" >> "$GITHUB_OUTPUT"
       - name: Enable emulator acceleration
         run: sudo chmod 666 /dev/kvm
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: ${{ matrix.api }}
+          api-level: ${{ steps.img.outputs.level }}
           target: ${{ matrix.target }}
           arch: x86_64
           profile: pixel_2
-          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -memory 3072 -cores 2
+          ram-size: 4096M
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -memory 4096 -cores 2
           disable-animations: false
           script: |
             adb install -r optimized-apk/${{ matrix.file }}
