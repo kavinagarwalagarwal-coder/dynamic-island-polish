@@ -47,6 +47,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private var morphOverlayManager: WindowManager? = null
     private var swiftMorphActive = false
     private val handler = Handler(Looper.getMainLooper())
+    private val restoreTouchAfterReturn = Runnable { render() }
     private val finishSwiftMorph = Runnable {
         removeSwiftMorph()
         render()
@@ -471,8 +472,14 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             else -> null to Presentation.IDLE
         }
         // Calls stay visible even over fullscreen video; everything else steps aside.
-        val swiftMorphStarted = absorb && t == null && p == Presentation.COMPACT &&
-            a != null && startSwiftMorph(a)
+        // Returning from an app is animated by the island itself (see IslandView.playReturn). The
+        // old SwiftUI stand-in showed a plain black pill first and then swapped to the real island.
+        if (absorb) {
+            android.util.Log.i("IslandHandoff", "Native return started")
+            removeSwiftMorph()
+            handler.removeCallbacks(restoreTouchAfterReturn)
+            handler.postDelayed(restoreTouchAfterReturn, 450L)
+        }
         val concealed = (fullscreen || immersiveMedia) && a?.mode != IslandMode.CALL && a?.mode != IslandMode.ALARM && a?.mode != IslandMode.VOLUME
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
@@ -496,7 +503,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         growWindow(view.windowSizeFor(a, p), false)
         view.show(a?.let { appTint(this, it) }, p, false)
-        if (swiftMorphStarted) view.prepareReturnHandoff()
         updateTouchWindow()
         syncDotBeat(a, p)
     }
