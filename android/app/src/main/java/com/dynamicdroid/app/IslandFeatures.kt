@@ -48,7 +48,37 @@ data class IslandFeatureSet(
     val hapticSwipe: Boolean = true,
     val hapticUp: Boolean = true,
     val quietHapticsInDnd: Boolean = true,
+    // Which kinds of live activity use the island at all. Off = the phone handles it as usual.
+    val music: Boolean = true,
+    val calls: Boolean = true,
+    val messages: Boolean = true,
+    val timers: Boolean = true,
+    val navigation: Boolean = true,
+    val charging: Boolean = true,
+    /** The edge glow only while the island is open, not around the small pill. */
+    val glowOpenOnly: Boolean = false,
+    /** Calls show over fullscreen apps in portrait; in landscape (games, videos) they never do. */
+    val callsOverFullscreen: Boolean = true,
+    /** In landscape there's no camera to hide, so the island turns see-through. */
+    val landscapeSeeThrough: Boolean = true,
+    /** Content fades to black around the camera hole, so nothing sits behind it. */
+    val cameraFade: Boolean = true,
 ) {
+    /** False when the user turned this kind of activity off. */
+    fun shows(mode: IslandMode): Boolean = when (mode) {
+        IslandMode.MUSIC -> music
+        IslandMode.CALL -> calls
+        IslandMode.MESSAGE -> messages
+        IslandMode.TIMER -> timers
+        IslandMode.NAVIGATION -> navigation
+        IslandMode.CHARGING -> charging
+        IslandMode.DOWNLOAD -> downloads
+        IslandMode.ALARM -> alarms
+        IslandMode.VOLUME -> volume
+        IslandMode.RINGER -> ringer
+        IslandMode.DEVICE -> true
+    }
+
     fun safe() = copy(compactHeightDp = compactHeightDp.coerceIn(MIN_COMPACT_DP, MAX_COMPACT_DP))
 
     fun haptic(gesture: HapticGesture) = when (gesture) {
@@ -100,6 +130,16 @@ object IslandFeatures {
             hapticSwipe = p.getBoolean("haptic_swipe", d.hapticSwipe),
             hapticUp = p.getBoolean("haptic_up", d.hapticUp),
             quietHapticsInDnd = p.getBoolean("haptic_dnd_quiet", d.quietHapticsInDnd),
+            music = p.getBoolean("show_music", d.music),
+            calls = p.getBoolean("show_calls", d.calls),
+            messages = p.getBoolean("show_messages", d.messages),
+            timers = p.getBoolean("show_timers", d.timers),
+            navigation = p.getBoolean("show_navigation", d.navigation),
+            charging = p.getBoolean("show_charging", d.charging),
+            glowOpenOnly = p.getBoolean("glow_open_only", d.glowOpenOnly),
+            callsOverFullscreen = p.getBoolean("calls_over_fullscreen", d.callsOverFullscreen),
+            landscapeSeeThrough = p.getBoolean("landscape_see_through", d.landscapeSeeThrough),
+            cameraFade = p.getBoolean("camera_fade", d.cameraFade),
         ).safe()
     }
 

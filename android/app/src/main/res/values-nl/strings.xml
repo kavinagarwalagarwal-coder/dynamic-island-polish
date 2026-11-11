@@ -347,4 +347,18 @@
     <string name="action_previous">Vorig nummer</string>
     <string name="dot_island">Stippen in het eiland</string>
     <string name="dot_island_note">Terwijl er muziek speelt, wordt de albumhoes in het eiland een kleine draaiende plaat van stippen en de golf een stippenequalizer. Open de kaart voor de grote plaat: die rimpelt op de beat in een ring van stuiterende stippen en spat uiteen in de volgende hoes als het nummer wisselt.</string>
+    <string name="feature_show_music">Muziek</string>
+    <string name="feature_show_calls">Oproepen</string>
+    <string name="feature_calls_fullscreen">Oproepen over apps op volledig scherm</string>
+    <string name="feature_calls_fullscreen_note">Alleen staand. Liggend (games, films) bedekken oproepen nooit het scherm; de oproep-pop-up van de telefoon neemt het over.</string>
+    <string name="feature_show_messages">Meldingen</string>
+    <string name="feature_show_messages_note">Uit houdt de meldingspop-ups van de telefoon.</string>
+    <string name="feature_show_timers">Timers en stopwatches</string>
+    <string name="feature_show_navigation">Navigatie</string>
+    <string name="feature_show_charging">Opladen</string>
+    <string name="feature_glow_open">Gloed alleen als hij open is</string>
+    <string name="feature_camera_fade">Vervagen in de camera</string>
+    <string name="feature_camera_fade_note">Inhoud loopt rond het cameragat zacht over in zwart, zodat er niets achter verdwijnt.</string>
+    <string name="feature_landscape">Doorzichtig in liggende stand</string>
+    <string name="feature_landscape_note">Zonder camera om te bedekken laat het eiland games en video\'s doorschijnen.</string>
 </resources>

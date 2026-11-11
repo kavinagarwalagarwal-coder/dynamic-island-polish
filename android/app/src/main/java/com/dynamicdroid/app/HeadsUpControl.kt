@@ -30,7 +30,8 @@ object HeadsUpControl {
     fun shouldHide(wanted: Boolean, islandUp: Boolean, listenerUp: Boolean) = wanted && islandUp && listenerUp
 
     fun sync(context: Context, islandUp: Boolean) {
-        val wanted = IslandFeatures.read(context).hidePhonePopups
+        // Only while the island shows messages itself; with messages off the phone's pop-ups stay.
+        val wanted = IslandFeatures.read(context).let { it.hidePhonePopups && it.messages }
         // Quiet hours hide the island on purpose; the phone's pop-ups take over again meanwhile.
         val showing = islandUp && !IslandCustomization.quietNow(context)
         apply(context, shouldHide(wanted, showing, IslandNotificationListener.instance != null))

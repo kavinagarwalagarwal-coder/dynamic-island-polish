@@ -358,4 +358,18 @@
     <string name="action_previous">Previous song</string>
     <string name="dot_island">Dots in the island</string>
     <string name="dot_island_note">While music plays, the island\'s album art becomes a tiny spinning record of dots and the waveform a dot equaliser. Open the card for the bigger record: it ripples on the beat inside a ring of bouncing dots, and bursts into the next cover when the song changes.</string>
+    <string name="feature_show_music">Music</string>
+    <string name="feature_show_calls">Calls</string>
+    <string name="feature_calls_fullscreen">Calls over fullscreen apps</string>
+    <string name="feature_calls_fullscreen_note">In portrait only. In landscape (games, films) calls never cover the screen; the phone\'s own call pop-up takes them.</string>
+    <string name="feature_show_messages">Notifications</string>
+    <string name="feature_show_messages_note">Off keeps the phone\'s own notification pop-ups.</string>
+    <string name="feature_show_timers">Timers and stopwatches</string>
+    <string name="feature_show_navigation">Navigation</string>
+    <string name="feature_show_charging">Charging</string>
+    <string name="feature_glow_open">Glow only when open</string>
+    <string name="feature_camera_fade">Fade into the camera</string>
+    <string name="feature_camera_fade_note">Content darkens smoothly into black around the camera hole, so nothing hides behind it.</string>
+    <string name="feature_landscape">See-through in landscape</string>
+    <string name="feature_landscape_note">With no camera to cover, the island lets games and videos show through.</string>
 </resources>

@@ -347,4 +347,18 @@
     <string name="action_previous">Canción anterior</string>
     <string name="dot_island">Puntos en la isla</string>
     <string name="dot_island_note">Mientras suena música, la portada de la isla se convierte en un pequeño disco de puntos que gira y la onda en un ecualizador de puntos. Abre la tarjeta para el disco grande: ondula con el ritmo dentro de un anillo de puntos que rebotan y estalla en la siguiente portada al cambiar de canción.</string>
+    <string name="feature_show_music">Música</string>
+    <string name="feature_show_calls">Llamadas</string>
+    <string name="feature_calls_fullscreen">Llamadas sobre apps a pantalla completa</string>
+    <string name="feature_calls_fullscreen_note">Solo en vertical. En horizontal (juegos, películas) las llamadas nunca tapan la pantalla; las atiende la ventana del teléfono.</string>
+    <string name="feature_show_messages">Notificaciones</string>
+    <string name="feature_show_messages_note">Desactivado mantiene las ventanas emergentes del teléfono.</string>
+    <string name="feature_show_timers">Temporizadores y cronómetros</string>
+    <string name="feature_show_navigation">Navegación</string>
+    <string name="feature_show_charging">Carga</string>
+    <string name="feature_glow_open">Brillo solo al abrirse</string>
+    <string name="feature_camera_fade">Fundido en la cámara</string>
+    <string name="feature_camera_fade_note">El contenido se oscurece suavemente hacia negro alrededor de la cámara, así nada queda detrás.</string>
+    <string name="feature_landscape">Translúcida en horizontal</string>
+    <string name="feature_landscape_note">Sin cámara que tapar, la isla deja ver juegos y vídeos.</string>
 </resources>

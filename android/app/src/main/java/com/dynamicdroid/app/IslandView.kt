@@ -499,6 +499,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (!absorb && SystemClock.uptimeMillis() < introHoldUntil) return
         if (introS.value < 0.001f && introS.target == 0f) return
         if (introHoldUntil == 0L && !sheenActive() && !isAbsorbing) restoreShapeSprings()
+        presenceS.stiffness = 240f
         next?.let { activity ->
             val speed = IslandCustomization.motionSpeed(context, activity.packageName)
             shapeSprings.forEach { it.stiffness = IslandMotion.SHAPE_K / (speed * speed) }
@@ -522,6 +523,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             centerS.target = cameraCenter(); topS.target = baseTop + dp(8f)
             absorbS.target = 0f
             setContentTargets(p)
+            softExit(old, next)
             settled = false
             kick()
             return
@@ -533,8 +535,22 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         topS.target = targetTop(p)
         absorbS.target = 0f
         setContentTargets(p)
+        softExit(old, next)
         settled = false
         kick()
+    }
+
+    /**
+     * The volume, ringer and device islands slide away at the same unhurried pace they arrive
+     * with, instead of snapping shut: content fades at the entrance speed and the shape settles
+     * on softer springs.
+     */
+    private fun softExit(old: LiveActivity?, next: LiveActivity?) {
+        if (old == null || next?.key == old.key || reduceMotion) return
+        if (old.mode != IslandMode.VOLUME && old.mode != IslandMode.RINGER && old.mode != IslandMode.DEVICE) return
+        expandedA.stiffness = IslandMotion.CONTENT_IN_K
+        shapeSprings.forEach { it.stiffness = IslandMotion.SHAPE_K * 0.55f }
+        presenceS.stiffness = 110f
     }
 
     fun cancelAppMorph() {
@@ -608,6 +624,49 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         postDelayed(introWiden, INTRO_HOLD_MS)
         settled = false
         kick()
+    }
+
+    private fun landscape() = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    private fun seeThrough() = features.landscapeSeeThrough && landscape()
+
+    /** True when the island sits on a real camera hole we know the position of. */
+    private fun onCamera() = anchorToCutout && fit.alignCamera && cameraX != null && !landscape()
+
+    private val fadePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var fadeShader: RadialGradient? = null
+    private var fadeShaderR = 0f
+
+    /**
+     * Content, cover art and dots darken smoothly into black around the camera hole, so nothing
+     * ever sits half-hidden behind it and the hole reads as part of the island.
+     */
+    private fun drawCameraFade(canvas: Canvas, bodyAlpha: Int) {
+        if (!features.cameraFade || !onCamera() || bodyAlpha < 4) return
+        val r = restingDiameter() / 2f
+        val cx = cameraCenter()
+        val cy = restingTop() + r
+        val outer = r * 2.6f
+        if (cx + outer < rect.left || cx - outer > rect.right || cy + outer < rect.top || cy - outer > rect.bottom) return
+        var shader = fadeShader
+        if (shader == null || fadeShaderR != outer) {
+            shader = RadialGradient(0f, 0f, outer,
+                intArrayOf(Color.BLACK, Color.BLACK, Color.argb(150, 0, 0, 0), Color.TRANSPARENT),
+                floatArrayOf(0f, 0.46f, 0.7f, 1f), Shader.TileMode.CLAMP)
+            fadeShader = shader; fadeShaderR = outer
+        }
+        matrix.reset(); matrix.setTranslate(cx, cy); shader.setLocalMatrix(matrix)
+        fadePaint.shader = shader
+        fadePaint.alpha = bodyAlpha
+        canvas.drawCircle(cx, cy, outer, fadePaint)
+        fadePaint.shader = null
+    }
+
+    /** How far right content left of the camera may reach, and where content right of it may start. */
+    private fun cameraKeepOut(): Pair<Float, Float>? {
+        if (!onCamera()) return null
+        val r = restingDiameter() / 2f + dp(5f)
+        val cx = cameraCenter()
+        return (cx - r) to (cx + r)
     }
 
     /** 0 while the shape is under ~70% of where it's heading, easing to 1 by ~92%. */
@@ -1002,9 +1061,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
         val bodyAlpha = (255 * presenceS.value.coerceIn(0f, 1f) * min(1f, intro * 2.5f)).toInt()
         drawSecondary(canvas, intro * reveal)
-        if (a != null) drawGlow(canvas, a, r, bodyAlpha)
+        if (a != null) {
+            val glowAlpha = if (features.glowOpenOnly) (bodyAlpha * expandedA.value.coerceIn(0f, 1f)).toInt() else bodyAlpha
+            drawGlow(canvas, a, r, glowAlpha)
+        }
         shapePaint.color = Color.BLACK
-        shapePaint.alpha = bodyAlpha
+        // In landscape there's no camera to cover, so the body lets the game or video show through.
+        shapePaint.alpha = if (seeThrough()) (bodyAlpha * LANDSCAPE_BODY).toInt() else bodyAlpha
         canvas.drawRoundRect(rect, r, r, shapePaint)
         if (a == null) { canvas.restore(); if (dimmed) canvas.restore(); if (layered) canvas.restore(); return }
         drawOutline(canvas, a, r, bodyAlpha)
@@ -1068,6 +1131,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
         // The timer's ring and digits are shared between compact and expanded and morph between them.
         if (liveTimer) drawTimerMorph(canvas, a, ea, ca, intro)
+        drawCameraFade(canvas, bodyAlpha)
         if (absorb > 0.01f) drawAbsorb(canvas, absorb)
         canvas.restore()
         canvas.restore()
@@ -1331,6 +1395,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             }
         }
         val right = rect.right - dp(12f)
+        // Text on the right never runs in behind the camera (narrow "small island" pills too).
+        val roomRight = cameraKeepOut()?.let { right - it.second }?.takeIf { it < rect.width() } ?: rect.width() / 2f - dp(24f)
         when (a.mode) {
             IslandMode.MUSIC -> {
                 // Artwork and waveform flank the camera, matching the SwiftUI compact layout.
@@ -1342,21 +1408,26 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 val t = a.chronometerText()
                 when {
                     a.callState == CallState.CALLING ->
-                        text(canvas, callingLabel(), right, cy + dp(4.5f), dp(90f), smallPaint, NothingStyle.muted, pulse(alpha), alignRight = true)
-                    t != null -> rolling(canvas, "call", t, right, cy + dp(4.5f), smallPaint, NothingStyle.muted, alpha, alignRight = true)
+                        text(canvas, callingLabel(), right, cy + dp(4.5f), min(dp(90f), roomRight), smallPaint, NothingStyle.muted, pulse(alpha), alignRight = true)
+                    t != null && smallPaint.measureText(t) <= roomRight ->
+                        rolling(canvas, "call", t, right, cy + dp(4.5f), smallPaint, NothingStyle.muted, alpha, alignRight = true)
+                    t != null -> drawWave(canvas, right - dp(20f), cy, dp(20f), dp(12f), NothingStyle.muted, true, alpha)
                     else -> drawWave(canvas, right - dp(20f), cy, dp(20f), dp(12f), NothingStyle.muted, true, alpha)
                 }
             }
             IslandMode.DOWNLOAD -> {
                 val fraction = levelS.value
                 drawMiniProgress(canvas, right - dp(9f), cy, dp(8.5f), fraction, alpha)
-                rolling(canvas, "download", "${IslandSignals.percent(a.progress ?: 0f)}%", right - dp(24f), cy + dp(4.5f),
-                    smallPaint, NothingStyle.foreground, alpha, alignRight = true)
+                // The number only shows when it fits beside the camera; the ring alone says enough.
+                val percent = "${IslandSignals.percent(a.progress ?: 0f)}%"
+                if (smallPaint.measureText("100%") <= roomRight - dp(24f))
+                    rolling(canvas, "download", percent, right - dp(24f), cy + dp(4.5f),
+                        smallPaint, NothingStyle.foreground, alpha, alignRight = true)
             }
-            IslandMode.ALARM -> text(canvas, a.title, right, cy + dp(4.5f), rect.width() / 2f - dp(24f), smallPaint, ALARM, alpha, alignRight = true)
+            IslandMode.ALARM -> text(canvas, a.title, right, cy + dp(4.5f), roomRight, smallPaint, ALARM, alpha, alignRight = true)
             else -> {
                 val label = a.chronometerText() ?: a.title
-                text(canvas, label, right, cy + dp(4.5f), rect.width() / 2f - dp(24f), smallPaint, NothingStyle.foreground, alpha, alignRight = true)
+                text(canvas, label, right, cy + dp(4.5f), roomRight, smallPaint, NothingStyle.foreground, alpha, alignRight = true)
             }
         }
     }
@@ -1436,8 +1507,24 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         drawAvatar(canvas, a, l, cy - av / 2, av, alpha)
         val tx = l + av + dp(10f)
         val rr = rect.right - dp(18f)
-        text(canvas, a.title, tx, cy - dp(2f), rr - tx, titlePaint, Color.WHITE, alpha)
-        text(canvas, a.subtitle.ifBlank { a.appLabel }, tx, cy + dp(16f), rr - tx, bodyPaint, GREY, alpha)
+        // The short app name goes on top, where the camera is, and stops before it; the message
+        // itself (who, then what) runs along the bottom line, clear of the camera.
+        val keep = cameraKeepOut()
+        val topRoom = if (keep != null && tx < keep.first) keep.first - tx else rr - tx
+        text(canvas, a.appLabel.ifBlank { a.title }, tx, cy - dp(5f), topRoom, smallPaint, GREY, alpha)
+        val who = if (a.appLabel.isBlank()) "" else a.title
+        val what = a.subtitle
+        val y = cy + dp(14f)
+        when {
+            who.isNotBlank() && what.isNotBlank() -> {
+                val whoW = min(titlePaint.measureText(who), (rr - tx) * 0.45f)
+                text(canvas, who, tx, y, whoW, titlePaint, Color.WHITE, alpha)
+                val gap = dp(6f)
+                text(canvas, what, tx + whoW + gap, y, rr - tx - whoW - gap, bodyPaint, GREY, alpha)
+            }
+            who.isNotBlank() -> text(canvas, who, tx, y, rr - tx, titlePaint, Color.WHITE, alpha)
+            else -> text(canvas, what, tx, y, rr - tx, bodyPaint, Color.WHITE, alpha)
+        }
     }
 
     private fun drawCallExpanded(canvas: Canvas, a: LiveActivity, alpha: Int) {
@@ -2522,6 +2609,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     a.durationMs > 0L && abs(e.y - barY) < dp(16f) &&
                     e.x >= barLeft - dp(12f) && e.x <= barRight + dp(12f)
                 if (seeking) seekFraction = fractionAt(e.x)
+                // Touching the dots ripples them out from your finger, as in the full player.
+                if (a != null && usesDots(a) && !reduceMotion && !touchingSecondary) { cardDots.ripple(0.9f, e.x, e.y); kick() }
                 // Only the slider row drags; the ringer buttons below it are taps.
                 volumeDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.VOLUME &&
                     e.y < rect.top + dp(VOLUME_HEIGHT_DP) + dp(2f)
@@ -2756,6 +2845,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val SHEEN_MS = 800L
         private const val INTRO_HOLD_MS = 190L
         private const val RETURN_HOLD_MS = 110L
+        private const val LANDSCAPE_BODY = 0.55f
         private const val ROLL_MS = 240L
         private const val OUTLINE_EVENT_MS = 4_000L
         private const val RINGER_HEIGHT_DP = 46f

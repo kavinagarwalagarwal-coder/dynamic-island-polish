@@ -85,6 +85,66 @@ class IslandRenderingTest {
         bitmap.recycle()
     }
 
+    /**
+     * The real island, playing music with dots on: the beat's ring of light must visibly sweep the
+     * dot field (brightness rises and falls frame to frame, and its brightest spot moves).
+     */
+    @Test fun dotFieldRippleIsVisibleInTheRealIsland() {
+        val art = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).also { b ->
+            for (y in 0 until 64) for (x in 0 until 64) b.setPixel(x, y, android.graphics.Color.rgb(40 + x * 3, 30 + y * 2, 120))
+        }
+        val music = LiveActivity("ripple", "music.test", IslandMode.MUSIC, "Ripple song", "Artist", "Player", null, art,
+            0xFFFFFFFF.toInt(), isPlaying = true, durationMs = 200_000L)
+        val totals = ArrayList<Long>(); val peaks = ArrayList<Int>()
+        var rippled = 0; var diag = ""
+        launchPlayground().use { scenario ->
+            scenario.onActivity { activity ->
+                val view = findIsland(activity.window.decorView)!!
+                view.applyFit(IslandFit(alignCamera = false)); view.setSecondary(null); view.show(music, Presentation.COMPACT)
+            }
+            SystemClock.sleep(1500)
+            val done = CountDownLatch(1)
+            scenario.onActivity { activity ->
+                val view = findIsland(activity.window.decorView)!!
+                val dp = view.resources.displayMetrics.density
+                var index = 0
+                val callback = object : android.view.Choreographer.FrameCallback {
+                    override fun doFrame(time: Long) {
+                        val rect = RectF(field<RectF>(view, "rect"))
+                        val b = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+                        view.draw(android.graphics.Canvas(b))
+                        val x0 = (rect.left + 34f * dp).toInt().coerceIn(0, b.width - 1)
+                        val x1 = (rect.right - 34f * dp).toInt().coerceIn(x0 + 1, b.width)
+                        val y0 = rect.top.toInt().coerceIn(0, b.height - 1)
+                        val y1 = rect.bottom.toInt().coerceIn(y0 + 1, b.height)
+                        var total = 0L; var best = -1L; var bestX = 0
+                        for (x in x0 until x1) {
+                            var col = 0L
+                            for (y in y0 until y1) col += android.graphics.Color.red(b.getPixel(x, y))
+                            total += col
+                            if (col > best) { best = col; bestX = x - x0 }
+                        }
+                        b.recycle()
+                        totals.add(total); peaks.add(bestX)
+                        val dots = field<IslandDots>(view, "cardDots")
+                        if (dots.rippling) rippled++
+                        if (index == 0) diag = "reduceMotion=" + field<Boolean>(view, "reduceMotion") +
+                            " rect=" + rect.toShortString() + " strip=" + x0 + ".." + x1
+                        if (++index < 90) android.view.Choreographer.getInstance().postFrameCallback(this) else done.countDown()
+                    }
+                }
+                android.view.Choreographer.getInstance().postFrameCallback(callback)
+            }
+            assertTrue(done.await(20, TimeUnit.SECONDS))
+        }
+        val lo = totals.minOrNull()!!; val hi = totals.maxOrNull()!!; val mean = totals.average()
+        val summary = "$diag frames=${totals.size} rippling=$rippled lo=$lo hi=$hi mean=${mean.toLong()} " +
+            "peaks=" + peaks.filterIndexed { i, _ -> i % 6 == 0 }.joinToString(",")
+        assertTrue("Ripples never ran: $summary", rippled > 20)
+        assertTrue("Ripple barely changes the field: $summary", hi - lo > mean * 0.25)
+        assertTrue("Brightest spot never moves: $summary", peaks.distinct().size > 6)
+    }
+
     @Test fun returnFromAppGrowsOutOfTheCamera() {
         val music = LiveActivity("handoff", "music.test", IslandMode.MUSIC, "Reference motion", "Local notification card", "Player", null, null,
             0xFFFFFFFF.toInt(), isPlaying = false)
@@ -162,8 +222,12 @@ class IslandRenderingTest {
                     val view = findIsland(activity.window.decorView)!!
                     view.setSecondary(timer); view.show(music, Presentation.COMPACT)
                     var index = 0
+                    // Draw every frame ourselves: on a slow emulator the window may skip frames, and the
+                    // neck only exists while a frame is being drawn.
+                    val probe = Bitmap.createBitmap(view.width, (90 * view.resources.displayMetrics.density).toInt(), Bitmap.Config.ARGB_8888)
                     val callback = object : android.view.Choreographer.FrameCallback {
                         override fun doFrame(time: Long) {
+                            view.draw(android.graphics.Canvas(probe))
                             connected = connected || !field<android.graphics.Path>(view, "dropNeck").isEmpty
                             val g = field<IslandDropGeometry>(view, "dropGeometry")
                             dropped = dropped || g.centerY > view.resources.displayMetrics.density * 28f

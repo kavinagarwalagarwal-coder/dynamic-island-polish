@@ -347,4 +347,18 @@
     <string name="action_previous">前の曲</string>
     <string name="dot_island">アイランドにドット</string>
     <string name="dot_island_note">再生中、アイランドのアルバムアートが回転する小さなドットのレコードに、波形がドットのイコライザーになります。カードを開くと大きなレコードに。跳ねるドットのリングの中でビートに合わせて波打ち、曲が変わると弾けて次のジャケットに組み変わります。</string>
+    <string name="feature_show_music">音楽</string>
+    <string name="feature_show_calls">通話</string>
+    <string name="feature_calls_fullscreen">全画面アプリの上に通話を表示</string>
+    <string name="feature_calls_fullscreen_note">縦向きのみ。横向き（ゲーム、映画）では通話が画面を覆わず、電話の通話ポップアップが対応します。</string>
+    <string name="feature_show_messages">通知</string>
+    <string name="feature_show_messages_note">オフにすると電話の通知ポップアップのままになります。</string>
+    <string name="feature_show_timers">タイマーとストップウォッチ</string>
+    <string name="feature_show_navigation">ナビ</string>
+    <string name="feature_show_charging">充電</string>
+    <string name="feature_glow_open">開いたときだけ光らせる</string>
+    <string name="feature_camera_fade">カメラに溶け込ませる</string>
+    <string name="feature_camera_fade_note">カメラ穴の周りで内容がなめらかに黒へ溶け、裏に隠れるものがなくなります。</string>
+    <string name="feature_landscape">横向きで透過</string>
+    <string name="feature_landscape_note">隠すカメラがない横向きでは、ゲームや動画が透けて見えます。</string>
 </resources>

@@ -166,6 +166,7 @@ class IslandAccessibilityService : AccessibilityService() {
     fun swipeAwayPopup(title: String, text: String) {
         if (title.length < 2 && text.length < 2) return
         popupHunt?.let(handler::removeCallbacks)
+        lastPopupCard = null
         val deadline = SystemClock.uptimeMillis() + POPUP_SEARCH_MS
         popupHunt = object : Runnable {
             override fun run() {
@@ -174,6 +175,8 @@ class IslandAccessibilityService : AccessibilityService() {
             }
         }.also { handler.postDelayed(it, 60L) }
     }
+
+    private var lastPopupCard: Rect? = null
 
     /** True when done: the pop-up was swiped away, or there is nothing sensible to do. */
     private fun tryDismissPopup(title: String, text: String): Boolean {
@@ -193,6 +196,9 @@ class IslandAccessibilityService : AccessibilityService() {
                 val card = cardBounds(hit, metrics.heightPixels * 0.35f)
                 // Pop-up cards are a few lines tall; the status bar itself is not.
                 if (card.height() < minCard || card.top > maxTop) continue
+                // Wait until the pop-up has finished sliding in: a swipe on a card that's still
+                // moving can be read by System UI as a pull on the shade instead of a dismissal.
+                if (card != lastPopupCard) { lastPopupCard = card; return false }
                 swipeUp(card)
                 return true
             }

@@ -347,4 +347,18 @@
     <string name="action_previous">Предыдущая песня</string>
     <string name="dot_island">Точки в острове</string>
     <string name="dot_island_note">Пока играет музыка, обложка в острове становится маленькой вращающейся пластинкой из точек, а волна — эквалайзером из точек. Откройте карточку, чтобы увидеть большую пластинку: она колышется в такт внутри кольца прыгающих точек и рассыпается в новую обложку при смене песни.</string>
+    <string name="feature_show_music">Музыка</string>
+    <string name="feature_show_calls">Звонки</string>
+    <string name="feature_calls_fullscreen">Звонки поверх полноэкранных приложений</string>
+    <string name="feature_calls_fullscreen_note">Только в портретной ориентации. В альбомной (игры, фильмы) звонки не закрывают экран; их принимает окно звонка телефона.</string>
+    <string name="feature_show_messages">Уведомления</string>
+    <string name="feature_show_messages_note">Выключено — остаются всплывающие уведомления телефона.</string>
+    <string name="feature_show_timers">Таймеры и секундомеры</string>
+    <string name="feature_show_navigation">Навигация</string>
+    <string name="feature_show_charging">Зарядка</string>
+    <string name="feature_glow_open">Свечение только в открытом виде</string>
+    <string name="feature_camera_fade">Растворение в камере</string>
+    <string name="feature_camera_fade_note">Содержимое плавно темнеет до чёрного вокруг камеры, и за ней ничего не прячется.</string>
+    <string name="feature_landscape">Прозрачный в альбомной ориентации</string>
+    <string name="feature_landscape_note">Когда камеру прятать не нужно, остров пропускает игры и видео.</string>
 </resources>

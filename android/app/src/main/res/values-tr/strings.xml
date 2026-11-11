@@ -347,4 +347,18 @@
     <string name="action_previous">Önceki şarkı</string>
     <string name="dot_island">Adada noktalar</string>
     <string name="dot_island_note">Müzik çalarken adadaki albüm kapağı küçük, dönen bir nokta plağına, dalga da nokta ekolayzıra dönüşür. Büyük plak için kartı açın: zıplayan noktalardan bir halkanın içinde ritimle dalgalanır ve şarkı değişince dağılıp yeni kapağa dönüşür.</string>
+    <string name="feature_show_music">Müzik</string>
+    <string name="feature_show_calls">Aramalar</string>
+    <string name="feature_calls_fullscreen">Tam ekran uygulamaların üstünde aramalar</string>
+    <string name="feature_calls_fullscreen_note">Yalnızca dikeyde. Yatayda (oyun, film) aramalar ekranı kapatmaz; telefonun kendi arama penceresi devralır.</string>
+    <string name="feature_show_messages">Bildirimler</string>
+    <string name="feature_show_messages_note">Kapalıyken telefonun kendi bildirim pencereleri kalır.</string>
+    <string name="feature_show_timers">Zamanlayıcılar ve kronometreler</string>
+    <string name="feature_show_navigation">Navigasyon</string>
+    <string name="feature_show_charging">Şarj</string>
+    <string name="feature_glow_open">Parıltı yalnızca açıkken</string>
+    <string name="feature_camera_fade">Kameraya karışma</string>
+    <string name="feature_camera_fade_note">İçerik kamera deliğinin çevresinde yumuşakça siyaha döner, arkasında hiçbir şey kalmaz.</string>
+    <string name="feature_landscape">Yatayda saydam</string>
+    <string name="feature_landscape_note">Kapatacak kamera yokken ada oyunları ve videoları gösterir.</string>
 </resources>
