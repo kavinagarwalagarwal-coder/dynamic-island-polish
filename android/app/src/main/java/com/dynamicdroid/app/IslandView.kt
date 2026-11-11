@@ -936,7 +936,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             // The small island's waveform reads fine at 30 fps; the open card's progress bar gets 60.
             a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else 33L
             // A tap's ripple (or a burst between songs) finishes even while paused.
-            usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling) -> 16L
+            usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling || fieldFading) -> 16L
             a.mode == IslandMode.CALL -> 33L
             a.mode == IslandMode.ALARM -> 33L
             a.clockBaseElapsed != null && a.pausedTimerMs == null -> {
@@ -972,6 +972,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         running = false
         liquidGlass.release()
         morphCard = null; softMorphCard = null
+        fieldCompact.release(); fieldCard.release(); oldCompact.release(); oldCard.release(); fieldVersion = -1
         super.onDetachedFromWindow()
     }
 
@@ -1789,25 +1790,58 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
      * Dot music: the whole island in white dots with the cover carved into them, breathing and
      * rippling with the record. Kept faint enough that the title and controls read on top.
      */
+    // The field is baked once per island size and cover into two layers (the small pill and the
+    // open card) and crossfaded as the island opens, so its dots stay put while the shape flows
+    // over them; only the beat ripples are drawn live. A new cover fades in over the old layers.
+    private var fieldCompact = IslandDotField.Layer()
+    private var fieldCard = IslandDotField.Layer()
+    private var oldCompact = IslandDotField.Layer()
+    private var oldCard = IslandDotField.Layer()
+    private var fieldVersion = -1
+    private var fieldFadeAt = 0L
+    private val fieldFading get() = SystemClock.uptimeMillis() - fieldFadeAt < FIELD_FADE_MS
+
     private fun drawDotField(canvas: Canvas, a: LiveActivity, bodyAlpha: Float) {
         fieldA.target = if (a.isPlaying) 1f else 0.4f
         val show = fieldA.value.coerceIn(0f, 1f)
         if (show < 0.01f || bodyAlpha < 2f) return
         advanceDots(a)
+        val version = dotField.coverVersion
+        if (version != fieldVersion) {
+            if (fieldVersion != -1 && !reduceMotion) {
+                oldCompact.release(); oldCard.release()
+                oldCompact = fieldCompact.also { fieldCompact = oldCompact }
+                oldCard = fieldCard.also { fieldCard = oldCard }
+                fieldFadeAt = SystemClock.uptimeMillis()
+            }
+            fieldVersion = version
+        }
         val open = expandedA.value.coerceIn(0f, 1f)
-        val strength = (0.6f - 0.24f * open) * show
-        val pitch = dp(4.5f + 1.8f * open)
-        // Ripples start at the record (left of the small island, top-left of the open card), and
-        // the field is carved away around it so the record sits in its own clearing.
-        val compactX = rect.left + dp(7f) + dp(11f)
-        val compactY = rect.centerY()
-        val cardX = rect.left + dp(22f) + dp(29f)
-        val cardY = rect.top + dp(22f) + dp(29f)
-        val ox = compactX + (cardX - compactX) * open
-        val oy = compactY + (cardY - compactY) * open
-        val hole = dp(14.5f + 18.5f * open)
-        dotField.draw(canvas, fillPaint, rect.left, rect.top, rect.right, rect.bottom, pitch, cardDots, a.isPlaying,
-            (bodyAlpha * strength).toInt(), peak = (bodyAlpha * 0.95f * show).toInt(), ox = ox, oy = oy, hole = hole)
+        val compact = specFor(Presentation.COMPACT, a)
+        val card = specFor(Presentation.EXPANDED, a)
+        val scale = fit.scale
+        dotField.bake(fieldCompact, compact.w, compact.h, dp(4.5f), dp(18f), compact.h / 2f, dp(14.5f), scale)
+        dotField.bake(fieldCard, card.w, card.h, dp(6.3f), dp(51f), dp(51f), dp(33f), scale)
+        val fade = if (fieldFading) ((SystemClock.uptimeMillis() - fieldFadeAt) / FIELD_FADE_MS.toFloat()).coerceIn(0f, 1f)
+            else { oldCompact.release(); oldCard.release(); 1f }
+        // Anchored to the island's centre and top, so the dots hold still as the shape grows.
+        val cx = rect.centerX()
+        val top = rect.top
+        val compactAlpha = bodyAlpha * 0.6f * show * (1f - open)
+        val cardAlpha = bodyAlpha * 0.36f * show * open
+        if (fade < 1f) {
+            dotField.drawLayer(canvas, fillPaint, oldCompact, cx - oldCompact.w / 2f, top, (compactAlpha * (1f - fade)).toInt())
+            dotField.drawLayer(canvas, fillPaint, oldCard, cx - oldCard.w / 2f, top, (cardAlpha * (1f - fade)).toInt())
+        }
+        dotField.drawLayer(canvas, fillPaint, fieldCompact, cx - compact.w / 2f, top, (compactAlpha * fade).toInt())
+        dotField.drawLayer(canvas, fillPaint, fieldCard, cx - card.w / 2f, top, (cardAlpha * fade).toInt())
+        // Ripples start at the record (left of the small island, top-left of the open card).
+        val ox = rect.left + dp(18f) + (dp(51f) - dp(18f)) * open
+        val oy = rect.centerY() + (rect.top + dp(51f) - rect.centerY()) * open
+        val reach = max(1f, kotlin.math.hypot(max(ox - rect.left, rect.right - ox), max(oy - rect.top, rect.bottom - oy)))
+        val layer = if (open > 0.5f) fieldCard else fieldCompact
+        dotField.drawRipples(canvas, fillPaint, layer, cx - layer.w / 2f, top, cardDots, ox, oy, reach,
+            (bodyAlpha * 0.95f * show).toInt())
     }
 
     private fun drawArtBackdrop(canvas: Canvas, bodyAlpha: Float) {
@@ -2881,6 +2915,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val INTRO_HOLD_MS = 190L
         private const val RETURN_HOLD_MS = 110L
         private const val LANDSCAPE_BODY = 0.55f
+        private const val FIELD_FADE_MS = 900L
         private const val ROLL_MS = 240L
         private const val OUTLINE_EVENT_MS = 4_000L
         private const val RINGER_HEIGHT_DP = 46f
