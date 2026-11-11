@@ -130,6 +130,18 @@ except Exception as error:
         crash = adb("logcat", "-d", "-s", "AndroidRuntime:E")[-1500:]
     except Exception:
         pass
+    try:
+        pid = adb("shell", "pidof", PACKAGE).strip()
+        app_log = adb("logcat", "-d", "--pid=" + pid) if pid else ""
+        print("---- app log (last 120 lines) ----")
+        print("\n".join(app_log.splitlines()[-120:]))
+        a11y = adb("shell", "dumpsys", "accessibility")
+        print("---- accessibility ----")
+        print("\n".join(l for l in a11y.splitlines() if "dynamicdroid" in l or "Bound services" in l or "Enabled services" in l)[:3000])
+        print("---- notification listeners ----")
+        print("\n".join(l for l in adb("shell", "dumpsys", "notification").splitlines() if "dynamicdroid" in l)[:3000])
+    except Exception as diag:
+        print("diagnostics:", diag)
     summary = f"{type(error).__name__}: {error} | {crash}".replace("%", "%25").replace("\n", " | ")
     print(f"::error title=Optimized smoke failed::{summary[:3800]}")
     raise
