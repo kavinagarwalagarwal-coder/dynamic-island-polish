@@ -257,7 +257,26 @@ class IslandDots(private val n: Int) {
     }
 
     /** True while any ripple is still crossing the island. */
-    val rippling: Boolean get() = rippleT.any { t - it in 0f..RIPPLE_LIFE }
+    val rippling: Boolean get() {
+        for (j in rippleT.indices) { val age = t - rippleT[j]; if (age >= 0f && age <= RIPPLE_LIFE) return true }
+        return false
+    }
+
+    /**
+     * Where the live ripples' rings are, for skipping dots they can't touch: fills [fronts] with
+     * each record ripple's ring distance (0..1+) and returns how many; -1 if a touch ripple is
+     * live (its rings aren't centred on the record, so nothing can be skipped).
+     */
+    fun recordFronts(fronts: FloatArray): Int {
+        var n = 0
+        for (j in rippleT.indices) {
+            val age = t - rippleT[j]
+            if (age < 0f || age > RIPPLE_LIFE) continue
+            if (!rippleX[j].isNaN()) return -1
+            fronts[n++] = age * 1.25f
+        }
+        return n
+    }
 
     /** The record, [radius] pixels, centred on ([cx], [cy]). */
     fun drawRecord(canvas: Canvas, paint: Paint, cx: Float, cy: Float, radius: Float, playing: Boolean, alpha: Int) {
@@ -416,6 +435,8 @@ class IslandDotField {
         var bitmap: Bitmap? = null
         var w = 0f; var h = 0f; var pitch = 0f; var holeX = 0f; var holeY = 0f; var hole = 0f
         var scale = 0f; var version = -1
+        /** The build in progress, so the same layer isn't requested twice. */
+        var pending: String? = null
         fun matches(w: Float, h: Float, pitch: Float, holeX: Float, holeY: Float, hole: Float, scale: Float, version: Int) =
             bitmap != null && this.version == version && abs(this.w - w) < 0.5f && abs(this.h - h) < 0.5f &&
                 this.pitch == pitch && abs(this.holeX - holeX) < 0.5f && abs(this.holeY - holeY) < 0.5f &&
@@ -427,13 +448,9 @@ class IslandDotField {
     /** Bumped whenever the cover changes, so cached layers rebuild. */
     private var version = 0
     val coverVersion: Int get() = version
-    private val bake = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
 
     /** Coverage (0..1) of the halftone cell at [u],[v] in the cover, for the current cover. */
-    private fun coverage(u: Float, v: Float): Float {
-        val i = (v.coerceIn(0f, 0.999f) * size).toInt() * size + (u.coerceIn(0f, 0.999f) * size).toInt()
-        return cov[i]
-    }
+    private fun coverage(u: Float, v: Float): Float = coverageOf(cov, u, v)
 
     private fun cells(w: Float, h: Float, pitch: Float) =
         Triple((w / pitch).toInt() + 1, (h / pitch).toInt() + 1, max(w, h))
@@ -442,16 +459,41 @@ class IslandDotField {
      * Makes sure [layer] holds the field for a [w]×[h] island (local units, drawn at [scale]
      * pixels per unit) with dots [pitch] apart and a clearing of radius [hole] around
      * ([holeX], [holeY]) for the record. Rebuilt only when one of those or the cover changes.
+     * With [async] the dots are drawn on a worker thread (the old layer keeps showing meanwhile)
+     * and [onReady] runs on the main thread once the new one is in place.
      */
-    fun bake(layer: Layer, w: Float, h: Float, pitch: Float, holeX: Float, holeY: Float, hole: Float, scale: Float) {
+    fun bake(layer: Layer, w: Float, h: Float, pitch: Float, holeX: Float, holeY: Float, hole: Float, scale: Float,
+             async: Boolean = false, onReady: () -> Unit = {}) {
         if (!ready || w < pitch || h < pitch) return
         if (layer.matches(w, h, pitch, holeX, holeY, hole, scale, version)) return
-        layer.release()
+        val key = "$w|$h|$pitch|$holeX|$holeY|$hole|$scale|$version"
+        if (layer.pending == key) return
+        layer.pending = key
+        val coverage = cov.copyOf()
+        val v = version
+        val job: () -> Unit = {
+            val bitmap = render(coverage, w, h, pitch, holeX, holeY, hole, scale)
+            val apply: () -> Unit = {
+                if (layer.pending == key && bitmap != null) {
+                    layer.bitmap = bitmap
+                    layer.w = w; layer.h = h; layer.pitch = pitch; layer.holeX = holeX; layer.holeY = holeY
+                    layer.hole = hole; layer.scale = scale; layer.version = v; layer.pending = null
+                    onReady()
+                }
+            }
+            if (async) main.post { apply() } else apply()
+        }
+        if (async) worker.execute { job() } else job()
+    }
+
+    private fun render(coverage: FloatArray, w: Float, h: Float, pitch: Float, holeX: Float, holeY: Float,
+                       hole: Float, scale: Float): Bitmap? {
         val bw = (w * scale).toInt().coerceAtLeast(1)
         val bh = (h * scale).toInt().coerceAtLeast(1)
-        val bitmap = runCatching { Bitmap.createBitmap(bw, bh, Bitmap.Config.ALPHA_8) }.getOrNull() ?: return
+        val bitmap = runCatching { Bitmap.createBitmap(bw, bh, Bitmap.Config.ALPHA_8) }.getOrNull() ?: return null
         val canvas = Canvas(bitmap)
         canvas.scale(scale, scale)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
         val (cols, rows, side) = cells(w, h, pitch)
         val gx = (w - (cols - 1) * pitch) / 2f
         val gy = (h - (rows - 1) * pitch) / 2f
@@ -463,7 +505,7 @@ class IslandDotField {
             val py = gy + yy * pitch
             for (xx in 0 until cols) {
                 val px = gx + xx * pitch
-                val c = coverage(u0 + px / side, v0 + py / side)
+                val c = coverageOf(coverage, u0 + px / side, v0 + py / side)
                 var fade = 1f
                 if (hole > 0f) {
                     val dx = px - holeX; val dy = py - holeY
@@ -473,16 +515,27 @@ class IslandDotField {
                 }
                 val a = 255f * (0.12f + 0.88f * c) * fade
                 if (a < 3f) continue
-                bake.alpha = a.toInt().coerceIn(0, 255)
-                canvas.drawCircle(px, py, min(pitch * (0.07f + 0.31f * c), pitch * 0.55f), bake)
+                paint.alpha = a.toInt().coerceIn(0, 255)
+                canvas.drawCircle(px, py, min(pitch * (0.07f + 0.31f * c), pitch * 0.55f), paint)
             }
         }
-        layer.bitmap = bitmap
-        layer.w = w; layer.h = h; layer.pitch = pitch; layer.holeX = holeX; layer.holeY = holeY; layer.hole = hole
-        layer.scale = scale; layer.version = version
+        return bitmap
+    }
+
+    private fun coverageOf(coverage: FloatArray, u: Float, v: Float): Float {
+        val i = (v.coerceIn(0f, 0.999f) * size).toInt() * size + (u.coerceIn(0f, 0.999f) * size).toInt()
+        return coverage[i]
+    }
+
+    private companion object {
+        val worker: java.util.concurrent.ExecutorService = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+            Thread(r, "island-dots").apply { isDaemon = true; priority = Thread.NORM_PRIORITY - 1 }
+        }
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
     }
 
     private val dst = android.graphics.RectF()
+    private val fronts = FloatArray(4)
 
     /** Blits [layer] with its top-left at ([left], [top]); [alpha] is the field's strength. */
     fun drawLayer(canvas: Canvas, paint: Paint, layer: Layer, left: Float, top: Float, alpha: Int) {
@@ -510,6 +563,7 @@ class IslandDotField {
         val v0 = (side - h) / 2f / side
         val holeX = left + layer.holeX; val holeY = top + layer.holeY
         val holeOut2 = (layer.hole * 1.3f).let { it * it }
+        val count = dots.recordFronts(fronts)
         paint.color = Color.WHITE
         for (yy in 0 until rows) {
             val py = gy + yy * pitch
@@ -517,6 +571,12 @@ class IslandDotField {
                 val px = gx + xx * pitch
                 val dx = px - ox; val dy = py - oy
                 val dist = sqrt(dx * dx + dy * dy) / reach
+                if (count >= 0) {
+                    // Most dots are nowhere near a ring: skip them with one comparison each.
+                    var near = false
+                    for (k in 0 until count) if (abs(fronts[k] - dist) < 0.2f) { near = true; break }
+                    if (!near) continue
+                }
                 val lit = min(1f, dots.light(px, py, ox, oy, reach, dist))
                 if (lit < 0.06f) continue
                 val hx = px - holeX; val hy = py - holeY

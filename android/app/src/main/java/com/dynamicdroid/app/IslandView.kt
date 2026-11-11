@@ -1820,8 +1820,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val compact = specFor(Presentation.COMPACT, a)
         val card = specFor(Presentation.EXPANDED, a)
         val scale = fit.scale
-        dotField.bake(fieldCompact, compact.w, compact.h, dp(4.5f), dp(18f), compact.h / 2f, dp(14.5f), scale)
-        dotField.bake(fieldCard, card.w, card.h, dp(6.3f), dp(51f), dp(51f), dp(33f), scale)
+        // Drawn on a worker thread, so a new song or size never costs a frame here.
+        dotField.bake(fieldCompact, compact.w, compact.h, dp(4.5f), dp(18f), compact.h / 2f, dp(14.5f), scale, async = true, onReady = ::kick)
+        dotField.bake(fieldCard, card.w, card.h, dp(6.3f), dp(51f), dp(51f), dp(33f), scale, async = true, onReady = ::kick)
         val fade = if (fieldFading) ((SystemClock.uptimeMillis() - fieldFadeAt) / FIELD_FADE_MS.toFloat()).coerceIn(0f, 1f)
             else { oldCompact.release(); oldCard.release(); 1f }
         // Anchored to the island's centre and top, so the dots hold still as the shape grows.
