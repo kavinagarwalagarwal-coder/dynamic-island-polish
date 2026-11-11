@@ -36,7 +36,7 @@ class IslandPerfTest {
         for (y in 0 until 128) for (x in 0 until 128) b.setPixel(x, y, Color.rgb(40 + x, 30 + y, 140))
     }
 
-    private data class Run(val name: String, val avg: Double, val max: Double, val frames: Int, val gaps: Int)
+    private data class Run(val name: String, val avg: Double, val max: Double, val frames: Int, val gaps: Int, val parts: String)
 
     private fun measure(scenario: ActivityScenario<MainActivity>, name: String, dots: Boolean): Run {
         val music = LiveActivity("perf", "music.test", IslandMode.MUSIC, "Perf song", "Artist", "Player", null, art(),
@@ -50,6 +50,7 @@ class IslandPerfTest {
         SystemClock.sleep(1200)
         val times = ArrayList<Double>()
         var gaps = 0
+        DrawProfile.reset(); DrawProfile.enabled = true
         val done = CountDownLatch(1)
         scenario.onActivity { activity ->
             val view = findIsland(activity.window.decorView)!!
@@ -72,9 +73,12 @@ class IslandPerfTest {
             android.view.Choreographer.getInstance().postFrameCallback(callback)
         }
         assertTrue(done.await(15, TimeUnit.SECONDS))
+        DrawProfile.enabled = false
+        // The island also draws itself in its window each frame, so parts count both draws.
+        val parts = DrawProfile.summary(times.size)
         scenario.onActivity { activity -> findIsland(activity.window.decorView)!!.show(music, Presentation.COMPACT) }
         SystemClock.sleep(800)
-        return Run(name, times.average(), times.maxOrNull() ?: 0.0, times.size, gaps)
+        return Run(name, times.average(), times.maxOrNull() ?: 0.0, times.size, gaps, parts)
     }
 
     @Test fun openingTheMusicIslandStaysWithinAFrame() {
@@ -95,7 +99,7 @@ class IslandPerfTest {
             runs += measure(scenario, "dots-again", dots = true)
         }
         val summary = runs.joinToString(" ; ") {
-            "%s avg=%.2fms max=%.2fms frames=%d late=%d".format(it.name, it.avg, it.max, it.frames, it.gaps)
+            "%s avg=%.2fms max=%.2fms frames=%d late=%d [%s]".format(it.name, it.avg, it.max, it.frames, it.gaps, it.parts)
         }
         if (report) throw AssertionError("PERF $summary")
         assertTrue("Drawing the opening island is too slow: $summary", runs.all { it.avg < 8.0 })

@@ -153,7 +153,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun usesDots(a: LiveActivity?) = features.dotMusic && a?.mode == IslandMode.MUSIC
 
     /** Once per frame: feed the cover to both records and move them along. */
-    private fun advanceDots(a: LiveActivity) {
+    private fun advanceDots(a: LiveActivity) = DrawProfile.span("step") { advanceDotsNow(a) }
+
+    private fun advanceDotsNow(a: LiveActivity) {
         val now = SystemClock.uptimeMillis()
         val song = a.key + "|" + a.title + "|" + a.subtitle
         val changed = dotSong != null && dotSong != song
@@ -1026,7 +1028,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     override fun onDraw(canvas: Canvas) {
         val saves = canvas.saveCount
-        try { drawIsland(canvas) } catch (t: Throwable) {
+        try { DrawProfile.span("total") { drawIsland(canvas) } } catch (t: Throwable) {
             // A drawing error loses one frame, not the island.
             canvas.restoreToCount(saves)
             CrashLog.caught(context, "draw ${activity?.mode} ${presentation}", t)
@@ -1476,8 +1478,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             advanceDots(a)
             val acx = l + art / 2f
             val acy = t + art / 2f
+            DrawProfile.span("record") {
             cardDots.drawRing(canvas, fillPaint, acx, acy, dp(23.5f), dp(2.6f), dp(1.05f), 3, userAccent ?: a.accent, a.isPlaying, alpha)
             cardDots.drawRecord(canvas, fillPaint, acx, acy, dp(21.5f), a.isPlaying, alpha)
+            }
         } else drawArtwork(canvas, a, l, t, art, dp(14f), alpha)
         musicArtHit.set(l - dp(6f), t - dp(6f), l + art + dp(6f), t + art + dp(6f))
         val tx = l + art + dp(14f)
@@ -1821,8 +1825,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val card = specFor(Presentation.EXPANDED, a)
         val scale = fit.scale
         // Drawn on a worker thread, so a new song or size never costs a frame here.
+        DrawProfile.span("bake") {
         dotField.bake(fieldCompact, compact.w, compact.h, dp(4.5f), dp(18f), compact.h / 2f, dp(14.5f), scale, async = true, onReady = ::kick)
         dotField.bake(fieldCard, card.w, card.h, dp(6.3f), dp(51f), dp(51f), dp(33f), scale, async = true, onReady = ::kick)
+        }
         val fade = if (fieldFading) ((SystemClock.uptimeMillis() - fieldFadeAt) / FIELD_FADE_MS.toFloat()).coerceIn(0f, 1f)
             else { oldCompact.release(); oldCard.release(); 1f }
         // Anchored to the island's centre and top, so the dots hold still as the shape grows.
@@ -1830,19 +1836,21 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val top = rect.top
         val compactAlpha = bodyAlpha * 0.6f * show * (1f - open)
         val cardAlpha = bodyAlpha * 0.36f * show * open
+        DrawProfile.span("layers") {
         if (fade < 1f) {
             dotField.drawLayer(canvas, fillPaint, oldCompact, cx - oldCompact.w / 2f, top, (compactAlpha * (1f - fade)).toInt())
             dotField.drawLayer(canvas, fillPaint, oldCard, cx - oldCard.w / 2f, top, (cardAlpha * (1f - fade)).toInt())
         }
         dotField.drawLayer(canvas, fillPaint, fieldCompact, cx - compact.w / 2f, top, (compactAlpha * fade).toInt())
         dotField.drawLayer(canvas, fillPaint, fieldCard, cx - card.w / 2f, top, (cardAlpha * fade).toInt())
+        }
         // Ripples start at the record (left of the small island, top-left of the open card).
         val ox = rect.left + dp(18f) + (dp(51f) - dp(18f)) * open
         val oy = rect.centerY() + (rect.top + dp(51f) - rect.centerY()) * open
         val reach = max(1f, kotlin.math.hypot(max(ox - rect.left, rect.right - ox), max(oy - rect.top, rect.bottom - oy)))
         val layer = if (open > 0.5f) fieldCard else fieldCompact
-        dotField.drawRipples(canvas, fillPaint, layer, cx - layer.w / 2f, top, cardDots, ox, oy, reach,
-            (bodyAlpha * 0.95f * show).toInt())
+        DrawProfile.span("ripples") { dotField.drawRipples(canvas, fillPaint, layer, cx - layer.w / 2f, top, cardDots, ox, oy, reach,
+            (bodyAlpha * 0.95f * show).toInt()) }
     }
 
     private fun drawArtBackdrop(canvas: Canvas, bodyAlpha: Float) {
