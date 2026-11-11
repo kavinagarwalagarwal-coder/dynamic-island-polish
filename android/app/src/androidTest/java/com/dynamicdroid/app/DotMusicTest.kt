@@ -124,8 +124,9 @@ class DotMusicTest {
             val pill = Bitmap.createBitmap(360, 90, Bitmap.Config.ARGB_8888)
             drawField(android.graphics.Canvas(pill), 12f, dots, 255, 255, 0f)
             val fp = IntArray(360 * 90).also { pill.getPixels(it, 0, 360, 0, 0, 360, 90) }
-            val left = fp.indices.count { it % 360 < 40 && Color.alpha(fp[it]) > 60 }
-            val right = fp.indices.count { it % 360 > 320 && Color.alpha(fp[it]) > 60 }
+            // The darkest parts of the cover are faint dots (about 12% white), so look for any dot.
+            val left = fp.indices.count { it % 360 < 40 && Color.alpha(fp[it]) > 15 }
+            val right = fp.indices.count { it % 360 > 320 && Color.alpha(fp[it]) > 15 }
             assertTrue("Dot field should reach both ends of the island ($left, $right)", left > 50 && right > 50)
 
             // A beat sends a visible ring of light out from the record across the field, and the
