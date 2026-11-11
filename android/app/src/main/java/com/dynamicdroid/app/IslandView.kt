@@ -646,6 +646,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val cx = cameraCenter()
         val cy = restingTop() + r
         val outer = r * 2.6f
+        if (!(outer > 1f)) return
         if (cx + outer < rect.left || cx - outer > rect.right || cy + outer < rect.top || cy - outer > rect.bottom) return
         var shader = fadeShader
         if (shader == null || fadeShaderR != outer) {
@@ -678,7 +679,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
      */
     private fun buildBody(path: Path, box: RectF, radius: Float, bendY: Float, bendX: Float) {
         path.reset()
-        val rad = min(radius, min(box.width(), box.height()) / 2f)
+        if (!(box.width() > 0f && box.height() > 0f)) return
+        val rad = min(radius, min(box.width(), box.height()) / 2f).coerceAtLeast(0f)
         if (abs(bendY) < 0.3f && abs(bendX) < 0.3f) { path.addRoundRect(box, rad, rad, Path.Direction.CW); return }
         val l = box.left; val t = box.top; val rr = box.right; val b = box.bottom
         val cx = box.centerX(); val cy = box.centerY()
