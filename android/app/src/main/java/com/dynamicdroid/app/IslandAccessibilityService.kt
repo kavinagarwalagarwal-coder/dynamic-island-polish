@@ -168,6 +168,7 @@ class IslandAccessibilityService : AccessibilityService() {
         popupHunt?.let(handler::removeCallbacks)
         lastPopupCard = null
         swipes = 0
+        sightings = 0
         val deadline = SystemClock.uptimeMillis() + POPUP_SEARCH_MS
         popupHunt = object : Runnable {
             override fun run() {
@@ -181,6 +182,7 @@ class IslandAccessibilityService : AccessibilityService() {
 
     private var lastPopupCard: Rect? = null
     private var swipes = 0
+    private var sightings = 0
     private var lastSwipeAt = 0L
 
     /** True when done: the pop-up was swiped away, or there is nothing sensible to do. */
@@ -202,9 +204,11 @@ class IslandAccessibilityService : AccessibilityService() {
                 val card = cardBounds(hit, metrics.heightPixels * 0.35f)
                 // Pop-up cards are a few lines tall; the status bar itself is not.
                 if (card.height() < minCard || card.top > maxTop) continue
-                // Wait until the pop-up has finished sliding in: a swipe on a card that's still
-                // moving can be read by System UI as a pull on the shade instead of a dismissal.
-                if (card != lastPopupCard) { lastPopupCard = card; return false }
+                // Give the pop-up a moment (two looks, ~90 ms) to finish sliding in: a swipe on a
+                // card that's still arriving can be read as a pull on the shade. Its bounds keep
+                // shifting by a few pixels as it settles, so don't wait for them to stop.
+                lastPopupCard = card
+                if (++sightings < 2) return false
                 seen = true
                 // A swipe that didn't take (System UI was busy, or the island's window was still
                 // in the way) gets another try, a moment later; at most three in all.
