@@ -1084,7 +1084,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
         // Content waits for the shape to make room, so it never shows squashed or clipped while
         // the island grows (appearing, widening, opening) and leaves before it shrinks.
-        val room = if (isAbsorbing) 1f else min(roomFor(rect.width(), widthS.target), roomFor(rect.height(), heightS.target))
+        // Measured on the springs, not the drawn (squashed) shape, so the liquid squash never makes
+        // the content flicker.
+        val room = if (isAbsorbing) 1f else min(roomFor(widthS.value, widthS.target), roomFor(heightS.value, heightS.target))
         val reveal = (if (isAbsorbing) appMorph.reveal else 1f) * room
 
         val bodyAlpha = (255 * presenceS.value.coerceIn(0f, 1f) * min(1f, intro * 2.5f)).toInt()
