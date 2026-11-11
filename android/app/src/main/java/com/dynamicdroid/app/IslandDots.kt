@@ -237,9 +237,9 @@ class IslandDots(private val n: Int) {
                 if (recordDist.isNaN()) { val dx = px - ox; val dy = py - oy; sqrt(dx * dx + dy * dy) / reach } else recordDist
             } else { val dx = px - rippleX[j]; val dy = py - rippleY[j]; sqrt(dx * dx + dy * dy) / reach }
             val front = age * 1.25f - dist
-            if (front > 0.22f || front < -0.22f) continue
+            if (front > 0.14f || front < -0.14f) continue
             val fade = 1f - age / RIPPLE_LIFE
-            k = max(k, rippleS[j] * exp(-front * front / (2f * 0.0045f)) * sqrt(fade))
+            k = max(k, rippleS[j] * exp(-front * front / (2f * 0.0025f)) * sqrt(fade))
         }
         return k
     }
@@ -259,8 +259,8 @@ class IslandDots(private val n: Int) {
             val d = sqrt(dx * dx + dy * dy)
             if (d < 0.5f) continue
             val front = age * 1.25f - d / reach
-            if (front > 0.22f || front < -0.22f) continue
-            val e = rippleS[j] * exp(-front * front / (2f * 0.0045f)) * (1f - age / RIPPLE_LIFE)
+            if (front > 0.14f || front < -0.14f) continue
+            val e = rippleS[j] * exp(-front * front / (2f * 0.0025f)) * (1f - age / RIPPLE_LIFE)
             out[0] += dx / d * e; out[1] += dy / d * e
         }
     }
@@ -598,7 +598,7 @@ class IslandDotField {
         if (count == 0) return
         paint.color = Color.WHITE
         if (marks.size < cols) marks = BooleanArray(cols + 16)
-        val band = 0.17f * reach
+        val band = 0.12f * reach
         for (yy in 0 until rows) {
             val py = gy + yy * pitch
             val dy = py - oy
@@ -630,7 +630,7 @@ class IslandDotField {
                 val dx = px - ox
                 val dist = sqrt(dx * dx + dy * dy) / reach
                 val lit = min(1f, dots.light(px, py, ox, oy, reach, dist, strong))
-                if (lit < 0.06f) continue
+                if (lit < 0.08f) continue
                 val hx = px - holeX; val hy = py - holeY
                 if (hx * hx + hy * hy < holeOut2) continue
                 val c = coverage(u0 + (px - left) / side, v0 + (py - top) / side)
