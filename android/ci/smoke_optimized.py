@@ -147,6 +147,9 @@ finally:
         ("optimized-swiftui-morph.png", ["adb", "exec-out", "screencap", "-p"]),
         ("optimized-logcat.txt", ["adb", "logcat", "-d", "-s", "AndroidRuntime:E"]),
         ("optimized-activity.txt", ["adb", "shell", "dumpsys", "activity", "activities"]),
+        ("optimized-full-logcat.txt", ["adb", "logcat", "-d", "-t", "4000"]),
+        ("optimized-services.txt", ["adb", "shell", "dumpsys", "activity", "services", "com.dynamicdroid.app"]),
+        ("optimized-a11y.txt", ["adb", "shell", "dumpsys", "accessibility"]),
     ]:
         try:
             (output / name).write_bytes(subprocess.check_output(command, timeout=25))
