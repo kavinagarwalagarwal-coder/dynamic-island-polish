@@ -361,4 +361,9 @@
     <string name="feature_camera_fade_note">カメラ穴の周りで内容がなめらかに黒へ溶け、裏に隠れるものがなくなります。</string>
     <string name="feature_landscape">横向きで透過</string>
     <string name="feature_landscape_note">隠すカメラがない横向きでは、ゲームや動画が透けて見えます。</string>
+    <string name="errors_heading">アイランドのエラー</string>
+    <string name="errors_note">アイランドで問題が起きましたが動作は続いています。レポートをコピーして開発者に送ると修正できます。</string>
+    <string name="errors_copy">エラーレポートをコピー</string>
+    <string name="errors_copied">レポートをコピーしました</string>
+    <string name="errors_clear">エラーを消去</string>
 </resources>

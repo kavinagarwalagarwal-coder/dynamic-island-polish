@@ -361,4 +361,9 @@
     <string name="feature_camera_fade_note">Inhalte werden um das Kameraloch sanft schwarz, damit nichts dahinter verschwindet.</string>
     <string name="feature_landscape">Durchsichtig im Querformat</string>
     <string name="feature_landscape_note">Ohne Kamera zum Verdecken lässt die Insel Spiele und Videos durchscheinen.</string>
+    <string name="errors_heading">Insel-Fehler</string>
+    <string name="errors_note">Die Insel hatte ein Problem und lief weiter. Kopiere den Bericht und schick ihn dem Entwickler, damit er es beheben kann.</string>
+    <string name="errors_copy">Fehlerbericht kopieren</string>
+    <string name="errors_copied">Fehlerbericht kopiert</string>
+    <string name="errors_clear">Fehler löschen</string>
 </resources>

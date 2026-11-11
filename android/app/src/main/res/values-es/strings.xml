@@ -361,4 +361,9 @@
     <string name="feature_camera_fade_note">El contenido se oscurece suavemente hacia negro alrededor de la cámara, así nada queda detrás.</string>
     <string name="feature_landscape">Translúcida en horizontal</string>
     <string name="feature_landscape_note">Sin cámara que tapar, la isla deja ver juegos y vídeos.</string>
+    <string name="errors_heading">Errores de la isla</string>
+    <string name="errors_note">La isla tuvo un problema y siguió funcionando. Copia el informe y envíalo al desarrollador para que lo arregle.</string>
+    <string name="errors_copy">Copiar informe de errores</string>
+    <string name="errors_copied">Informe copiado</string>
+    <string name="errors_clear">Borrar errores</string>
 </resources>

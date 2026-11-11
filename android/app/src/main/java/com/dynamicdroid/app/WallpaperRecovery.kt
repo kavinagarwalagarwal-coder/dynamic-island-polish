@@ -47,6 +47,7 @@ object WallpaperRecovery {
 class DynamicDroidApplication : Application() {
     override fun onCreate() {
         super.onCreate()
+        CrashLog.install(this)
         WallpaperSkinStore.migrate(this)
         WallpaperRecovery.onProcessStart(this)
     }

@@ -870,6 +870,16 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     override fun doFrame(frameTimeNanos: Long) {
+        try { frame(frameTimeNanos) } catch (t: Throwable) {
+            // Never let one bad frame stop the island: record it, settle, and keep going.
+            CrashLog.caught(context, "frame", t)
+            springs.forEach { if (!it.value.isFinite()) it.snap(if (it.target.isFinite()) it.target else 0f) }
+            running = false; lastFrame = 0L; delayedFrame = false
+            postDelayed({ kick() }, 32L)
+        }
+    }
+
+    private fun frame(frameTimeNanos: Long) {
         delayedFrame = false
         if (!isAttachedToWindow || !isShown) { running = false; lastFrame = 0L; return }
         val dt = if (lastFrame == 0L) 1f / 60f else (frameTimeNanos - lastFrame) / 1_000_000_000f
@@ -1012,6 +1022,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // ---------------------------------------------------------------- drawing
 
     override fun onDraw(canvas: Canvas) {
+        val saves = canvas.saveCount
+        try { drawIsland(canvas) } catch (t: Throwable) {
+            // A drawing error loses one frame, not the island.
+            canvas.restoreToCount(saves)
+            CrashLog.caught(context, "draw ${activity?.mode} ${presentation}", t)
+        }
+    }
+
+    private fun drawIsland(canvas: Canvas) {
         // Fully hidden (fullscreen video/photos): draw nothing at all.
         val conceal = concealS.value.coerceIn(0f, 1f)
         if (conceal < 0.01f) return
@@ -2590,7 +2609,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         val local = MotionEvent.obtain(e)
         local.setLocation(e.x / fit.scale, e.y / fit.scale)
-        return try { handleTouch(local) } finally { local.recycle() }
+        return try { handleTouch(local) } catch (t: Throwable) {
+            CrashLog.caught(context, "touch ${activity?.mode} ${presentation}", t)
+            true
+        } finally { local.recycle() }
     }
 
     private fun handleTouch(e: MotionEvent): Boolean {

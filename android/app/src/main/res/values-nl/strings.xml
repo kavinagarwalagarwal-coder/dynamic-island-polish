@@ -361,4 +361,9 @@
     <string name="feature_camera_fade_note">Inhoud loopt rond het cameragat zacht over in zwart, zodat er niets achter verdwijnt.</string>
     <string name="feature_landscape">Doorzichtig in liggende stand</string>
     <string name="feature_landscape_note">Zonder camera om te bedekken laat het eiland games en video\'s doorschijnen.</string>
+    <string name="errors_heading">Eilandfouten</string>
+    <string name="errors_note">Het eiland liep tegen een probleem aan en ging door. Kopieer het rapport en stuur het naar de ontwikkelaar zodat het opgelost kan worden.</string>
+    <string name="errors_copy">Foutrapport kopiëren</string>
+    <string name="errors_copied">Foutrapport gekopieerd</string>
+    <string name="errors_clear">Fouten wissen</string>
 </resources>

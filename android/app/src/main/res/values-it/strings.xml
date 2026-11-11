@@ -361,4 +361,9 @@
     <string name="feature_camera_fade_note">Il contenuto si scurisce dolcemente verso il nero attorno alla fotocamera, così nulla resta nascosto dietro.</string>
     <string name="feature_landscape">Trasparente in orizzontale</string>
     <string name="feature_landscape_note">Senza fotocamera da coprire, l\'isola lascia vedere giochi e video.</string>
+    <string name="errors_heading">Errori dell\'isola</string>
+    <string name="errors_note">L\'isola ha avuto un problema e ha continuato. Copia il rapporto e invialo allo sviluppatore per correggerlo.</string>
+    <string name="errors_copy">Copia rapporto errori</string>
+    <string name="errors_copied">Rapporto copiato</string>
+    <string name="errors_clear">Cancella errori</string>
 </resources>

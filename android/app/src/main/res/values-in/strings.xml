@@ -361,4 +361,9 @@
     <string name="feature_camera_fade_note">Konten menggelap halus menjadi hitam di sekitar lubang kamera, jadi tak ada yang tersembunyi di baliknya.</string>
     <string name="feature_landscape">Tembus pandang saat lanskap</string>
     <string name="feature_landscape_note">Tanpa kamera untuk ditutupi, pulau memperlihatkan game dan video.</string>
+    <string name="errors_heading">Kesalahan pulau</string>
+    <string name="errors_note">Pulau mengalami masalah dan tetap berjalan. Salin laporannya dan kirim ke pengembang agar bisa diperbaiki.</string>
+    <string name="errors_copy">Salin laporan kesalahan</string>
+    <string name="errors_copied">Laporan disalin</string>
+    <string name="errors_clear">Hapus kesalahan</string>
 </resources>

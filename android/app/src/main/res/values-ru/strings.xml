@@ -361,4 +361,9 @@
     <string name="feature_camera_fade_note">Содержимое плавно темнеет до чёрного вокруг камеры, и за ней ничего не прячется.</string>
     <string name="feature_landscape">Прозрачный в альбомной ориентации</string>
     <string name="feature_landscape_note">Когда камеру прятать не нужно, остров пропускает игры и видео.</string>
+    <string name="errors_heading">Ошибки острова</string>
+    <string name="errors_note">Остров столкнулся с проблемой и продолжил работу. Скопируйте отчёт и отправьте разработчику, чтобы её исправить.</string>
+    <string name="errors_copy">Скопировать отчёт об ошибках</string>
+    <string name="errors_copied">Отчёт скопирован</string>
+    <string name="errors_clear">Очистить ошибки</string>
 </resources>

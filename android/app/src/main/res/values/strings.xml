@@ -372,4 +372,9 @@
     <string name="feature_camera_fade_note">Content darkens smoothly into black around the camera hole, so nothing hides behind it.</string>
     <string name="feature_landscape">See-through in landscape</string>
     <string name="feature_landscape_note">With no camera to cover, the island lets games and videos show through.</string>
+    <string name="errors_heading">Island errors</string>
+    <string name="errors_note">The island ran into a problem and kept going. Copy the report and send it to the developer so it can be fixed.</string>
+    <string name="errors_copy">Copy error report</string>
+    <string name="errors_copied">Error report copied</string>
+    <string name="errors_clear">Clear errors</string>
 </resources>

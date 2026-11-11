@@ -237,6 +237,21 @@ private fun MainActivity.SetupPage(flow: Flow) {
         Heading(stringResource(R.string.setup_clock_heading))
         Note(remember(tick) { TimerDiagnostics.read(this@SetupPage) })
     }
+    // Errors the island recorded (it carries on after them); one tap copies the report.
+    val errors = remember(tick) { CrashLog.read(this@SetupPage) }
+    AnimatedVisibility(errors != null, flow.next(), enter = fadeIn() + expandVertically(Fluid.liquid()), exit = fadeOut() + shrinkVertically(Fluid.liquid())) {
+        Column {
+            Heading(stringResource(R.string.errors_heading))
+            Note(stringResource(R.string.errors_note), size = 14)
+            Note(errors.orEmpty().lineSequence().take(4).joinToString("\n"))
+            ActionButton(stringResource(R.string.errors_copy)) {
+                getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(
+                    android.content.ClipData.newPlainText("Dynamic Droid errors", CrashLog.read(this@SetupPage).orEmpty()))
+                toast(getString(R.string.errors_copied))
+            }
+            ActionButton(stringResource(R.string.errors_clear)) { CrashLog.clear(this@SetupPage); tick++ }
+        }
+    }
 }
 
 // -------------------------------------------------------------------- Appearance

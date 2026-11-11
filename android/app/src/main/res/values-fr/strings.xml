@@ -361,4 +361,9 @@
     <string name="feature_camera_fade_note">Le contenu s\'assombrit doucement vers le noir autour de la caméra, rien ne se cache derrière.</string>
     <string name="feature_landscape">Transparente en paysage</string>
     <string name="feature_landscape_note">Sans caméra à masquer, l\'île laisse voir jeux et vidéos.</string>
+    <string name="errors_heading">Erreurs de l\'île</string>
+    <string name="errors_note">L\'île a rencontré un problème et a continué. Copiez le rapport et envoyez-le au développeur pour qu\'il le corrige.</string>
+    <string name="errors_copy">Copier le rapport d\'erreurs</string>
+    <string name="errors_copied">Rapport copié</string>
+    <string name="errors_clear">Effacer les erreurs</string>
 </resources>

@@ -419,6 +419,10 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     // ---------------------------------------------------------------- state
 
     private fun render(absorb: Boolean = false) {
+        try { renderNow(absorb) } catch (t: Throwable) { CrashLog.caught(this, "render", t) }
+    }
+
+    private fun renderNow(absorb: Boolean) {
         val view = island ?: return
         val features = IslandFeatures.read(this)
         var t = transient?.takeIf { features.shows(it.mode) }
