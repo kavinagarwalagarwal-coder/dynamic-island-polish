@@ -78,6 +78,25 @@ class ReplyPanel(
                 if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_UP) { dismiss(); return true }
                 return super.dispatchKeyEvent(event)
             }
+            // Android 16+ apps built for it get predictive back: the back key no longer reaches
+            // views, so listen through the window's back dispatcher as well.
+            private var backCallback: Any? = null
+            override fun onAttachedToWindow() {
+                super.onAttachedToWindow()
+                if (Build.VERSION.SDK_INT >= 33) {
+                    val cb = android.window.OnBackInvokedCallback { dismiss() }
+                    findOnBackInvokedDispatcher()?.registerOnBackInvokedCallback(
+                        android.window.OnBackInvokedDispatcher.PRIORITY_OVERLAY, cb)
+                    backCallback = cb
+                }
+            }
+            override fun onDetachedFromWindow() {
+                if (Build.VERSION.SDK_INT >= 33) (backCallback as? android.window.OnBackInvokedCallback)?.let {
+                    runCatching { findOnBackInvokedDispatcher()?.unregisterOnBackInvokedCallback(it) }
+                }
+                backCallback = null
+                super.onDetachedFromWindow()
+            }
         }.apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL

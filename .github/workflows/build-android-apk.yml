@@ -39,22 +39,34 @@ jobs:
       - name: Build APK
         run: |
           set -o pipefail
-          gradle --no-daemon --stacktrace -Pkotlin.jvm.target.validation.mode=warning -p android :app:testDebugUnitTest :app:assembleDebug :app:assemblePerformance :notification-fixture:assembleDebug 2>&1 | tee gradle.log || {
+          gradle --no-daemon --stacktrace -Pkotlin.jvm.target.validation.mode=warning -p android :app:testStandardDebugUnitTest :app:assembleStandardDebug :app:assembleAndroid17Debug :app:assembleStandardPerformance :app:assembleAndroid17Performance :notification-fixture:assembleDebug 2>&1 | tee gradle.log || {
             # GitHub shows at most 10 annotations per step, so send one combined summary.
             summary=$(grep -vE "^> Task " gradle.log | grep -E -A4 "^e: |FAILED|What went wrong|Caused by|OutOfMemory|error:" | grep -vE "^> Task " | head -40 | tr '\n' '|' | sed 's/%/%25/g')
             echo "::error title=Gradle build failed::${summary:0:3800}"
             exit 1
           }
 
+      # Standard: the current build (targets Android 15, runs on Android 8 to 17).
       - uses: actions/upload-artifact@v6
         with:
           name: dynamic-droid-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          path: android/app/build/outputs/apk/standard/debug/app-standard-debug.apk
 
       - uses: actions/upload-artifact@v6
         with:
           name: dynamic-droid-optimized-apk
-          path: android/app/build/outputs/apk/performance/app-performance.apk
+          path: android/app/build/outputs/apk/standard/performance/app-standard-performance.apk
+
+      # Android 17: the same app built for Android 17's rules.
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dynamic-droid-android17-debug-apk
+          path: android/app/build/outputs/apk/android17/debug/app-android17-debug.apk
+
+      - uses: actions/upload-artifact@v6
+        with:
+          name: dynamic-droid-android17-optimized-apk
+          path: android/app/build/outputs/apk/android17/performance/app-android17-performance.apk
 
       - uses: actions/upload-artifact@v6
         with:
@@ -87,7 +99,7 @@ jobs:
             gradle --no-daemon -p android :notification-fixture:assembleDebug
             adb install -r android/notification-fixture/build/outputs/apk/debug/notification-fixture-debug.apk
             adb shell pm grant com.dynamicdroid.fixture android.permission.POST_NOTIFICATIONS
-            gradle --no-daemon -p android :app:connectedDebugAndroidTest ${{ inputs.tests && format('-Pandroid.testInstrumentationRunnerArguments.class={0} -Pandroid.testInstrumentationRunnerArguments.report=1', inputs.tests) || '' }}
+            gradle --no-daemon -p android :app:connectedStandardDebugAndroidTest ${{ inputs.tests && format('-Pandroid.testInstrumentationRunnerArguments.class={0} -Pandroid.testInstrumentationRunnerArguments.report=1', inputs.tests) || '' }}
             adb pull /sdcard/Pictures/IslandSmoke island-screenshots
       - name: Report failed instrumentation tests
         if: failure()
@@ -115,7 +127,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        api: [26, 30]
+        include:
+          - { api: 26, flavor: Standard, target: default }
+          - { api: 30, flavor: Standard, target: default }
+          - { api: 37, flavor: Android17, target: google_apis }
     steps:
       - uses: actions/checkout@v5
       - uses: actions/setup-java@v5
@@ -130,25 +145,32 @@ jobs:
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
           arch: x86_64
           profile: pixel_2
           disable-animations: false
-          script: gradle --no-daemon -p android :app:connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.dynamicdroid.app.DeviceCompatibilityTest
+          script: gradle --no-daemon -p android :app:connected${{ matrix.flavor }}DebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.class=com.dynamicdroid.app.DeviceCompatibilityTest
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: compatibility-api-${{ matrix.api }}
+          name: compatibility-api-${{ matrix.api }}-${{ matrix.flavor }}
           path: android/app/build/outputs/androidTest-results
 
   optimized-smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { api: 36, apk: dynamic-droid-optimized-apk, file: app-standard-performance.apk, target: default }
+          - { api: 37, apk: dynamic-droid-android17-optimized-apk, file: app-android17-performance.apk, target: google_apis }
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v7
         with:
-          name: dynamic-droid-optimized-apk
+          name: ${{ matrix.apk }}
           path: optimized-apk
       - uses: actions/download-artifact@v7
         with:
@@ -162,17 +184,18 @@ jobs:
         run: sudo chmod 666 /dev/kvm
       - uses: reactivecircus/android-emulator-runner@v2
         with:
-          api-level: 36
+          api-level: ${{ matrix.api }}
+          target: ${{ matrix.target }}
           arch: x86_64
           profile: pixel_2
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -memory 3072 -cores 2
           disable-animations: false
           script: |
-            adb install -r optimized-apk/app-performance.apk
+            adb install -r optimized-apk/${{ matrix.file }}
             adb install -r notification-fixture/notification-fixture-debug.apk
             python3 android/ci/smoke_optimized.py
       - uses: actions/upload-artifact@v6
         if: always()
         with:
-          name: optimized-app-smoke
+          name: optimized-app-smoke-api-${{ matrix.api }}
           path: island-screenshots/optimized*

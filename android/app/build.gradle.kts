@@ -6,7 +6,8 @@ plugins {
 
 android {
     namespace = "com.dynamicdroid.app"
-    compileSdk = 36
+    // 37 = Android 17. Compiling against it changes nothing at runtime; targetSdk does.
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "com.dynamicdroid.app"
@@ -15,6 +16,24 @@ android {
         testInstrumentationRunner = "com.dynamicdroid.app.IslandTestRunner"
         versionCode = 15
         versionName = "1.7.0"
+    }
+
+    // Two builds of the same app (same package, so either one installs over the other and keeps
+    // its settings):
+    //  - standard: the current build, targets Android 15 and runs on Android 8 to 17.
+    //  - android17: opts in to Android 17's rules (predictive back, background audio limits,
+    //    large-screen resizing). For phones already on Android 16 or 17.
+    flavorDimensions += "platform"
+    productFlavors {
+        create("standard") {
+            dimension = "platform"
+            targetSdk = 35
+        }
+        create("android17") {
+            dimension = "platform"
+            targetSdk = 37
+            versionNameSuffix = "-android17"
+        }
     }
 
     buildFeatures {
