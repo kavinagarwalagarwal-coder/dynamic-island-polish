@@ -324,12 +324,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
     }
 
-    // Shape. Same interpolating springs as Sources/IslandUI (Skip / SwiftUI).
-    private val widthS = Spring(dp(104f), IslandMotion.SHAPE_K, IslandMotion.WIDTH_DAMPING_RATIO, 0.5f)
-    private val heightS = Spring(dp(32f), IslandMotion.SHAPE_K, IslandMotion.HEIGHT_DAMPING_RATIO, 0.5f)
-    private val radiusS = Spring(dp(16f), IslandMotion.SHAPE_K, IslandMotion.RADIUS_DAMPING_RATIO, 0.5f)
+    // Shape: interpolating springs, tuned to flow like a liquid (see IslandMotion.FLUID_*).
+    private val widthS = Spring(dp(104f), IslandMotion.SHAPE_K, IslandMotion.FLUID_WIDTH_DAMPING, 0.5f)
+    private val heightS = Spring(dp(32f), IslandMotion.SHAPE_K, IslandMotion.FLUID_HEIGHT_DAMPING, 0.5f)
+    private val radiusS = Spring(dp(16f), IslandMotion.SHAPE_K, IslandMotion.FLUID_RADIUS_DAMPING, 0.5f)
     private val topS = Spring(baseTop, IslandMotion.SHAPE_K, 0.86f, 0.5f)
-    private val centerS = Spring(resources.displayMetrics.widthPixels / 2f / fit.scale, IslandMotion.SHAPE_K, IslandMotion.CENTER_DAMPING_RATIO, 0.5f)
+    private val centerS = Spring(resources.displayMetrics.widthPixels / 2f / fit.scale, IslandMotion.SHAPE_K, IslandMotion.FLUID_CENTER_DAMPING, 0.5f)
     // Content and gesture feedback
     private val expandedA = Spring(0f, IslandMotion.CONTENT_IN_K, 1f, 0.004f)
     private val compactA = Spring(0f, IslandMotion.CONTENT_IN_K, 1f, 0.004f)
@@ -669,6 +669,35 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         return (cx - r) to (cx + r)
     }
 
+    private val body = Path()
+    private val corner = RectF()
+
+    /**
+     * The island's outline: a rounded rectangle whose top and bottom edges bow by [bendY] and
+     * whose sides bow by [bendX] (positive = outward). Plain rounded rect when both are tiny.
+     */
+    private fun buildBody(path: Path, box: RectF, radius: Float, bendY: Float, bendX: Float) {
+        path.reset()
+        val rad = min(radius, min(box.width(), box.height()) / 2f)
+        if (abs(bendY) < 0.3f && abs(bendX) < 0.3f) { path.addRoundRect(box, rad, rad, Path.Direction.CW); return }
+        val l = box.left; val t = box.top; val rr = box.right; val b = box.bottom
+        val cx = box.centerX(); val cy = box.centerY()
+        val d = rad * 2f
+        // A quadratic's control point sits twice as far out as the curve's peak.
+        val by = bendY.coerceIn(-box.height() * 0.2f, box.height() * 0.2f) * 2f
+        val bx = bendX.coerceIn(-box.width() * 0.1f, box.width() * 0.1f) * 2f
+        path.moveTo(l + rad, t)
+        path.quadTo(cx, t - by, rr - rad, t)
+        corner.set(rr - d, t, rr, t + d); path.arcTo(corner, -90f, 90f, false)
+        path.quadTo(rr + bx, cy, rr, b - rad)
+        corner.set(rr - d, b - d, rr, b); path.arcTo(corner, 0f, 90f, false)
+        path.quadTo(cx, b + by, l + rad, b)
+        corner.set(l, b - d, l + d, b); path.arcTo(corner, 90f, 90f, false)
+        path.quadTo(l - bx, cy, l, t + rad)
+        corner.set(l, t, l + d, t + d); path.arcTo(corner, 180f, 90f, false)
+        path.close()
+    }
+
     /** 0 while the shape is under ~70% of where it's heading, easing to 1 by ~92%. */
     private fun roomFor(now: Float, target: Float): Float {
         if (target <= 1f) return 1f
@@ -718,10 +747,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun restoreShapeSprings() {
         shapeSprings.forEach { it.stiffness = IslandMotion.SHAPE_K }
-        widthS.dampingRatio = IslandMotion.WIDTH_DAMPING_RATIO
-        heightS.dampingRatio = IslandMotion.HEIGHT_DAMPING_RATIO
-        radiusS.dampingRatio = IslandMotion.RADIUS_DAMPING_RATIO
-        centerS.dampingRatio = IslandMotion.CENTER_DAMPING_RATIO
+        widthS.dampingRatio = IslandMotion.FLUID_WIDTH_DAMPING
+        heightS.dampingRatio = IslandMotion.FLUID_HEIGHT_DAMPING
+        radiusS.dampingRatio = IslandMotion.FLUID_RADIUS_DAMPING
+        centerS.dampingRatio = IslandMotion.FLUID_CENTER_DAMPING
         topS.dampingRatio = 0.86f
     }
 
@@ -1014,8 +1043,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val press = pressS.value
         // Hiding shrinks the island back into the camera as it fades.
         val shrink = 0.35f + 0.65f * conceal
-        val w = widthS.value * press * shrink
-        val h = max(dp(1f), heightS.value + stretchS.value) * press * (0.6f + 0.4f * conceal)
+        var w = widthS.value * press * shrink
+        var h = max(dp(1f), heightS.value + stretchS.value) * press * (0.6f + 0.4f * conceal)
+        // Like a drop of liquid keeping its volume: while the island widens fast it thins a
+        // little, while it grows taller it narrows, and it fills back out as it settles.
+        val flowX = if (reduceMotion) 0f else (widthS.speed / dp(1500f)).coerceIn(-1f, 1f)
+        val flowY = if (reduceMotion) 0f else (heightS.speed / dp(1500f)).coerceIn(-1f, 1f)
+        h = max(dp(1f), h * (1f - 0.11f * flowX + 0.03f * flowY))
+        w *= 1f - 0.05f * flowY + 0.015f * flowX
         val top = topS.value
         rect.set(cx - w / 2f, top, cx + w / 2f, top + h)
         var r = min(radiusS.value * press, h / 2f)
@@ -1040,12 +1075,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         shapePaint.color = Color.BLACK
         // In landscape there's no camera to cover, so the body lets the game or video show through.
         shapePaint.alpha = if (seeThrough()) (bodyAlpha * LANDSCAPE_BODY).toInt() else bodyAlpha
-        canvas.drawRoundRect(rect, r, r, shapePaint)
+        // The edges flow too: they pinch in while the island stretches and bow out as it
+        // shrinks, so a morph reads as liquid rather than a rubber rectangle.
+        buildBody(body, rect, r, -flowX * dp(2.4f), -flowY * dp(3f))
+        canvas.drawPath(body, shapePaint)
         if (a == null) { canvas.restore(); if (dimmed) canvas.restore(); if (layered) canvas.restore(); return }
         drawOutline(canvas, a, r, bodyAlpha)
 
-        clip.reset()
-        clip.addRoundRect(rect, r, r, Path.Direction.CW)
+        clip.set(body)
         canvas.save()
         canvas.clipPath(clip)
         if (absorb < .06f) {
