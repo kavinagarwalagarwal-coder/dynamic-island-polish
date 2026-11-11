@@ -58,7 +58,8 @@ jobs:
 
   render:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # The emulator suite runs 14-17 minutes; leave room for a slow runner.
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
