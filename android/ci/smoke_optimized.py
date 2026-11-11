@@ -111,6 +111,15 @@ def main():
     adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + PACKAGE + ".IslandNotificationListener")
     adb("shell", "settings", "put", "secure", "enabled_accessibility_services", PACKAGE + "/" + PACKAGE + ".IslandAccessibilityService")
     adb("shell", "settings", "put", "secure", "accessibility_enabled", "1")
+    # Binding is asynchronous and slow on a busy emulator (Android 17 images especially): wait
+    # until the phone reports both services connected instead of trusting a fixed sleep.
+    def bound():
+        listeners = adb("shell", "dumpsys", "notification", timeout=40)
+        a11y = adb("shell", "dumpsys", "accessibility", timeout=40)
+        return (PACKAGE + "/" + PACKAGE + ".IslandNotificationListener") in listeners and "Dynamic Droid island" in a11y
+    end = time.time() + 30
+    while time.time() < end and not bound():
+        time.sleep(1)
     time.sleep(1)
     fixture = "com.dynamicdroid.fixture/.FixtureActivity"
     adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "custom")
@@ -123,10 +132,14 @@ def main():
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(.3)
     adb("shell", "input", "keyevent", "KEYCODE_HOME")
-    time.sleep(2)
+    returned = False
+    end = time.time() + 8
+    while time.time() < end and not returned:
+        time.sleep(.5)
+        returned = "Native return started" in adb("logcat", "-d", "-s", "IslandHandoff:I")
     check_crash()
     assert adb("shell", "pidof", PACKAGE).strip() == before, "App restarted during the live handoff"
-    assert "Native return started" in adb("logcat", "-d", "-s", "IslandHandoff:I"), "The island did not grow back after leaving the player"
+    assert returned, "The island did not grow back after leaving the player"
     print("Optimized standalone APK: Playground and real player-to-Home return passed.")
 
 try:
