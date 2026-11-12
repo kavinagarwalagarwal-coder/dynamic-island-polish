@@ -4,6 +4,14 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
+// One permanent signing key, so every new build installs as an update over the last one
+// (Android refuses updates signed with a different key). CI decodes it from the repo secrets into
+// DD_KEYSTORE; without it (forks, local builds) the usual per-machine debug key is used.
+val sharedKeystore = System.getenv("DD_KEYSTORE")?.let { File(it) }?.takeIf { it.isFile }
+
+// Each GitHub build gets a higher version number than the one before, so it installs as an update.
+val buildNumber = System.getenv("GITHUB_RUN_NUMBER")?.toIntOrNull()
+
 android {
     namespace = "com.dynamicdroid.app"
     // 37 = Android 17. Compiling against it changes nothing at runtime; targetSdk does.
@@ -16,8 +24,8 @@ android {
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "com.dynamicdroid.app.IslandTestRunner"
-        versionCode = 15
-        versionName = "1.7.0"
+        versionCode = if (buildNumber != null) 100 + buildNumber else 15
+        versionName = if (buildNumber != null) "1.7.0.$buildNumber" else "1.7.0"
     }
 
     // Two builds, each with its own app ID so both can be installed side by side:
@@ -55,14 +63,26 @@ android {
         }
     }
 
+    signingConfigs {
+        if (sharedKeystore != null) create("shared") {
+            storeFile = sharedKeystore
+            storePassword = System.getenv("DD_KEYSTORE_PASSWORD")
+            keyAlias = System.getenv("DD_KEY_ALIAS") ?: "dynamicdroid"
+            keyPassword = System.getenv("DD_KEY_PASSWORD") ?: System.getenv("DD_KEYSTORE_PASSWORD")
+        }
+    }
+
     buildTypes {
+        getByName("debug") {
+            if (sharedKeystore != null) signingConfig = signingConfigs.getByName("shared")
+        }
         create("performance") {
             initWith(getByName("release"))
             isDebuggable = false
             isMinifyEnabled = true
             isShrinkResources = true
-            // Installable test build; uses the same key as this CI run's debug variant.
-            signingConfig = signingConfigs.getByName("debug")
+            // Installable build: the permanent key when CI has it, else this machine's debug key.
+            signingConfig = signingConfigs.getByName(if (sharedKeystore != null) "shared" else "debug")
             matchingFallbacks += listOf("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }

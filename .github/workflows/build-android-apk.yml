@@ -36,6 +36,22 @@ jobs:
         with:
           gradle-version: "8.13"
 
+      # The permanent signing key, so each download installs as an update over the last one.
+      # Set once in Settings -> Secrets and variables -> Actions. Without it, builds still work
+      # but each one is signed with a throwaway key (and must be uninstalled to install the next).
+      - name: Load the signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.DD_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.DD_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ] && [ -n "$KEYSTORE_PASSWORD" ]; then
+            echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/dynamicdroid.jks"
+            echo "DD_KEYSTORE=$RUNNER_TEMP/dynamicdroid.jks" >> "$GITHUB_ENV"
+            echo "DD_KEYSTORE_PASSWORD=$KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+            echo "Signing with the permanent key"
+          else
+            echo "::warning title=No signing key::Add DD_KEYSTORE_BASE64 and DD_KEYSTORE_PASSWORD repo secrets so new builds install as updates."
+          fi
       - name: Build APK
         run: |
           set -o pipefail
@@ -45,6 +61,15 @@ jobs:
             echo "::error title=Gradle build failed::${summary:0:3800}"
             exit 1
           }
+
+      - name: Show the signing key and version
+        run: |
+          signer=$(ls -d "$ANDROID_HOME"/build-tools/*/ | sort -V | tail -1)apksigner
+          for apk in android/app/build/outputs/apk/*/performance/*.apk; do
+            echo "$apk"
+            "$signer" verify --print-certs "$apk" | grep "SHA-256"
+            "${signer%apksigner}aapt2" dump badging "$apk" 2>/dev/null | head -1 || true
+          done
 
       # Standard: the current build (targets Android 15, runs on Android 8 to 17).
       - uses: actions/upload-artifact@v6
