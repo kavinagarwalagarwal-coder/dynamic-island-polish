@@ -102,6 +102,8 @@ class IslandRenderingTest {
         launchPlayground().use { scenario ->
             scenario.onActivity { activity ->
                 val view = findIsland(activity.window.decorView)!!
+                // Dot music is part of the Nothing look; the Apple look (the default) turns it off.
+                view.applyFeatures(IslandFeatures.read(activity).copy(dotMusic = true))
                 view.applyFit(IslandFit(alignCamera = false)); view.setSecondary(null); view.show(music, Presentation.COMPACT)
             }
             SystemClock.sleep(1500)
@@ -328,6 +330,10 @@ class IslandRenderingTest {
                 assertTrue(field<RectF>(view, "secondaryRect").isEmpty)
             }
             capture("merged-single")
+            // The camera-only idle: the resting pill (on by default since the Apple look) is off here.
+            scenario.onActivity { activity ->
+                findIsland(activity.window.decorView)!!.applyFeatures(IslandFeatures.read(activity).copy(idlePill = false))
+            }
             present(null, null, Presentation.IDLE)
             scenario.onActivity { activity ->
                 val view = findIsland(activity.window.decorView)!!

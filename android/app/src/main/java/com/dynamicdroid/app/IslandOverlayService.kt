@@ -71,8 +71,26 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             .enabledInputMethodList.map { it.packageName }.toSet() }.getOrDefault(emptySet())
     }
     private val homePackages by lazy {
+        // Settings registers a FallbackHome that only runs while the phone boots; it is not a
+        // home screen, so leaving Settings must not count as going home.
         packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+            .filterNot { it.activityInfo.name.endsWith("FallbackHome") }
             .map { it.activityInfo.packageName }.toSet()
+    }
+    /**
+     * The last app the accessibility service saw come to the front, even while nothing was live.
+     * A player's window often appears a moment before its music notification does; without this,
+     * that moment was dropped and leaving the player did not bring the island back.
+     */
+    private var seenForeground: String? = null
+
+    private fun foregroundQualifies(pkg: String) = pkg !in keyboardPackages && (pkg in homePackages ||
+        activities.all().any { it.packageName == pkg } || packageManager.getLaunchIntentForPackage(pkg) != null)
+
+    /** Start following the foreground app, catching up on the one already in front. */
+    private fun startWatcher() {
+        watcher?.start()
+        seenForeground?.let { if (foregroundQualifies(it)) watcher?.hint(it) }
     }
     private var watcher: ForegroundWatcher? = null
     /** A newly started timer opens briefly, then morphs up into the pill. */
@@ -290,14 +308,14 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 (activities.all().isNotEmpty() || transient != null || IslandFeatures.read(this).idlePill)
         }
         IslandAccessibilityService.onForegroundPackage = { pkg ->
-            if (pkg !in keyboardPackages && (pkg in homePackages || activities.all().any { it.packageName == pkg } ||
-                    packageManager.getLaunchIntentForPackage(pkg) != null)) watcher?.hint(pkg)
+            if (pkg !in keyboardPackages) seenForeground = pkg
+            if (foregroundQualifies(pkg)) watcher?.hint(pkg)
         }
         status = StatusMonitor(this) { info -> island?.applyStatus(info) }.also { it.start() }
         IslandAccessibilityService.onChanged = { handler.post {
             syncForeground()
             reattach()
-            if (activities.all().isNotEmpty()) watcher?.start()
+            if (activities.all().isNotEmpty()) startWatcher()
         } }
         attachWindow()
         IslandBus.listener = this
@@ -350,7 +368,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         if (intent?.action == ACTION_WALLPAPER) {
             island?.applyWallpaper(WallpaperSkinStore.read(this), WallpaperSkinStore.image(this))
         }
-        if (ongoing != null) watcher?.start()
+        if (ongoing != null) startWatcher()
         return START_STICKY
     }
 
@@ -569,7 +587,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                         Presentation.EXPANDED else Presentation.COMPACT
                 }
             }
-            watcher?.start()
+            startWatcher()
         }
         render()
     }
