@@ -456,4 +456,7 @@
     <string name="look_nothing">Nothing</string>
     <string name="motion_apple">Apple</string>
     <string name="look_note">Apple follows the iPhone\'s Dynamic Island: its type, colours, sizes and spring. Nothing is the original monochrome, dot-matrix look. Switching also sets the music, backdrop, resting pill and motion settings to match; you can still change each one.</string>
+    <string name="demo_fly_in">Fly-in</string>
+    <string name="feature_app_morph">App flies into the island</string>
+    <string name="feature_app_morph_note">Going home from the app that\'s playing, it shrinks and flies up into the island, wearing its album art or icon.</string>
 </resources>

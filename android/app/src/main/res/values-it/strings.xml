@@ -445,4 +445,7 @@
     <string name="look_nothing">Nothing</string>
     <string name="motion_apple">Apple</string>
     <string name="look_note">Apple segue la Dynamic Island dell\'iPhone: caratteri, colori, dimensioni e molla. Nothing è l\'aspetto originale monocromatico a matrice di punti. Cambiando si adattano anche musica, sfondo, pillola a riposo e movimento; puoi comunque modificarli.</string>
+    <string name="demo_fly_in">Volo</string>
+    <string name="feature_app_morph">L\'app vola nell\'isola</string>
+    <string name="feature_app_morph_note">Tornando alla home dall\'app in riproduzione, si rimpicciolisce e vola nell\'isola, con la copertina o l\'icona.</string>
 </resources>

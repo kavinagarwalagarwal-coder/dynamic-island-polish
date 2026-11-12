@@ -445,4 +445,7 @@
     <string name="look_nothing">Nothing</string>
     <string name="motion_apple">Apple</string>
     <string name="look_note">Apple mengikuti Dynamic Island iPhone: huruf, warna, ukuran, dan pegasnya. Nothing adalah tampilan asli monokrom bermatriks titik. Mengganti gaya juga menyesuaikan musik, latar, pil diam, dan gerakan; masing-masing tetap bisa diubah.</string>
+    <string name="demo_fly_in">Terbang</string>
+    <string name="feature_app_morph">Aplikasi terbang ke pulau</string>
+    <string name="feature_app_morph_note">Saat kembali ke beranda dari aplikasi yang sedang diputar, aplikasi mengecil dan terbang ke pulau dengan sampul atau ikonnya.</string>
 </resources>

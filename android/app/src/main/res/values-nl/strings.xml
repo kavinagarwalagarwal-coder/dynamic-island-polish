@@ -445,4 +445,7 @@
     <string name="look_nothing">Nothing</string>
     <string name="motion_apple">Apple</string>
     <string name="look_note">Apple volgt het Dynamic Island van de iPhone: letters, kleuren, maten en veer. Nothing is de oorspronkelijke monochrome puntmatrix-look. Wisselen past ook muziek, achtergrond, rustende pil en beweging aan; je kunt elk ervan nog wijzigen.</string>
+    <string name="demo_fly_in">Invliegen</string>
+    <string name="feature_app_morph">App vliegt het eiland in</string>
+    <string name="feature_app_morph_note">Ga je vanuit de spelende app naar het startscherm, dan krimpt die en vliegt met hoes of icoon het eiland in.</string>
 </resources>

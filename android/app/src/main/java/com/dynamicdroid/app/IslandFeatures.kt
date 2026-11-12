@@ -95,6 +95,8 @@ data class IslandFeatureSet(
     val homeCard: Boolean = true,
     /** Swipe the small music island sideways to skip tracks. */
     val swipeTracks: Boolean = true,
+    /** Going home from the app that's playing: the app flies up into the island. */
+    val appMorph: Boolean = true,
 ) {
     /** False when the user turned this kind of activity off. */
     fun shows(mode: IslandMode): Boolean = when (mode) {
@@ -193,6 +195,7 @@ object IslandFeatures {
             sleep = p.getBoolean("show_sleep", d.sleep),
             homeCard = p.getBoolean("home_card", d.homeCard),
             swipeTracks = p.getBoolean("swipe_tracks", d.swipeTracks),
+            appMorph = p.getBoolean("app_morph", d.appMorph),
         ).safe()
     }
 

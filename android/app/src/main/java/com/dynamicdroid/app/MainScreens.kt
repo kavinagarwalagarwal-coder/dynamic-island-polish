@@ -194,6 +194,10 @@ private fun MainActivity.PlaygroundPage(flow: Flow) {
             Chip(stringResource(R.string.dot_open_short)) { startActivity(Intent(this@PlaygroundPage, DotPlayerActivity::class.java)) }
         }
         ChipRow {
+            // The fly-in you get when going home from the app that's playing.
+            Chip(stringResource(R.string.demo_fly_in)) {
+                preview.setSecondary(null); preview.show(demoMusic(true), Presentation.COMPACT, absorb = true)
+            }
             Chip(stringResource(R.string.demo_event)) { preview.setSecondary(null); showDemo(demoEvent(), Presentation.EXPANDED) }
             Chip(stringResource(R.string.mode_torch)) { preview.setSecondary(null); showDemo(demoTorch(), Presentation.EXPANDED) }
             Chip(stringResource(R.string.mode_sleep)) { preview.setSecondary(null); showDemo(demoSleep(), Presentation.EXPANDED) }
@@ -433,6 +437,7 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_sleep, "show_sleep", f.sleep, R.string.feature_sleep_note)
         toggle(R.string.feature_home_card, "home_card", f.homeCard, R.string.feature_home_card_note)
         toggle(R.string.feature_swipe_tracks, "swipe_tracks", f.swipeTracks, R.string.feature_swipe_tracks_note)
+        toggle(R.string.feature_app_morph, "app_morph", f.appMorph, R.string.feature_app_morph_note)
     }
     Column(flow.next()) {
         Heading(stringResource(R.string.features_events))

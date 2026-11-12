@@ -530,8 +530,10 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 handler.postDelayed(autoCollapse, delay)
             }
         }
-        growWindow(view.windowSizeFor(a, p), false)
-        view.show(a?.let { appTint(this, it) }, p, false)
+        // Flying in from the app: the window briefly covers the screen (touch-through) for the card.
+        val fly = absorb && features.appMorph
+        growWindow(view.windowSizeFor(a, p), fly)
+        view.show(a?.let { appTint(this, it) }, p, fly)
         updateTouchWindow()
         syncDotBeat(a, p)
     }
@@ -643,6 +645,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // Use the unfiltered shelf: the owner was deliberately hidden while its app was open.
         val source = activities.pair().first?.takeIf { it.mode == IslandMode.MUSIC || it.mode == IslandMode.CALL }
         foregroundPkg = pkg
+        // While the playing app is open, hear about window changes at once rather than after
+        // accessibility's usual half-second wait, so the fly-in starts as the app closes.
+        IslandAccessibilityService.instance?.fastWindowEvents(source?.packageName == pkg && IslandFeatures.read(this).appMorph)
         if (pkg !in homePackages) island?.cancelAppMorph()
         val unlocked = getSystemService(PowerManager::class.java)?.isInteractive == true &&
             getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false

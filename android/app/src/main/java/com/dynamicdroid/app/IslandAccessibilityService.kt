@@ -85,6 +85,19 @@ class IslandAccessibilityService : AccessibilityService() {
 
     private var lastIslandStart = 0L
 
+    /**
+     * Accessibility normally waits half a second after the last event of a kind before passing
+     * it on. While the playing app is open we want its closing right away, so the fly-in starts
+     * with Android's own close animation instead of after it.
+     */
+    fun fastWindowEvents(fast: Boolean) {
+        val info = serviceInfo ?: return
+        val want = if (fast) FAST_EVENTS_MS else NORMAL_EVENTS_MS
+        if (info.notificationTimeout == want) return
+        info.notificationTimeout = want
+        runCatching { serviceInfo = info }
+    }
+
     /** Package of the active full-screen app window; package metadata only, never content. */
     private fun activeAppPackage(): String? = runCatching {
         windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isActive }
@@ -360,6 +373,8 @@ class IslandAccessibilityService : AccessibilityService() {
     }
 
     companion object {
+        private const val FAST_EVENTS_MS = 60L
+        private const val NORMAL_EVENTS_MS = 500L
         /** A window opened, closed or became active: maybe a different app is in front. */
         private const val APP_WINDOW_CHANGES = AccessibilityEvent.WINDOWS_CHANGE_ADDED or
             AccessibilityEvent.WINDOWS_CHANGE_REMOVED or AccessibilityEvent.WINDOWS_CHANGE_ACTIVE

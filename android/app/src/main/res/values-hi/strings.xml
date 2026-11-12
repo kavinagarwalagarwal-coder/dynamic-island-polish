@@ -445,4 +445,7 @@
     <string name="look_nothing">Nothing</string>
     <string name="motion_apple">Apple</string>
     <string name="look_note">Apple अपनाता है iPhone के Dynamic Island को: उसके अक्षर, रंग, आकार और स्प्रिंग। Nothing मूल मोनोक्रोम, डॉट-मैट्रिक्स लुक है। बदलने पर म्यूज़िक, बैकड्रॉप, आराम वाली पिल और मोशन की सेटिंग भी उसी हिसाब से हो जाती हैं; आप हर एक को फिर भी बदल सकते हैं।</string>
+    <string name="demo_fly_in">उड़कर आना</string>
+    <string name="feature_app_morph">ऐप उड़कर आइलैंड में जाए</string>
+    <string name="feature_app_morph_note">जो ऐप चल रहा है उससे होम पर जाने पर वह सिकुड़कर, अपने एल्बम आर्ट या आइकन के साथ, आइलैंड में उड़ जाता है।</string>
 </resources>

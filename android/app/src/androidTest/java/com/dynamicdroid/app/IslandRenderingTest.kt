@@ -343,4 +343,57 @@ class IslandRenderingTest {
             capture("hidden-camera-idle")
         }
     }
+
+    /**
+     * Going home from the playing app: the card starts big near the middle of the screen, shrinks
+     * and rises without ever growing back or dropping, lands as the compact island and stays cheap
+     * to draw on every frame.
+     */
+    @Test fun appFliesIntoTheIsland() {
+        val art = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).also { b ->
+            for (y in 0 until 64) for (x in 0 until 64) b.setPixel(x, y, android.graphics.Color.rgb(200, 60 + x * 2, 40 + y * 3))
+        }
+        val music = LiveActivity("fly", "music.test", IslandMode.MUSIC, "Fly song", "Artist", "Player", null, art,
+            0xFFFF5A36.toInt(), isPlaying = true, durationMs = 200_000L)
+        val heights = ArrayList<Float>(); val centers = ArrayList<Float>(); val costs = ArrayList<Long>()
+        var landed = RectF(); var compactH = 0f
+        launchPlayground().use { scenario ->
+            val done = CountDownLatch(1)
+            scenario.onActivity { activity ->
+                val view = findIsland(activity.window.decorView)!!
+                view.applyFeatures(IslandFeatures.read(activity).copy(appMorph = true, idlePill = true))
+                view.applyFit(IslandFit(alignCamera = false)); view.setSecondary(null)
+                view.show(music, Presentation.COMPACT, absorb = true)
+                val node = android.graphics.RenderNode("fly").apply { setPosition(0, 0, view.width, view.height) }
+                var frames = 0
+                val callback = object : android.view.Choreographer.FrameCallback {
+                    override fun doFrame(frameTimeNanos: Long) {
+                        val rect = RectF(field<RectF>(view, "rect"))
+                        if (view.isAbsorbing) { heights += rect.height(); centers += rect.centerY() }
+                        val t0 = System.nanoTime()
+                        val c = node.beginRecording(); view.draw(c); node.endRecording()
+                        if (view.isAbsorbing) costs += System.nanoTime() - t0
+                        if ((!view.isAbsorbing && frames > 5) || ++frames > 180) {
+                            landed = rect
+                            compactH = view.resources.displayMetrics.density * IslandFeatures.read(view.context).compactHeightDp
+                            done.countDown()
+                        } else android.view.Choreographer.getInstance().postFrameCallback(this)
+                    }
+                }
+                android.view.Choreographer.getInstance().postFrameCallback(callback)
+            }
+            assertTrue("Fly-in never finished", done.await(8, TimeUnit.SECONDS))
+        }
+        val diag = "frames=${heights.size} h=${heights.take(3)}..${heights.takeLast(3)} cy=${centers.take(2)}..${centers.takeLast(2)} landed=$landed"
+        assertTrue("Fly-in had too few frames to be seen: $diag", heights.size >= 12)
+        assertTrue("Card did not start big: $diag", heights.first() > compactH * 3f)
+        // Shrinking and rising, never growing back or dropping by more than a pixel or two.
+        val px = 2f * InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        assertTrue("Card grew back on the way: $diag", heights.zipWithNext().all { (a, b) -> b <= a + px })
+        assertTrue("Card dropped on the way: $diag", centers.zipWithNext().all { (a, b) -> b <= a + px })
+        assertTrue("Did not land as the compact island: $diag", kotlin.math.abs(landed.height() - compactH) < compactH * .2f)
+        val avgMs = costs.average() / 1e6
+        assertTrue("Fly-in frames too costly: avg=${"%.2f".format(avgMs)}ms $diag", avgMs < 6.0)
+    }
+
 }

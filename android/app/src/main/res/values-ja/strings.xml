@@ -445,4 +445,7 @@
     <string name="look_nothing">Nothing</string>
     <string name="motion_apple">Apple</string>
     <string name="look_note">Apple は iPhone の Dynamic Island に合わせます：文字、色、サイズ、スプリング。Nothing は元のモノクロのドットマトリクス表示です。切り替えると音楽、背景、待機中のピル、動きの設定も合わせて変わります。それぞれ後から変更できます。</string>
+    <string name="demo_fly_in">吸い込み</string>
+    <string name="feature_app_morph">アプリがアイランドへ</string>
+    <string name="feature_app_morph_note">再生中のアプリからホームに戻ると、アルバムアートやアイコンをまとったまま縮んでアイランドに吸い込まれます。</string>
 </resources>

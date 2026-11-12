@@ -445,4 +445,7 @@
     <string name="look_nothing">Nothing</string>
     <string name="motion_apple">Apple</string>
     <string name="look_note">Apple повторяет Dynamic Island iPhone: шрифт, цвета, размеры и пружину. Nothing — исходный монохромный точечный вид. При смене также настраиваются музыка, фон, спящая пилюля и движение; каждое можно изменить отдельно.</string>
+    <string name="demo_fly_in">Влёт</string>
+    <string name="feature_app_morph">Приложение влетает в остров</string>
+    <string name="feature_app_morph_note">При выходе на главный экран из играющего приложения оно сжимается и влетает в остров с обложкой или значком.</string>
 </resources>

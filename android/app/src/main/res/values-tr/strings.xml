@@ -445,4 +445,7 @@
     <string name="look_nothing">Nothing</string>
     <string name="motion_apple">Apple</string>
     <string name="look_note">Apple, iPhone’un Dynamic Island’ını izler: yazı tipi, renkler, boyutlar ve yay. Nothing, orijinal tek renkli nokta matris görünümüdür. Değiştirmek müzik, arka plan, dinlenen hap ve hareket ayarlarını da uyarlar; her birini yine değiştirebilirsiniz.</string>
+    <string name="demo_fly_in">Uçuş</string>
+    <string name="feature_app_morph">Uygulama adaya uçar</string>
+    <string name="feature_app_morph_note">Çalan uygulamadan ana ekrana dönünce uygulama küçülür ve kapağı ya da simgesiyle adaya uçar.</string>
 </resources>
