@@ -13,3 +13,7 @@ class IslandTestRunner : AndroidJUnitRunner() {
         super.onCreate(arguments)
     }
 }
+
+/** The installed app's ID; it differs per build (standard or android17), so tests never hardcode it. */
+val APP_ID: String
+    get() = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.packageName

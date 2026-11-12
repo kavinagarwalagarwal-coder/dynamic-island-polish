@@ -10,7 +10,9 @@ android {
     compileSdk = 37
 
     defaultConfig {
-        applicationId = "com.dynamicdroid.app"
+        // A unique ID, so the phone never mistakes this app for another app that happens to share
+        // a common name like "com.dynamicdroid.app". The code package stays com.dynamicdroid.app.
+        applicationId = "io.github.kavinagarwalagarwal.dynamicdroid"
         minSdk = 26
         targetSdk = 35
         testInstrumentationRunner = "com.dynamicdroid.app.IslandTestRunner"
@@ -18,11 +20,10 @@ android {
         versionName = "1.7.0"
     }
 
-    // Two builds of the same app (same package, so either one installs over the other and keeps
-    // its settings):
+    // Two builds, each with its own app ID so both can be installed side by side:
     //  - standard: the current build, targets Android 15 and runs on Android 8 to 17.
     //  - android17: opts in to Android 17's rules (predictive back, background audio limits,
-    //    large-screen resizing). For phones already on Android 16 or 17.
+    //    large-screen resizing). For phones already on Android 16 or 17. Shows as "Dynamic Droid 17".
     flavorDimensions += "platform"
     productFlavors {
         create("standard") {
@@ -32,6 +33,7 @@ android {
         create("android17") {
             dimension = "platform"
             targetSdk = 37
+            applicationIdSuffix = ".android17"
             versionNameSuffix = "-android17"
         }
     }

@@ -69,7 +69,7 @@ class VolumeAndRingerTest {
         val startRinger = audio.ringerMode
         ActivityScenario.launch(MainActivity::class.java).use {
             try {
-                shell("settings put secure enabled_accessibility_services com.dynamicdroid.app/com.dynamicdroid.app.IslandAccessibilityService")
+                shell("settings put secure enabled_accessibility_services ${APP_ID}/com.dynamicdroid.app.IslandAccessibilityService")
                 shell("settings put secure accessibility_enabled 1")
                 assertTrue("Overlay service not attached", waitFor(20_000) {
                     IslandBus.listener is IslandOverlayService && IslandAccessibilityService.instance != null

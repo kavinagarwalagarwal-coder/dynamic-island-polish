@@ -1,11 +1,14 @@
 """Exercise the installed optimized APK without adding an instrumentation runtime to it."""
+import os
 import pathlib
 import re
 import subprocess
 import time
 import xml.etree.ElementTree as ET
 
-PACKAGE = "com.dynamicdroid.app"
+# The app ID differs per build (standard or android17); CI passes it in.
+PACKAGE = os.environ.get("APP_ID", "io.github.kavinagarwalagarwal.dynamicdroid")
+CODE = "com.dynamicdroid.app"
 recording = None
 
 def adb(*args, timeout=25):
@@ -81,7 +84,7 @@ def main():
     adb("shell", "am", "force-stop", PACKAGE)
     adb("logcat", "-c")
     adb("shell", "pm", "grant", PACKAGE, "android.permission.POST_NOTIFICATIONS")
-    adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.MainActivity")
+    adb("shell", "am", "start", "-W", "-n", PACKAGE + "/" + CODE + ".MainActivity")
     # Launch flourish, then the first-run tour on a fresh install.
     time.sleep(2.5)
     check_crash()
@@ -98,7 +101,7 @@ def main():
         else:
             adb("shell", "am", "broadcast", "-a", "android.intent.action.CLOSE_SYSTEM_DIALOGS")
             if attempt in (5, 9):
-                adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.MainActivity")
+                adb("shell", "am", "start", "-W", "-n", PACKAGE + "/" + CODE + ".MainActivity")
         time.sleep(1)
     else:
         raise AssertionError("Main screen never showed 'Playground'; visible: " + ", ".join(l for l in labels if l)[:600])
@@ -108,15 +111,15 @@ def main():
     assert adb("shell", "pidof", PACKAGE).strip(), "Optimized app stopped on the Playground"
     adb("shell", "pm", "grant", "com.dynamicdroid.fixture", "android.permission.POST_NOTIFICATIONS")
     adb("shell", "appops", "set", PACKAGE, "SYSTEM_ALERT_WINDOW", "allow")
-    adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + PACKAGE + ".IslandNotificationListener")
-    adb("shell", "settings", "put", "secure", "enabled_accessibility_services", PACKAGE + "/" + PACKAGE + ".IslandAccessibilityService")
+    adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + CODE + ".IslandNotificationListener")
+    adb("shell", "settings", "put", "secure", "enabled_accessibility_services", PACKAGE + "/" + CODE + ".IslandAccessibilityService")
     adb("shell", "settings", "put", "secure", "accessibility_enabled", "1")
     # Binding is asynchronous and slow on a busy emulator (Android 17 images especially): wait
     # until the phone reports both services connected instead of trusting a fixed sleep.
     def bound():
         listeners = adb("shell", "dumpsys", "notification", timeout=40)
         a11y = adb("shell", "dumpsys", "accessibility", timeout=40)
-        return (PACKAGE + "/" + PACKAGE + ".IslandNotificationListener") in listeners and "Dynamic Droid island" in a11y
+        return (PACKAGE + "/" + CODE + ".IslandNotificationListener") in listeners and "Bound services:{Service" in a11y
     end = time.time() + 30
     while time.time() < end and not bound():
         time.sleep(1)
@@ -181,7 +184,7 @@ finally:
         ("optimized-logcat.txt", ["adb", "logcat", "-d", "-s", "AndroidRuntime:E"]),
         ("optimized-activity.txt", ["adb", "shell", "dumpsys", "activity", "activities"]),
         ("optimized-full-logcat.txt", ["adb", "logcat", "-d", "-t", "4000"]),
-        ("optimized-services.txt", ["adb", "shell", "dumpsys", "activity", "services", "com.dynamicdroid.app"]),
+        ("optimized-services.txt", ["adb", "shell", "dumpsys", "activity", "services", PACKAGE]),
         ("optimized-a11y.txt", ["adb", "shell", "dumpsys", "accessibility"]),
     ]:
         try:

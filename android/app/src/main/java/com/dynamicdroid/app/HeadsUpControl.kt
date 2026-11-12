@@ -16,7 +16,9 @@ import android.provider.Settings
  */
 object HeadsUpControl {
     private const val KEY = "heads_up_notifications_enabled"
-    const val GRANT_COMMAND = "adb shell pm grant com.dynamicdroid.app android.permission.WRITE_SECURE_SETTINGS"
+    /** Uses the installed app ID, which differs between the standard and Android 17 builds. */
+    fun grantCommand(context: android.content.Context) =
+        "adb shell pm grant ${context.packageName} android.permission.WRITE_SECURE_SETTINGS"
 
     private fun prefs(context: Context) = context.getSharedPreferences("heads_up", Context.MODE_PRIVATE)
 

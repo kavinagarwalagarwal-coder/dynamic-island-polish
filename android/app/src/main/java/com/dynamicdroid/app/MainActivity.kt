@@ -829,11 +829,11 @@ class MainActivity : AppCompatActivity() {
     internal fun explainPopupGrant() {
         android.app.AlertDialog.Builder(this, R.style.IslandDialog)
             .setTitle(getString(R.string.popups_grant_title))
-            .setMessage(getString(R.string.popups_grant_body, HeadsUpControl.GRANT_COMMAND))
+            .setMessage(getString(R.string.popups_grant_body, HeadsUpControl.grantCommand(this)))
             .setNegativeButton(getString(R.string.common_done), null)
             .setPositiveButton(getString(R.string.popups_copy)) { _, _ ->
                 getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(
-                    android.content.ClipData.newPlainText("adb", HeadsUpControl.GRANT_COMMAND))
+                    android.content.ClipData.newPlainText("adb", HeadsUpControl.grantCommand(this)))
                 toast(getString(R.string.popups_copied))
             }.show()
     }

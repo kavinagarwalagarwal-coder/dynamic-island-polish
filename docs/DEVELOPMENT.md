@@ -109,7 +109,8 @@ Features → **Hide the phone's pop-up notifications** is a single toggle. When 
 Optional: to stop pop-ups from flashing at all, grant a one-time permission from a computer (USB debugging on). Dynamic Droid then switches the phone's pop-ups off while the island runs and restores your setting afterwards. If you use this, turn the option off before uninstalling.
 
 ```
-adb shell pm grant com.dynamicdroid.app android.permission.WRITE_SECURE_SETTINGS
+adb shell pm grant io.github.kavinagarwalagarwal.dynamicdroid android.permission.WRITE_SECURE_SETTINGS
+# Android 17 build: io.github.kavinagarwalagarwal.dynamicdroid.android17
 ```
 
 ### Ring, vibrate and silent from the island (2.0)

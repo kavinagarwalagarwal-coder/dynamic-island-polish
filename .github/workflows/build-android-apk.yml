@@ -175,9 +175,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { api: 36, apk: dynamic-droid-optimized-apk, file: app-standard-performance.apk, target: default }
-          - { api: 37, apk: dynamic-droid-android17-optimized-apk, file: app-android17-performance.apk, target: google_apis }
-          - { api: 37, apk: dynamic-droid-optimized-apk, file: app-standard-performance.apk, target: google_apis }
+          - { api: 36, apk: dynamic-droid-optimized-apk, file: app-standard-performance.apk, target: default, id: io.github.kavinagarwalagarwal.dynamicdroid }
+          - { api: 37, apk: dynamic-droid-android17-optimized-apk, file: app-android17-performance.apk, target: google_apis, id: io.github.kavinagarwalagarwal.dynamicdroid.android17 }
+          - { api: 37, apk: dynamic-droid-optimized-apk, file: app-standard-performance.apk, target: google_apis, id: io.github.kavinagarwalagarwal.dynamicdroid }
     steps:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v7
@@ -215,7 +215,7 @@ jobs:
           script: |
             adb install -r optimized-apk/${{ matrix.file }}
             adb install -r notification-fixture/notification-fixture-debug.apk
-            python3 android/ci/smoke_optimized.py
+            APP_ID=${{ matrix.id }} python3 android/ci/smoke_optimized.py
       - uses: actions/upload-artifact@v6
         if: always()
         with:
