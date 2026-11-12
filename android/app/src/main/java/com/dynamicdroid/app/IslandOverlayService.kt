@@ -630,6 +630,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false
         val morph = AppReturnPolicy.shouldMorph(source?.packageName, previous, pkg, pkg in homePackages,
             source?.key != island?.activity?.key, unlocked)
+        android.util.Log.d("IslandHandoff", "foreground $previous -> $pkg source=${source?.packageName} " +
+            "home=${pkg in homePackages} unlocked=$unlocked morph=$morph")
         if (morph) { presentation = Presentation.COMPACT; fullscreen = false }
         if (IslandCustomization.isHiddenForForeground(this, pkg)) island?.cancelAppMorph()
         render(absorb = morph && !IslandCustomization.isHiddenForForeground(this, pkg))

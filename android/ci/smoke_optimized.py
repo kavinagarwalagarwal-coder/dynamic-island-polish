@@ -77,7 +77,9 @@ def click_if_present(label, wait=6.0):
     return False
 
 def check_crash():
-    assert "FATAL EXCEPTION" not in adb("logcat", "-d", "-s", "AndroidRuntime:E"), "Optimized app crashed"
+    # Only our own crashes count: Google Play services sometimes dies on the emulator images.
+    log = adb("logcat", "-d", "-s", "AndroidRuntime:E")
+    assert not ("FATAL EXCEPTION" in log and "Process: " + PACKAGE + "," in log), "Optimized app crashed"
 
 def main():
     global recording
