@@ -20,6 +20,18 @@ import org.junit.runner.RunWith
 class FeatureIslandRenderTest {
     private val instrumentation = InstrumentationRegistry.getInstrumentation()
 
+    /** Compose attaches the preview on its next frame; wait for it rather than for the queue. */
+    private fun awaitPreview(scenario: ActivityScenario<MainActivity>) {
+        val deadline = android.os.SystemClock.uptimeMillis() + 6_000L
+        while (android.os.SystemClock.uptimeMillis() < deadline) {
+            var found = false
+            scenario.onActivity { activity -> found = findIsland(activity.window.decorView)?.isAttachedToWindow == true }
+            if (found) { instrumentation.waitForIdleSync(); android.os.SystemClock.sleep(150); return }
+            android.os.SystemClock.sleep(50)
+        }
+        error("The Playground preview never attached")
+    }
+
     private fun findIsland(view: View): IslandView? {
         if (view is IslandView) return view
         if (view is ViewGroup) for (i in 0 until view.childCount) findIsland(view.getChildAt(i))?.let { return it }
@@ -77,14 +89,9 @@ class FeatureIslandRenderTest {
         )
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->
-                fun click(view: View): Boolean {
-                    if (view is android.widget.Button && view.text.toString() == "Playground") { view.performClick(); return true }
-                    if (view is ViewGroup) for (i in 0 until view.childCount) if (click(view.getChildAt(i))) return true
-                    return false
-                }
-                assertTrue(click(activity.window.decorView))
+                activity.openPage("Playground")
             }
-            instrumentation.waitForIdleSync()
+            awaitPreview(scenario)
             for ((name, live, presentation) in scenes) {
                 scenario.onActivity { activity ->
                     val view = findIsland(activity.window.decorView)!!

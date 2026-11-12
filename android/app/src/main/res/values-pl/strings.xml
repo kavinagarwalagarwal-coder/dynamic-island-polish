@@ -361,4 +361,9 @@
     <string name="feature_camera_fade_note">Treść płynnie ciemnieje do czerni wokół otworu aparatu, więc nic się za nim nie chowa.</string>
     <string name="feature_landscape">Przezroczysta w poziomie</string>
     <string name="feature_landscape_note">Bez aparatu do zakrycia wyspa pokazuje gry i filmy pod spodem.</string>
+    <string name="errors_heading">Błędy wyspy</string>
+    <string name="errors_note">Wyspa napotkała problem i działała dalej. Skopiuj raport i wyślij go twórcy, aby mógł to naprawić.</string>
+    <string name="errors_copy">Kopiuj raport błędów</string>
+    <string name="errors_copied">Skopiowano raport</string>
+    <string name="errors_clear">Wyczyść błędy</string>
 </resources>

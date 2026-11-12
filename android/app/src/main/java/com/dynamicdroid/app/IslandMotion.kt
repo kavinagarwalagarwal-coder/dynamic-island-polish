@@ -16,6 +16,12 @@ object IslandMotion {
     const val HEIGHT_DAMPING_RATIO = 0.88f
     const val CENTER_DAMPING_RATIO = 0.90f
     const val RADIUS_DAMPING_RATIO = 0.93f
+    // Fluid tuning: a touch less damping so the shape flows past its mark and settles back like
+    // a liquid, while staying well clear of a bounce.
+    const val FLUID_WIDTH_DAMPING = 0.74f
+    const val FLUID_HEIGHT_DAMPING = 0.79f
+    const val FLUID_CENTER_DAMPING = 0.84f
+    const val FLUID_RADIUS_DAMPING = 0.86f
     const val CONTENT_IN_K = 140f
     const val CONTENT_OUT_K = 380f
     const val IDLE_SIDE_MARGIN_DP = 2f

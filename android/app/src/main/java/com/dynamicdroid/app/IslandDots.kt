@@ -5,6 +5,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import kotlin.math.PI
+import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.exp
@@ -28,6 +29,11 @@ class IslandDots(private val n: Int) {
     private val alive = BooleanArray(count)
     private val homeR = FloatArray(count)
     private val homeA = FloatArray(count)
+    // Home position as x/y (cells from the centre), so spinning is a rotation, not trig per dot.
+    private val homeX = FloatArray(count)
+    /** Halftone dot size for each dot's current cover brightness, per cell (pow is slow). */
+    private val radTo = FloatArray(count)
+    private val homeY = FloatArray(count)
     private val lumFrom = FloatArray(count)
     private val lumTo = FloatArray(count)
     private val colFrom = IntArray(count)
@@ -80,6 +86,8 @@ class IslandDots(private val n: Int) {
             alive[i] = d <= half - .15f && d >= n * 0.08f
             homeR[i] = d
             homeA[i] = atan2(dy, dx)
+            homeX[i] = dx
+            homeY[i] = dy
             val c = sampled?.get(i) ?: Color.rgb(90, 90, 90)
             val lum = if (sampled == null) 0.3f + 0.25f * (1f - d / half) else DotArt.luminance(c)
             val color = if (mono || sampled == null) Color.WHITE else DotArt.vivid(c)
@@ -87,6 +95,7 @@ class IslandDots(private val n: Int) {
             lumFrom[i] = if (!first) lumFrom[i] + (lumTo[i] - lumFrom[i]) * ease(mix) else lum
             colTo[i] = color
             lumTo[i] = lum
+            radTo[i] = DotArt.halftoneRadius(lum, 1f)
         }
         ready = true
         mix = if (first || !animate) 1f else 0f
@@ -218,18 +227,19 @@ class IslandDots(private val n: Int) {
      * The same for a dot at ([px], [py]): ripples from the record are measured from ([ox], [oy]),
      * ones from a touch from where the finger landed; [reach] turns pixels into 0..1.
      */
-    fun light(px: Float, py: Float, ox: Float, oy: Float, reach: Float, recordDist: Float = Float.NaN): Float {
+    fun light(px: Float, py: Float, ox: Float, oy: Float, reach: Float, recordDist: Float = Float.NaN,
+              minStrength: Float = 0f): Float {
         var k = 0f
         for (j in rippleT.indices) {
             val age = t - rippleT[j]
-            if (age < 0f || age > RIPPLE_LIFE) continue
+            if (age < 0f || age > RIPPLE_LIFE || rippleS[j] < minStrength) continue
             val dist = if (rippleX[j].isNaN()) {
                 if (recordDist.isNaN()) { val dx = px - ox; val dy = py - oy; sqrt(dx * dx + dy * dy) / reach } else recordDist
             } else { val dx = px - rippleX[j]; val dy = py - rippleY[j]; sqrt(dx * dx + dy * dy) / reach }
             val front = age * 1.25f - dist
-            if (front > 0.22f || front < -0.22f) continue
+            if (front > 0.14f || front < -0.14f) continue
             val fade = 1f - age / RIPPLE_LIFE
-            k = max(k, rippleS[j] * exp(-front * front / (2f * 0.0045f)) * sqrt(fade))
+            k = max(k, rippleS[j] * exp(-front * front / (2f * 0.0025f)) * sqrt(fade))
         }
         return k
     }
@@ -238,50 +248,85 @@ class IslandDots(private val n: Int) {
      * How far the ripples push a dot at ([px], [py]) away from their source, as a fraction of a
      * cell, written to [out] (x, y). Like the full player, dots are shoved outward as a ring passes.
      */
-    fun push(px: Float, py: Float, ox: Float, oy: Float, reach: Float, out: FloatArray) {
+    fun push(px: Float, py: Float, ox: Float, oy: Float, reach: Float, out: FloatArray, minStrength: Float = 0f) {
         out[0] = 0f; out[1] = 0f
         for (j in rippleT.indices) {
             val age = t - rippleT[j]
-            if (age < 0f || age > RIPPLE_LIFE) continue
+            if (age < 0f || age > RIPPLE_LIFE || rippleS[j] < minStrength) continue
             val sx = if (rippleX[j].isNaN()) ox else rippleX[j]
             val sy = if (rippleY[j].isNaN()) oy else rippleY[j]
             val dx = px - sx; val dy = py - sy
             val d = sqrt(dx * dx + dy * dy)
             if (d < 0.5f) continue
             val front = age * 1.25f - d / reach
-            if (front > 0.22f || front < -0.22f) continue
-            val e = rippleS[j] * exp(-front * front / (2f * 0.0045f)) * (1f - age / RIPPLE_LIFE)
+            if (front > 0.14f || front < -0.14f) continue
+            val e = rippleS[j] * exp(-front * front / (2f * 0.0025f)) * (1f - age / RIPPLE_LIFE)
             out[0] += dx / d * e; out[1] += dy / d * e
         }
     }
 
     /** True while any ripple is still crossing the island. */
-    val rippling: Boolean get() = rippleT.any { t - it in 0f..RIPPLE_LIFE }
+    val rippling: Boolean get() {
+        for (j in rippleT.indices) { val age = t - rippleT[j]; if (age >= 0f && age <= RIPPLE_LIFE) return true }
+        return false
+    }
+
+    /**
+     * Where the live ripples' rings are, for skipping dots they can't touch: fills [fronts] with
+     * each record ripple's ring distance (0..1+) and returns how many; -1 if a touch ripple is
+     * live (its rings aren't centred on the record, so nothing can be skipped).
+     */
+    fun recordFronts(fronts: FloatArray, minStrength: Float = 0f): Int {
+        var n = 0
+        for (j in rippleT.indices) {
+            val age = t - rippleT[j]
+            if (age < 0f || age > RIPPLE_LIFE || rippleS[j] < minStrength) continue
+            if (!rippleX[j].isNaN()) return -1
+            fronts[n++] = age * 1.25f
+        }
+        return n
+    }
 
     /** The record, [radius] pixels, centred on ([cx], [cy]). */
+    // Per-frame ripple fronts for the record, so each dot checks a few numbers instead of
+    // working every ripple out again.
+    private val liveFront = FloatArray(4)
+    private val liveGain = FloatArray(4)
+
     fun drawRecord(canvas: Canvas, paint: Paint, cx: Float, cy: Float, radius: Float, playing: Boolean, alpha: Int) {
         if (!ready) return
         val cell = radius * 2f / n
         val m = ease(mix)
         val dim = if (playing) 1f else 0.6f
+        var live = 0
+        for (j in rippleT.indices) {
+            val age = t - rippleT[j]
+            if (age < 0f || age > RIPPLE_LIFE) continue
+            liveFront[live] = age * n * 1.1f
+            liveGain[live] = rippleS[j] * (1f - age / RIPPLE_LIFE)
+            live++
+        }
+        val cs = cos(spin) * cell
+        val sn = sin(spin) * cell
+        val breathe = if (playing) 0.07f else 0.02f
+        val phase = t * 1.8f
         for (i in 0 until count) {
             if (!alive[i]) continue
-            val a = homeA[i] + spin
-            val r0 = homeR[i] * cell
-            val x = cx + r0 * cos(a) + ox[i] * cell
-            val y = cy + r0 * sin(a) + oy[i] * cell
-            val lum = lumFrom[i] + (lumTo[i] - lumFrom[i]) * m
-            var r = max(DotArt.halftoneRadius(lum, cell), cell * 0.16f)
-            r *= 1f + (if (playing) 0.07f else 0.02f) * sin(t * 1.8f - homeR[i] * 0.45f)
+            val x = cx + homeX[i] * cs - homeY[i] * sn + ox[i] * cell
+            val y = cy + homeX[i] * sn + homeY[i] * cs + oy[i] * cell
+            val frac = if (m >= 1f) radTo[i] else
+                DotArt.halftoneRadius(lumFrom[i] + (lumTo[i] - lumFrom[i]) * m, 1f)
+            var r = max(frac * cell, cell * 0.16f)
+            r *= 1f + breathe * sin(phase - homeR[i] * 0.45f)
             var lit = 0f
-            for (j in rippleT.indices) {
-                val age = t - rippleT[j]
-                if (age < 0f || age > RIPPLE_LIFE) continue
-                val front = age * n * 1.1f - homeR[i]
-                lit = max(lit, rippleS[j] * exp(-front * front / 1.6f) * (1f - age / RIPPLE_LIFE))
+            for (k in 0 until live) {
+                val front = liveFront[k] - homeR[i]
+                if (front > 3.5f || front < -3.5f) continue
+                lit = max(lit, liveGain[k] * exp(-front * front / 1.6f))
             }
             r = min(r * (1f + 0.9f * lit), cell * 0.62f)
-            paint.color = blend(blend(colFrom[i], colTo[i], m), Color.WHITE, min(1f, lit * 0.8f))
+            val base = if (m >= 1f) colTo[i] else blend(colFrom[i], colTo[i], m)
+            paint.color = if (lit > 0.01f) blend(base, Color.WHITE, min(1f, lit * 0.8f)) else base
             paint.alpha = (alpha * min(1f, dim + lit)).toInt().coerceIn(0, 255)
             canvas.drawCircle(x, y, r, paint)
         }
@@ -297,11 +342,12 @@ class IslandDots(private val n: Int) {
             val a = b * 2f * PI.toFloat() / bands - PI.toFloat() / 2 + spin * 0.25f
             val level = ring[b]
             val lit = 1 + (level * (stack - 1) + 0.35f).toInt().coerceAtMost(stack - 1)
+            val ca = cos(a); val sa = sin(a)
             for (s in 0 until lit) {
                 val rr = inner + s * pitch
                 paint.color = if (s == lit - 1 && level > 0.62f) accent else Color.WHITE
                 paint.alpha = ((if (playing) 0.85f else 0.3f) * alpha * (1f - s * 0.2f)).toInt().coerceIn(0, 255)
-                canvas.drawCircle(cx + rr * cos(a), cy + rr * sin(a), dot * (1f - s * 0.12f), paint)
+                canvas.drawCircle(cx + rr * ca, cy + rr * sa, dot * (1f - s * 0.12f), paint)
             }
         }
     }
@@ -398,76 +444,200 @@ class IslandDotField {
             // Deepen the darks so the picture stands out of the field instead of a flat grid.
             for (i in cov.indices) cov[i] = cov[i].pow(1.35f)
         }
-        mix = if (ready && animate) 0f else 1f
-        if (!ready || !animate) for (i in cov.indices) covFrom[i] = cov[i]
+        // Layers are re-baked for the new cover; the view crossfades from the old ones.
+        mix = 1f
+        for (i in cov.indices) covFrom[i] = cov[i]
+        version++
         ready = true
     }
 
     fun step(dt: Float) { if (mix < 1f) mix = min(1f, mix + dt / 0.9f) }
 
     /**
-     * Fills [l],[t],[r],[b] (already clipped to the island's shape) with dots [pitch] apart.
-     * [alpha] is the field's resting strength, low enough that text on top stays readable; the
-     * beat ripples from ([ox], [oy]) light dots up toward [peak]. Dots within [hole] of the
-     * ripple's source fade out, carving room for the record.
+     * One pre-drawn halftone of the cover for a fixed island size: the dots are drawn once into an
+     * alpha bitmap and then just blitted every frame, instead of hundreds of circles per frame.
      */
-    fun draw(canvas: Canvas, paint: Paint, l: Float, t: Float, r: Float, b: Float, pitch: Float,
-             dots: IslandDots, playing: Boolean, alpha: Int, peak: Int = alpha,
-             ox: Float = (l + r) / 2f, oy: Float = (t + b) / 2f, hole: Float = 0f) {
-        if (!ready || alpha <= 2) return
-        val w = r - l
-        val h = b - t
-        if (w < pitch || h < pitch) return
-        val cols = (w / pitch).toInt() + 1
-        val rows = (h / pitch).toInt() + 1
-        val gx = l + (w - (cols - 1) * pitch) / 2f
-        val gy = t + (h - (rows - 1) * pitch) / 2f
-        // Centre-crop the square cover to the island's shape.
-        val side = max(w, h)
+    class Layer {
+        var bitmap: Bitmap? = null
+        var w = 0f; var h = 0f; var pitch = 0f; var holeX = 0f; var holeY = 0f; var hole = 0f
+        var scale = 0f; var version = -1
+        /** The build in progress, so the same layer isn't requested twice. */
+        var pending: String? = null
+        fun matches(w: Float, h: Float, pitch: Float, holeX: Float, holeY: Float, hole: Float, scale: Float, version: Int) =
+            bitmap != null && this.version == version && abs(this.w - w) < 0.5f && abs(this.h - h) < 0.5f &&
+                this.pitch == pitch && abs(this.holeX - holeX) < 0.5f && abs(this.holeY - holeY) < 0.5f &&
+                this.hole == hole && this.scale == scale
+        // Dropped, not recycled: a frame already recorded may still be drawing it.
+        fun release() { bitmap = null }
+    }
+
+    /** Bumped whenever the cover changes, so cached layers rebuild. */
+    private var version = 0
+    val coverVersion: Int get() = version
+
+    /** Coverage (0..1) of the halftone cell at [u],[v] in the cover, for the current cover. */
+    private fun coverage(u: Float, v: Float): Float = coverageOf(cov, u, v)
+
+    private fun cells(w: Float, h: Float, pitch: Float) =
+        Triple((w / pitch).toInt() + 1, (h / pitch).toInt() + 1, max(w, h))
+
+    /**
+     * Makes sure [layer] holds the field for a [w]×[h] island (local units, drawn at [scale]
+     * pixels per unit) with dots [pitch] apart and a clearing of radius [hole] around
+     * ([holeX], [holeY]) for the record. Rebuilt only when one of those or the cover changes.
+     * With [async] the dots are drawn on a worker thread (the old layer keeps showing meanwhile)
+     * and [onReady] runs on the main thread once the new one is in place.
+     */
+    fun bake(layer: Layer, w: Float, h: Float, pitch: Float, holeX: Float, holeY: Float, hole: Float, scale: Float,
+             async: Boolean = false, onReady: () -> Unit = {}) {
+        if (!ready || w < pitch || h < pitch) return
+        if (layer.matches(w, h, pitch, holeX, holeY, hole, scale, version)) return
+        val key = "$w|$h|$pitch|$holeX|$holeY|$hole|$scale|$version"
+        if (layer.pending == key) return
+        layer.pending = key
+        val coverage = cov.copyOf()
+        val v = version
+        val job: () -> Unit = {
+            val bitmap = render(coverage, w, h, pitch, holeX, holeY, hole, scale)
+            val apply: () -> Unit = {
+                if (layer.pending == key && bitmap != null) {
+                    layer.bitmap = bitmap
+                    layer.w = w; layer.h = h; layer.pitch = pitch; layer.holeX = holeX; layer.holeY = holeY
+                    layer.hole = hole; layer.scale = scale; layer.version = v; layer.pending = null
+                    onReady()
+                }
+            }
+            if (async) main.post { apply() } else apply()
+        }
+        if (async) worker.execute { job() } else job()
+    }
+
+    private fun render(coverage: FloatArray, w: Float, h: Float, pitch: Float, holeX: Float, holeY: Float,
+                       hole: Float, scale: Float): Bitmap? {
+        val bw = (w * scale).toInt().coerceAtLeast(1)
+        val bh = (h * scale).toInt().coerceAtLeast(1)
+        val bitmap = runCatching { Bitmap.createBitmap(bw, bh, Bitmap.Config.ARGB_8888) }.getOrNull() ?: return null
+        val canvas = Canvas(bitmap)
+        canvas.scale(scale, scale)
+        val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.WHITE }
+        val (cols, rows, side) = cells(w, h, pitch)
+        val gx = (w - (cols - 1) * pitch) / 2f
+        val gy = (h - (rows - 1) * pitch) / 2f
         val u0 = (side - w) / 2f / side
         val v0 = (side - h) / 2f / side
-        // Ripples are measured from their source to the farthest corner.
-        val reach = max(1f, sqrt(max((ox - l) * (ox - l), (r - ox) * (r - ox)) + max((oy - t) * (oy - t), (b - oy) * (b - oy))))
-        val m = ease(mix)
-        val time = dots.time
-        val breathe = if (playing) 0.07f else 0.02f
-        val rippling = dots.rippling
         val holeIn = hole * 0.92f
         val holeOut = hole * 1.3f
-        paint.color = Color.WHITE
         for (yy in 0 until rows) {
             val py = gy + yy * pitch
-            val v = (v0 + (py - t) / side).coerceIn(0f, 0.999f)
             for (xx in 0 until cols) {
-                var px = gx + xx * pitch
-                val u = (u0 + (px - l) / side).coerceIn(0f, 0.999f)
-                val i = (v * size).toInt() * size + (u * size).toInt()
-                val c = covFrom[i] + (cov[i] - covFrom[i]) * m
-                val dx = px - ox
-                val dy = py - oy
-                val d = sqrt(dx * dx + dy * dy)
+                val px = gx + xx * pitch
+                val c = coverageOf(coverage, u0 + px / side, v0 + py / side)
                 var fade = 1f
-                if (hole > 0f && d < holeOut) {
+                if (hole > 0f) {
+                    val dx = px - holeX; val dy = py - holeY
+                    val d = sqrt(dx * dx + dy * dy)
                     if (d <= holeIn) continue
-                    val k = (d - holeIn) / (holeOut - holeIn)
-                    fade = k * k * (3f - 2f * k)
+                    if (d < holeOut) { val k = (d - holeIn) / (holeOut - holeIn); fade = k * k * (3f - 2f * k) }
                 }
-                val dist = d / reach
-                val lit = if (rippling) min(1f, dots.light(px, py, ox, oy, reach, dist)) else 0f
-                var rad = pitch * (0.07f + 0.31f * c) * (1f + breathe * sin(time * 1.8f - dist * 6f))
-                var a = alpha * (0.12f + 0.88f * c)
-                var y = py
-                if (lit > 0.01f) {
-                    rad *= 1f + 1.2f * lit
-                    a += (peak - a) * lit
-                    // The ring shoves dots outward as it passes, like the full player.
-                    dots.push(px, py, ox, oy, reach, shove)
-                    px += shove[0] * pitch * 0.6f; y += shove[1] * pitch * 0.6f
-                }
-                a *= fade
+                val a = 255f * (0.12f + 0.88f * c) * fade
                 if (a < 3f) continue
                 paint.alpha = a.toInt().coerceIn(0, 255)
-                canvas.drawCircle(px, y, min(rad, pitch * 0.55f), paint)
+                canvas.drawCircle(px, py, min(pitch * (0.07f + 0.31f * c), pitch * 0.55f), paint)
+            }
+        }
+        return bitmap
+    }
+
+    private fun coverageOf(coverage: FloatArray, u: Float, v: Float): Float {
+        val i = (v.coerceIn(0f, 0.999f) * size).toInt() * size + (u.coerceIn(0f, 0.999f) * size).toInt()
+        return coverage[i]
+    }
+
+    private companion object {
+        const val FIELD_RIPPLE_MIN = 0.8f
+        val worker: java.util.concurrent.ExecutorService = java.util.concurrent.Executors.newSingleThreadExecutor { r ->
+            Thread(r, "island-dots").apply { isDaemon = true; priority = Thread.NORM_PRIORITY - 1 }
+        }
+        val main = android.os.Handler(android.os.Looper.getMainLooper())
+    }
+
+    private val dst = android.graphics.RectF()
+    private val fronts = FloatArray(4)
+    private var marks = BooleanArray(64)
+
+    /** Blits [layer] with its top-left at ([left], [top]); [alpha] is the field's strength. */
+    fun drawLayer(canvas: Canvas, paint: Paint, layer: Layer, left: Float, top: Float, alpha: Int) {
+        val bitmap = layer.bitmap ?: return
+        if (alpha <= 2) return
+        paint.color = Color.WHITE
+        paint.alpha = alpha.coerceIn(0, 255)
+        dst.set(left, top, left + layer.w, top + layer.h)
+        canvas.drawBitmap(bitmap, null, dst, paint)
+    }
+
+    /**
+     * The beat ripples on top of a baked [layer] at ([left], [top]): only the dots the ring of
+     * light is crossing are drawn, brighter, larger and shoved outward, so a beat costs a few
+     * dozen circles instead of the whole field. Ripples start at ([ox], [oy]) (island units).
+     */
+    fun drawRipples(canvas: Canvas, paint: Paint, layer: Layer, left: Float, top: Float,
+                    dots: IslandDots, ox: Float, oy: Float, reach: Float, peak: Int) {
+        if (layer.bitmap == null || peak <= 2 || !dots.rippling) return
+        // Across the whole island only the strong beats ripple (taps, song changes, the
+        // downbeats); every beat still pulses the record itself.
+        val strong = FIELD_RIPPLE_MIN
+        val w = layer.w; val h = layer.h; val pitch = layer.pitch
+        val (cols, rows, side) = cells(w, h, pitch)
+        val gx = left + (w - (cols - 1) * pitch) / 2f
+        val gy = top + (h - (rows - 1) * pitch) / 2f
+        val u0 = (side - w) / 2f / side
+        val v0 = (side - h) / 2f / side
+        val holeX = left + layer.holeX; val holeY = top + layer.holeY
+        val holeOut2 = (layer.hole * 1.3f).let { it * it }
+        val count = dots.recordFronts(fronts, strong)
+        if (count == 0) return
+        paint.color = Color.WHITE
+        if (marks.size < cols) marks = BooleanArray(cols + 16)
+        val band = 0.12f * reach
+        for (yy in 0 until rows) {
+            val py = gy + yy * pitch
+            val dy = py - oy
+            if (count >= 0) {
+                // Only the cells this row shares with a ring: work them out per row from the
+                // ring's radius instead of testing every dot on the island.
+                java.util.Arrays.fill(marks, 0, cols, false)
+                var any = false
+                for (k in 0 until count) {
+                    val r = fronts[k] * reach
+                    val outer = r + band
+                    if (abs(dy) >= outer) continue
+                    val inner = r - band
+                    val far = sqrt(outer * outer - dy * dy)
+                    val near = if (inner > abs(dy)) sqrt(inner * inner - dy * dy) else 0f
+                    for (side2 in 0..1) {
+                        val sign = if (side2 == 0) -1f else 1f
+                        val a0 = ox + sign * near; val a1 = ox + sign * far
+                        val from = ((min(a0, a1) - gx) / pitch).toInt().coerceAtLeast(0)
+                        val to = (kotlin.math.ceil((max(a0, a1) - gx) / pitch).toInt()).coerceAtMost(cols - 1)
+                        for (c in from..to) { marks[c] = true; any = true }
+                    }
+                }
+                if (!any) continue
+            }
+            for (xx in 0 until cols) {
+                if (count >= 0 && !marks[xx]) continue
+                val px = gx + xx * pitch
+                val dx = px - ox
+                val dist = sqrt(dx * dx + dy * dy) / reach
+                val lit = min(1f, dots.light(px, py, ox, oy, reach, dist, strong))
+                if (lit < 0.08f) continue
+                val hx = px - holeX; val hy = py - holeY
+                if (hx * hx + hy * hy < holeOut2) continue
+                val c = coverage(u0 + (px - left) / side, v0 + (py - top) / side)
+                val rad = min(pitch * (0.07f + 0.31f * c) * (1f + 1.2f * lit), pitch * 0.55f)
+                dots.push(px, py, ox, oy, reach, shove, strong)
+                paint.alpha = (peak * lit).toInt().coerceIn(0, 255)
+                canvas.drawCircle(px + shove[0] * pitch * 0.6f, py + shove[1] * pitch * 0.6f, rad, paint)
             }
         }
     }

@@ -27,28 +27,30 @@ class IslandRenderingTest {
     private fun launchPlayground(): ActivityScenario<MainActivity> {
         val scenario = ActivityScenario.launch(MainActivity::class.java)
         scenario.onActivity { activity ->
-            fun click(view: View): Boolean {
-                if (view is android.widget.Button && view.text.toString() == "Playground") { view.performClick(); return true }
-                if (view is ViewGroup) for (i in 0 until view.childCount) if (click(view.getChildAt(i))) return true
-                return false
-            }
-            assertTrue(click(activity.window.decorView))
+            activity.openPage("Playground")
         }
-        instrumentation.waitForIdleSync()
+        awaitPreview(scenario)
         return scenario
+    }
+
+    /** Compose attaches the preview on its next frame; wait for it rather than for the queue. */
+    private fun awaitPreview(scenario: ActivityScenario<MainActivity>) {
+        val deadline = SystemClock.uptimeMillis() + 6_000L
+        while (SystemClock.uptimeMillis() < deadline) {
+            var found = false
+            scenario.onActivity { activity -> found = findIsland(activity.window.decorView)?.isAttachedToWindow == true }
+            if (found) { instrumentation.waitForIdleSync(); SystemClock.sleep(150); return }
+            SystemClock.sleep(50)
+        }
+        error("The Playground preview never attached")
     }
 
     @Test fun navigationExposesSetupAppearanceAndPlacementWithoutLongSettingsScroll() {
         launchPlayground().use { scenario ->
             for (name in listOf("Setup", "Phone fit", "Appearance", "Playground")) {
                 scenario.onActivity { activity ->
-                    fun find(view: View): android.widget.Button? {
-                        if (view is android.widget.Button && view.text.toString() == name) return view
-                        if (view is ViewGroup) for (i in 0 until view.childCount) find(view.getChildAt(i))?.let { return it }
-                        return null
-                    }
-                    val button = find(activity.window.decorView) ?: error("Missing $name navigation")
-                    assertTrue(button.isShown); assertTrue(button.performClick()); assertTrue(button.isSelected)
+                    activity.openPage(name)
+                    assertTrue("Page $name did not open", activity.page == name)
                 }
                 instrumentation.waitForIdleSync()
                 // IdleSync drains the UI queue before SurfaceFlinger presents the new page.
@@ -107,6 +109,8 @@ class IslandRenderingTest {
             scenario.onActivity { activity ->
                 val view = findIsland(activity.window.decorView)!!
                 val dp = view.resources.displayMetrics.density
+                // A strong beat (like a downbeat or a tap) to ripple across the whole island.
+                field<IslandDots>(view, "cardDots").ripple(1f)
                 var index = 0
                 val callback = object : android.view.Choreographer.FrameCallback {
                     override fun doFrame(time: Long) {

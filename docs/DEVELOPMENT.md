@@ -3,7 +3,7 @@
 Build, architecture and release notes. For what the app does, see the [README](../README.md).
 
 
-Android Dynamic Island. The **shape and motion** are authored in SwiftUI (`Sources/IslandUI`) so they can be compiled to Android with [Skip](https://skip.tools). The live overlay (permissions, notifications, accessibility) stays in `android/`.
+Android Dynamic Island, all native Kotlin in `android/`. The island is drawn on a Canvas with its own springs (`IslandView`, `Spring`, `IslandMotion`); the settings app is Jetpack Compose. The earlier SwiftUI/Skip layer has been removed.
 
 ## What changed
 
@@ -18,36 +18,6 @@ Android Dynamic Island. The **shape and motion** are authored in SwiftUI (`Sourc
 3. Tap **Start Dynamic Island**.
 
 Or use **Actions → Build Android APK** after this repo is on GitHub.
-
-## SwiftUI + Skip
-
-```
-Sources/IslandUI/     SwiftUI island (source of motion)
-android/              Overlay, listeners, Canvas port of the same springs
-Package.swift         Builds IslandUI on Swift 5.7+
-skip.yml              Skip module mapping
-```
-
-This Mac is on Swift 5.7 (macOS 12), which cannot run the current Skip CLI (needs Swift 5.9 / Xcode 15). The Android Canvas island is a hand port of the SwiftUI springs so the phone app works today.
-
-On a newer Mac:
-
-```sh
-brew install skiptools/skip/skip
-skip checkup
-swift build
-skip export --module IslandUI
-```
-
-Then host the exported Compose view from `IslandOverlayService` in place of `IslandView` when you are ready to switch renderers.
-
-## Preview the island on macOS / iOS
-
-Open `Package.swift` in Xcode and preview `IslandPlayground` in `DynamicIslandView.swift`, or:
-
-```sh
-swift build
-```
 
 ## Island interaction and timer refinement
 

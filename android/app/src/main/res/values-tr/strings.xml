@@ -361,4 +361,9 @@
     <string name="feature_camera_fade_note">İçerik kamera deliğinin çevresinde yumuşakça siyaha döner, arkasında hiçbir şey kalmaz.</string>
     <string name="feature_landscape">Yatayda saydam</string>
     <string name="feature_landscape_note">Kapatacak kamera yokken ada oyunları ve videoları gösterir.</string>
+    <string name="errors_heading">Ada hataları</string>
+    <string name="errors_note">Ada bir sorunla karşılaştı ve çalışmaya devam etti. Düzeltilmesi için raporu kopyalayıp geliştiriciye gönderin.</string>
+    <string name="errors_copy">Hata raporunu kopyala</string>
+    <string name="errors_copied">Hata raporu kopyalandı</string>
+    <string name="errors_clear">Hataları temizle</string>
 </resources>

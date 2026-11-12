@@ -167,21 +167,29 @@ class IslandAccessibilityService : AccessibilityService() {
         if (title.length < 2 && text.length < 2) return
         popupHunt?.let(handler::removeCallbacks)
         lastPopupCard = null
+        swipes = 0
+        sightings = 0
         val deadline = SystemClock.uptimeMillis() + POPUP_SEARCH_MS
         popupHunt = object : Runnable {
             override fun run() {
                 if (runCatching { tryDismissPopup(title, text) }.getOrDefault(true)) { popupHunt = null; return }
-                if (SystemClock.uptimeMillis() < deadline) handler.postDelayed(this, 90L) else popupHunt = null
+                // After a swipe, keep watching a little longer in case it didn't take.
+                val until = if (swipes > 0) maxOf(deadline, lastSwipeAt + POPUP_RETRY_MS * 2) else deadline
+                if (SystemClock.uptimeMillis() < until) handler.postDelayed(this, 90L) else popupHunt = null
             }
         }.also { handler.postDelayed(it, 60L) }
     }
 
     private var lastPopupCard: Rect? = null
+    private var swipes = 0
+    private var sightings = 0
+    private var lastSwipeAt = 0L
 
     /** True when done: the pop-up was swiped away, or there is nothing sensible to do. */
     private fun tryDismissPopup(title: String, text: String): Boolean {
         // The lock screen lists notifications instead of popping them up; never touch it.
         if (getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true) return true
+        var seen = false
         val metrics = resources.displayMetrics
         val maxTop = metrics.heightPixels * 0.3f
         val minCard = 48f * metrics.density
@@ -196,13 +204,25 @@ class IslandAccessibilityService : AccessibilityService() {
                 val card = cardBounds(hit, metrics.heightPixels * 0.35f)
                 // Pop-up cards are a few lines tall; the status bar itself is not.
                 if (card.height() < minCard || card.top > maxTop) continue
-                // Wait until the pop-up has finished sliding in: a swipe on a card that's still
-                // moving can be read by System UI as a pull on the shade instead of a dismissal.
-                if (card != lastPopupCard) { lastPopupCard = card; return false }
-                swipeUp(card)
-                return true
+                // Give the pop-up a moment (two looks, ~90 ms) to finish sliding in: a swipe on a
+                // card that's still arriving can be read as a pull on the shade. Its bounds keep
+                // shifting by a few pixels as it settles, so don't wait for them to stop.
+                lastPopupCard = card
+                if (++sightings < 2) return false
+                seen = true
+                // A swipe that didn't take (System UI was busy, or the island's window was still
+                // in the way) gets another try, a moment later; at most three in all.
+                val now = SystemClock.uptimeMillis()
+                if (swipes == 0 || now - lastSwipeAt > POPUP_RETRY_MS) {
+                    if (swipes >= 3) return true
+                    swipes++; lastSwipeAt = now
+                    swipeUp(card)
+                }
+                return false
             }
         }
+        // Gone after our swipe: done. Not seen yet: keep looking.
+        if (!seen && swipes > 0) return true
         return false
     }
 
@@ -240,11 +260,13 @@ class IslandAccessibilityService : AccessibilityService() {
             lineTo(x, 1f)
         }
         // The island's own window spans the top of the screen; let the swipe pass through it.
-        beforePopupSwipe?.invoke(450L)
+        // Give WindowManager time to apply that before the finger lands (slow phones relayout late),
+        // and keep it through a possible retry.
+        beforePopupSwipe?.invoke(POPUP_RETRY_MS + 500L)
         handler.postDelayed({
             dispatchGesture(GestureDescription.Builder()
                 .addStroke(GestureDescription.StrokeDescription(path, 0L, 120L)).build(), null, null)
-        }, 48L)
+        }, 140L)
     }
 
     /** Keys whose press we took, so their release is consumed too and never reaches the system. */
@@ -320,7 +342,8 @@ class IslandAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val SYSTEM_UI = "com.android.systemui"
-        private const val POPUP_SEARCH_MS = 1500L
+        private const val POPUP_SEARCH_MS = 3500L
+        private const val POPUP_RETRY_MS = 650L
         private const val CONTENT_CHECK_EVERY_MS = 1500L
         private const val MEDIA_NODE_LIMIT = 400
         private const val STILL_THERE_MS = 2_000L

@@ -361,4 +361,9 @@
     <string name="feature_camera_fade_note">कैमरा होल के आसपास कंटेंट धीरे-धीरे काला हो जाता है, ताकि उसके पीछे कुछ न छिपे।</string>
     <string name="feature_landscape">लैंडस्केप में पारदर्शी</string>
     <string name="feature_landscape_note">ढकने को कैमरा न होने पर आइलैंड गेम और वीडियो को दिखने देता है।</string>
+    <string name="errors_heading">आइलैंड की गड़बड़ियाँ</string>
+    <string name="errors_note">आइलैंड में एक समस्या आई और वह चलता रहा। रिपोर्ट कॉपी करके डेवलपर को भेजें ताकि इसे ठीक किया जा सके।</string>
+    <string name="errors_copy">एरर रिपोर्ट कॉपी करें</string>
+    <string name="errors_copied">एरर रिपोर्ट कॉपी हो गई</string>
+    <string name="errors_clear">एरर साफ़ करें</string>
 </resources>

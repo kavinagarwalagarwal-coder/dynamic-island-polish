@@ -153,7 +153,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun usesDots(a: LiveActivity?) = features.dotMusic && a?.mode == IslandMode.MUSIC
 
     /** Once per frame: feed the cover to both records and move them along. */
-    private fun advanceDots(a: LiveActivity) {
+    private fun advanceDots(a: LiveActivity) = DrawProfile.span("step") { advanceDotsNow(a) }
+
+    private fun advanceDotsNow(a: LiveActivity) {
         val now = SystemClock.uptimeMillis()
         val song = a.key + "|" + a.title + "|" + a.subtitle
         val changed = dotSong != null && dotSong != song
@@ -324,12 +326,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
     }
 
-    // Shape. Same interpolating springs as Sources/IslandUI (Skip / SwiftUI).
-    private val widthS = Spring(dp(104f), IslandMotion.SHAPE_K, IslandMotion.WIDTH_DAMPING_RATIO, 0.5f)
-    private val heightS = Spring(dp(32f), IslandMotion.SHAPE_K, IslandMotion.HEIGHT_DAMPING_RATIO, 0.5f)
-    private val radiusS = Spring(dp(16f), IslandMotion.SHAPE_K, IslandMotion.RADIUS_DAMPING_RATIO, 0.5f)
+    // Shape: interpolating springs, tuned to flow like a liquid (see IslandMotion.FLUID_*).
+    private val widthS = Spring(dp(104f), IslandMotion.SHAPE_K, IslandMotion.FLUID_WIDTH_DAMPING, 0.5f)
+    private val heightS = Spring(dp(32f), IslandMotion.SHAPE_K, IslandMotion.FLUID_HEIGHT_DAMPING, 0.5f)
+    private val radiusS = Spring(dp(16f), IslandMotion.SHAPE_K, IslandMotion.FLUID_RADIUS_DAMPING, 0.5f)
     private val topS = Spring(baseTop, IslandMotion.SHAPE_K, 0.86f, 0.5f)
-    private val centerS = Spring(resources.displayMetrics.widthPixels / 2f / fit.scale, IslandMotion.SHAPE_K, IslandMotion.CENTER_DAMPING_RATIO, 0.5f)
+    private val centerS = Spring(resources.displayMetrics.widthPixels / 2f / fit.scale, IslandMotion.SHAPE_K, IslandMotion.FLUID_CENTER_DAMPING, 0.5f)
     // Content and gesture feedback
     private val expandedA = Spring(0f, IslandMotion.CONTENT_IN_K, 1f, 0.004f)
     private val compactA = Spring(0f, IslandMotion.CONTENT_IN_K, 1f, 0.004f)
@@ -646,6 +648,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val cx = cameraCenter()
         val cy = restingTop() + r
         val outer = r * 2.6f
+        if (!(outer > 1f)) return
         if (cx + outer < rect.left || cx - outer > rect.right || cy + outer < rect.top || cy - outer > rect.bottom) return
         var shader = fadeShader
         if (shader == null || fadeShaderR != outer) {
@@ -667,6 +670,36 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val r = restingDiameter() / 2f + dp(5f)
         val cx = cameraCenter()
         return (cx - r) to (cx + r)
+    }
+
+    private val body = Path()
+    private val corner = RectF()
+
+    /**
+     * The island's outline: a rounded rectangle whose top and bottom edges bow by [bendY] and
+     * whose sides bow by [bendX] (positive = outward). Plain rounded rect when both are tiny.
+     */
+    private fun buildBody(path: Path, box: RectF, radius: Float, bendY: Float, bendX: Float) {
+        path.reset()
+        if (!(box.width() > 0f && box.height() > 0f)) return
+        val rad = min(radius, min(box.width(), box.height()) / 2f).coerceAtLeast(0f)
+        if (abs(bendY) < 0.3f && abs(bendX) < 0.3f) { path.addRoundRect(box, rad, rad, Path.Direction.CW); return }
+        val l = box.left; val t = box.top; val rr = box.right; val b = box.bottom
+        val cx = box.centerX(); val cy = box.centerY()
+        val d = rad * 2f
+        // A quadratic's control point sits twice as far out as the curve's peak.
+        val by = bendY.coerceIn(-box.height() * 0.2f, box.height() * 0.2f) * 2f
+        val bx = bendX.coerceIn(-box.width() * 0.1f, box.width() * 0.1f) * 2f
+        path.moveTo(l + rad, t)
+        path.quadTo(cx, t - by, rr - rad, t)
+        corner.set(rr - d, t, rr, t + d); path.arcTo(corner, -90f, 90f, false)
+        path.quadTo(rr + bx, cy, rr, b - rad)
+        corner.set(rr - d, b - d, rr, b); path.arcTo(corner, 0f, 90f, false)
+        path.quadTo(cx, b + by, l + rad, b)
+        corner.set(l, b - d, l + d, b); path.arcTo(corner, 90f, 90f, false)
+        path.quadTo(l - bx, cy, l, t + rad)
+        corner.set(l, t, l + d, t + d); path.arcTo(corner, 180f, 90f, false)
+        path.close()
     }
 
     /** 0 while the shape is under ~70% of where it's heading, easing to 1 by ~92%. */
@@ -718,10 +751,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun restoreShapeSprings() {
         shapeSprings.forEach { it.stiffness = IslandMotion.SHAPE_K }
-        widthS.dampingRatio = IslandMotion.WIDTH_DAMPING_RATIO
-        heightS.dampingRatio = IslandMotion.HEIGHT_DAMPING_RATIO
-        radiusS.dampingRatio = IslandMotion.RADIUS_DAMPING_RATIO
-        centerS.dampingRatio = IslandMotion.CENTER_DAMPING_RATIO
+        widthS.dampingRatio = IslandMotion.FLUID_WIDTH_DAMPING
+        heightS.dampingRatio = IslandMotion.FLUID_HEIGHT_DAMPING
+        radiusS.dampingRatio = IslandMotion.FLUID_RADIUS_DAMPING
+        centerS.dampingRatio = IslandMotion.FLUID_CENTER_DAMPING
         topS.dampingRatio = 0.86f
     }
 
@@ -733,34 +766,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         // Keep the bottom slack tiny: the window eats touches wherever it covers, so a tall
         // idle window would deaden a strip of the screen under the island.
         return Pair(resources.displayMetrics.widthPixels, ((baseTop + spec.h + dp(14f)) * fit.scale).toInt())
-    }
-
-    /** The live SwiftUI entrance must end at exactly the native island's fitted bounds. */
-    fun returnHandoffBounds(next: LiveActivity): RectF {
-        val spec = specFor(Presentation.COMPACT, next)
-        val cx = IslandFit.center(layoutWidth() / fit.scale, spec.w, spec.cx, dp(4f))
-        return RectF((cx - spec.w / 2f) * fit.scale, baseTop * fit.scale,
-            (cx + spec.w / 2f) * fit.scale, (baseTop + spec.h) * fit.scale)
-    }
-
-    /** Settle the real layout under the SwiftUI shell; content fades in at handoff. */
-    fun prepareReturnHandoff() {
-        val spec = specFor(presentation, activity)
-        cancelAppMorph()
-        widthS.snap(spec.w); heightS.snap(spec.h); radiusS.snap(spec.r)
-        centerS.snap(spec.cx); topS.snap(targetTop(presentation))
-        concealS.snap(1f); presenceS.snap(1f); introS.snap(1f)
-        compactA.snap(0f)
-        alpha = 0f
-        kick()
-    }
-
-    fun finishReturnHandoff() {
-        alpha = 1f
-        compactA.snap(0f)
-        setContentTargets(presentation)
-        settled = false
-        kick()
     }
 
     val isAbsorbing: Boolean get() = absorbS.value > 0.002f
@@ -869,6 +874,16 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     override fun doFrame(frameTimeNanos: Long) {
+        try { frame(frameTimeNanos) } catch (t: Throwable) {
+            // Never let one bad frame stop the island: record it, settle, and keep going.
+            CrashLog.caught(context, "frame", t)
+            springs.forEach { if (!it.value.isFinite()) it.snap(if (it.target.isFinite()) it.target else 0f) }
+            running = false; lastFrame = 0L; delayedFrame = false
+            postDelayed({ kick() }, 32L)
+        }
+    }
+
+    private fun frame(frameTimeNanos: Long) {
         delayedFrame = false
         if (!isAttachedToWindow || !isShown) { running = false; lastFrame = 0L; return }
         val dt = if (lastFrame == 0L) 1f / 60f else (frameTimeNanos - lastFrame) / 1_000_000_000f
@@ -923,7 +938,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             // The small island's waveform reads fine at 30 fps; the open card's progress bar gets 60.
             a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else 33L
             // A tap's ripple (or a burst between songs) finishes even while paused.
-            usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling) -> 16L
+            usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling || fieldFading) -> 16L
             a.mode == IslandMode.CALL -> 33L
             a.mode == IslandMode.ALARM -> 33L
             a.clockBaseElapsed != null && a.pausedTimerMs == null -> {
@@ -959,6 +974,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         running = false
         liquidGlass.release()
         morphCard = null; softMorphCard = null
+        fieldCompact.release(); fieldCard.release(); oldCompact.release(); oldCard.release(); fieldVersion = -1
         super.onDetachedFromWindow()
     }
 
@@ -1011,6 +1027,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // ---------------------------------------------------------------- drawing
 
     override fun onDraw(canvas: Canvas) {
+        val saves = canvas.saveCount
+        try { DrawProfile.span("total") { drawIsland(canvas) } } catch (t: Throwable) {
+            // A drawing error loses one frame, not the island.
+            canvas.restoreToCount(saves)
+            CrashLog.caught(context, "draw ${activity?.mode} ${presentation}", t)
+        }
+    }
+
+    private fun drawIsland(canvas: Canvas) {
         // Fully hidden (fullscreen video/photos): draw nothing at all.
         val conceal = concealS.value.coerceIn(0f, 1f)
         if (conceal < 0.01f) return
@@ -1042,8 +1067,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val press = pressS.value
         // Hiding shrinks the island back into the camera as it fades.
         val shrink = 0.35f + 0.65f * conceal
-        val w = widthS.value * press * shrink
-        val h = max(dp(1f), heightS.value + stretchS.value) * press * (0.6f + 0.4f * conceal)
+        var w = widthS.value * press * shrink
+        var h = max(dp(1f), heightS.value + stretchS.value) * press * (0.6f + 0.4f * conceal)
+        // Like a drop of liquid keeping its volume: while the island widens fast it thins a
+        // little, while it grows taller it narrows, and it fills back out as it settles.
+        val flowX = if (reduceMotion) 0f else (widthS.speed / dp(1500f)).coerceIn(-1f, 1f)
+        val flowY = if (reduceMotion) 0f else (heightS.speed / dp(1500f)).coerceIn(-1f, 1f)
+        h = max(dp(1f), h * (1f - 0.11f * flowX + 0.03f * flowY))
+        w *= 1f - 0.05f * flowY + 0.015f * flowX
         val top = topS.value
         rect.set(cx - w / 2f, top, cx + w / 2f, top + h)
         var r = min(radiusS.value * press, h / 2f)
@@ -1056,7 +1087,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
         // Content waits for the shape to make room, so it never shows squashed or clipped while
         // the island grows (appearing, widening, opening) and leaves before it shrinks.
-        val room = if (isAbsorbing) 1f else min(roomFor(rect.width(), widthS.target), roomFor(rect.height(), heightS.target))
+        // Measured on the springs, not the drawn (squashed) shape, so the liquid squash never makes
+        // the content flicker.
+        val room = if (isAbsorbing) 1f else min(roomFor(widthS.value, widthS.target), roomFor(heightS.value, heightS.target))
         val reveal = (if (isAbsorbing) appMorph.reveal else 1f) * room
 
         val bodyAlpha = (255 * presenceS.value.coerceIn(0f, 1f) * min(1f, intro * 2.5f)).toInt()
@@ -1068,12 +1101,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         shapePaint.color = Color.BLACK
         // In landscape there's no camera to cover, so the body lets the game or video show through.
         shapePaint.alpha = if (seeThrough()) (bodyAlpha * LANDSCAPE_BODY).toInt() else bodyAlpha
-        canvas.drawRoundRect(rect, r, r, shapePaint)
+        // The edges flow too: they pinch in while the island stretches and bow out as it
+        // shrinks, so a morph reads as liquid rather than a rubber rectangle.
+        buildBody(body, rect, r, -flowX * dp(2.4f), -flowY * dp(3f))
+        canvas.drawPath(body, shapePaint)
         if (a == null) { canvas.restore(); if (dimmed) canvas.restore(); if (layered) canvas.restore(); return }
         drawOutline(canvas, a, r, bodyAlpha)
 
-        clip.reset()
-        clip.addRoundRect(rect, r, r, Path.Direction.CW)
+        clip.set(body)
         canvas.save()
         canvas.clipPath(clip)
         if (absorb < .06f) {
@@ -1443,8 +1478,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             advanceDots(a)
             val acx = l + art / 2f
             val acy = t + art / 2f
+            DrawProfile.span("record") {
             cardDots.drawRing(canvas, fillPaint, acx, acy, dp(23.5f), dp(2.6f), dp(1.05f), 3, userAccent ?: a.accent, a.isPlaying, alpha)
             cardDots.drawRecord(canvas, fillPaint, acx, acy, dp(21.5f), a.isPlaying, alpha)
+            }
         } else drawArtwork(canvas, a, l, t, art, dp(14f), alpha)
         musicArtHit.set(l - dp(6f), t - dp(6f), l + art + dp(6f), t + art + dp(6f))
         val tx = l + art + dp(14f)
@@ -1757,25 +1794,63 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
      * Dot music: the whole island in white dots with the cover carved into them, breathing and
      * rippling with the record. Kept faint enough that the title and controls read on top.
      */
+    // The field is baked once per island size and cover into two layers (the small pill and the
+    // open card) and crossfaded as the island opens, so its dots stay put while the shape flows
+    // over them; only the beat ripples are drawn live. A new cover fades in over the old layers.
+    private var fieldCompact = IslandDotField.Layer()
+    private var fieldCard = IslandDotField.Layer()
+    private var oldCompact = IslandDotField.Layer()
+    private var oldCard = IslandDotField.Layer()
+    private var fieldVersion = -1
+    private var fieldFadeAt = 0L
+    private val fieldFading get() = SystemClock.uptimeMillis() - fieldFadeAt < FIELD_FADE_MS
+
     private fun drawDotField(canvas: Canvas, a: LiveActivity, bodyAlpha: Float) {
         fieldA.target = if (a.isPlaying) 1f else 0.4f
         val show = fieldA.value.coerceIn(0f, 1f)
         if (show < 0.01f || bodyAlpha < 2f) return
         advanceDots(a)
+        val version = dotField.coverVersion
+        if (version != fieldVersion) {
+            if (fieldVersion != -1 && !reduceMotion) {
+                oldCompact.release(); oldCard.release()
+                oldCompact = fieldCompact.also { fieldCompact = oldCompact }
+                oldCard = fieldCard.also { fieldCard = oldCard }
+                fieldFadeAt = SystemClock.uptimeMillis()
+            }
+            fieldVersion = version
+        }
         val open = expandedA.value.coerceIn(0f, 1f)
-        val strength = (0.6f - 0.24f * open) * show
-        val pitch = dp(4.5f + 1.8f * open)
-        // Ripples start at the record (left of the small island, top-left of the open card), and
-        // the field is carved away around it so the record sits in its own clearing.
-        val compactX = rect.left + dp(7f) + dp(11f)
-        val compactY = rect.centerY()
-        val cardX = rect.left + dp(22f) + dp(29f)
-        val cardY = rect.top + dp(22f) + dp(29f)
-        val ox = compactX + (cardX - compactX) * open
-        val oy = compactY + (cardY - compactY) * open
-        val hole = dp(14.5f + 18.5f * open)
-        dotField.draw(canvas, fillPaint, rect.left, rect.top, rect.right, rect.bottom, pitch, cardDots, a.isPlaying,
-            (bodyAlpha * strength).toInt(), peak = (bodyAlpha * 0.95f * show).toInt(), ox = ox, oy = oy, hole = hole)
+        val compact = specFor(Presentation.COMPACT, a)
+        val card = specFor(Presentation.EXPANDED, a)
+        val scale = fit.scale
+        // Drawn on a worker thread, so a new song or size never costs a frame here.
+        DrawProfile.span("bake") {
+        dotField.bake(fieldCompact, compact.w, compact.h, dp(4.5f), dp(18f), compact.h / 2f, dp(14.5f), scale, async = true, onReady = ::kick)
+        dotField.bake(fieldCard, card.w, card.h, dp(6.3f), dp(51f), dp(51f), dp(33f), scale, async = true, onReady = ::kick)
+        }
+        val fade = if (fieldFading) ((SystemClock.uptimeMillis() - fieldFadeAt) / FIELD_FADE_MS.toFloat()).coerceIn(0f, 1f)
+            else { oldCompact.release(); oldCard.release(); 1f }
+        // Anchored to the island's centre and top, so the dots hold still as the shape grows.
+        val cx = rect.centerX()
+        val top = rect.top
+        val compactAlpha = bodyAlpha * 0.6f * show * (1f - open)
+        val cardAlpha = bodyAlpha * 0.36f * show * open
+        DrawProfile.span("layers") {
+        if (fade < 1f) {
+            dotField.drawLayer(canvas, fillPaint, oldCompact, cx - oldCompact.w / 2f, top, (compactAlpha * (1f - fade)).toInt())
+            dotField.drawLayer(canvas, fillPaint, oldCard, cx - oldCard.w / 2f, top, (cardAlpha * (1f - fade)).toInt())
+        }
+        dotField.drawLayer(canvas, fillPaint, fieldCompact, cx - compact.w / 2f, top, (compactAlpha * fade).toInt())
+        dotField.drawLayer(canvas, fillPaint, fieldCard, cx - card.w / 2f, top, (cardAlpha * fade).toInt())
+        }
+        // Ripples start at the record (left of the small island, top-left of the open card).
+        val ox = rect.left + dp(18f) + (dp(51f) - dp(18f)) * open
+        val oy = rect.centerY() + (rect.top + dp(51f) - rect.centerY()) * open
+        val reach = max(1f, kotlin.math.hypot(max(ox - rect.left, rect.right - ox), max(oy - rect.top, rect.bottom - oy)))
+        val layer = if (open > 0.5f) fieldCard else fieldCompact
+        DrawProfile.span("ripples") { dotField.drawRipples(canvas, fillPaint, layer, cx - layer.w / 2f, top, cardDots, ox, oy, reach,
+            (bodyAlpha * 0.95f * show).toInt()) }
     }
 
     private fun drawArtBackdrop(canvas: Canvas, bodyAlpha: Float) {
@@ -2581,7 +2656,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     override fun onTouchEvent(e: MotionEvent): Boolean {
         val local = MotionEvent.obtain(e)
         local.setLocation(e.x / fit.scale, e.y / fit.scale)
-        return try { handleTouch(local) } finally { local.recycle() }
+        return try { handleTouch(local) } catch (t: Throwable) {
+            CrashLog.caught(context, "touch ${activity?.mode} ${presentation}", t)
+            true
+        } finally { local.recycle() }
     }
 
     private fun handleTouch(e: MotionEvent): Boolean {
@@ -2846,6 +2924,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val INTRO_HOLD_MS = 190L
         private const val RETURN_HOLD_MS = 110L
         private const val LANDSCAPE_BODY = 0.55f
+        private const val FIELD_FADE_MS = 900L
         private const val ROLL_MS = 240L
         private const val OUTLINE_EVENT_MS = 4_000L
         private const val RINGER_HEIGHT_DP = 46f

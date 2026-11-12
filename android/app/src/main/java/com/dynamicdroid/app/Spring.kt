@@ -15,6 +15,8 @@ class Spring(
         private set
     var target = initial
     private var velocity = 0f
+    /** Current speed, units per second (for squash, stretch and liquid edges). */
+    val speed: Float get() = velocity
 
     val isAtRest: Boolean
         get() = abs(target - value) < threshold && abs(velocity) < threshold * 10f

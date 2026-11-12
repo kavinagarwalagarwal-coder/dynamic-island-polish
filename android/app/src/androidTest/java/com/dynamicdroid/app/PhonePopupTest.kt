@@ -71,7 +71,15 @@ class PhonePopupTest {
             if (root?.packageName == "com.android.systemui") walk(root, 0)
             "${root?.packageName}/t${w.type}/${Rect().also(w::getBoundsInScreen)} $texts"
         }
-        return "windows=$windows"
+        // What the swipe logic saw: how many swipes it made and on which card.
+        val a11y = IslandAccessibilityService.instance
+        val state = a11y?.let { svc ->
+            fun f(name: String) = runCatching {
+                IslandAccessibilityService::class.java.getDeclaredField(name).apply { isAccessible = true }.get(svc)
+            }.getOrNull()
+            "swipes=${f("swipes")} card=${f("lastPopupCard")} hunting=${f("popupHunt") != null}"
+        } ?: "no a11y service"
+        return "$state windows=$windows"
     }
 
     private fun stillInShade(title: String) =

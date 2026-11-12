@@ -114,11 +114,19 @@ class DotMusicTest {
             // The whole-island field: white dots carving the cover, edge to edge.
             val field = IslandDotField()
             field.prepare(cover(Color.rgb(200, 40, 90)), animate = false)
+            // The field is baked once into a layer, then blitted; beat ripples are drawn on top.
+            fun drawField(canvas: android.graphics.Canvas, pitch: Float, d: IslandDots, alpha: Int, peak: Int, hole: Float) {
+                val layer = IslandDotField.Layer()
+                field.bake(layer, 360f, 90f, pitch, 30f, 45f, hole, 1f)
+                field.drawLayer(canvas, paint, layer, 0f, 0f, alpha)
+                field.drawRipples(canvas, paint, layer, 0f, 0f, d, 30f, 45f, 333f, peak)
+            }
             val pill = Bitmap.createBitmap(360, 90, Bitmap.Config.ARGB_8888)
-            field.draw(android.graphics.Canvas(pill), paint, 0f, 0f, 360f, 90f, 12f, dots, true, 255)
+            drawField(android.graphics.Canvas(pill), 12f, dots, 255, 255, 0f)
             val fp = IntArray(360 * 90).also { pill.getPixels(it, 0, 360, 0, 0, 360, 90) }
-            val left = fp.indices.count { it % 360 < 40 && Color.alpha(fp[it]) > 60 }
-            val right = fp.indices.count { it % 360 > 320 && Color.alpha(fp[it]) > 60 }
+            // The darkest parts of the cover are faint dots (about 12% white), so look for any dot.
+            val left = fp.indices.count { it % 360 < 40 && Color.alpha(fp[it]) > 15 }
+            val right = fp.indices.count { it % 360 > 320 && Color.alpha(fp[it]) > 15 }
             assertTrue("Dot field should reach both ends of the island ($left, $right)", left > 50 && right > 50)
 
             // A beat sends a visible ring of light out from the record across the field, and the
@@ -128,8 +136,7 @@ class DotMusicTest {
             calm.step(1f / 60f, playing = false, spectrum = null, reduceMotion = false)
             fun bright(d: IslandDots): Long {
                 val bmp = Bitmap.createBitmap(360, 90, Bitmap.Config.ARGB_8888)
-                field.draw(android.graphics.Canvas(bmp), paint, 0f, 0f, 360f, 90f, 6f, d, true, 120,
-                    peak = 255, ox = 30f, oy = 45f, hole = 22f)
+                drawField(android.graphics.Canvas(bmp), 6f, d, 120, 255, 22f)
                 val p = IntArray(360 * 90).also { bmp.getPixels(it, 0, 360, 0, 0, 360, 90) }
                 assertTrue("Record clearing should stay empty", (0 until 6).all { dy -> Color.alpha(p[(42 + dy) * 360 + 30]) == 0 })
                 return p.sumOf { Color.alpha(it).toLong() }

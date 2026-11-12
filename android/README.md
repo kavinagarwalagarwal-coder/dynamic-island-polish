@@ -4,16 +4,13 @@ Native Kotlin Android implementation of the live-activity island.
 
 ## Run
 
-1. Install Skip and export the SwiftUI morph module from the repository root:
-   `skip export --module IslandMorphUI --dir android/app/libs/debug --debug`.
-   For a release build, export it into `android/app/libs/release` with `--release`.
-2. Open the `android` directory in Android Studio.
-3. Let Android Studio install Android SDK 35 and sync Gradle.
-4. Run the `app` configuration on Android 8.0+.
-5. In the app, grant **Display over other apps**, enable **Notification access**, and turn on
+1. Open the `android` directory in Android Studio.
+2. Let Android Studio install Android SDK 35 and sync Gradle.
+3. Run the `app` configuration on Android 8.0+.
+4. In the app, grant **Display over other apps**, enable **Notification access**, and turn on
    **Allow tapping over the status bar** (accessibility). On Android 13+ a sideloaded app's
    accessibility switch is greyed out until you open App info → ⋮ → **Allow restricted settings**.
-6. Tap **Start Dynamic Island**.
+5. Tap **Start Dynamic Island**.
 
 ## Build without Android Studio
 
@@ -30,13 +27,12 @@ Native Kotlin Android implementation of the live-activity island.
 - `IslandNotificationListener`: maps call, media, navigation, timer, and message notifications into island states. For media, it reads the active `MediaSession` metadata and playback state, including artwork, duration, and the supported transport controls.
 - `IslandAccessibilityService`: owns no logic and reads no screen content; it only lets the island use an accessibility overlay, which sits above the status bar so taps at the top reach the island instead of opening the notification shade. Without it the island falls back to a normal overlay.
 - `IslandView`: native Canvas rendering for the live island, album art, playback progress, timer bubbles, gestures and media controls.
-- `IslandMorphUI`: SwiftUI source translated by Skip into Compose and shown by the overlay service for the app-to-island flight. The native service swaps back to `IslandView` when the flight settles.
+- `MainActivity` and `ui/`: the settings app, written in Jetpack Compose.
 
 The idle island is a full-width status bar (time on the left, network and battery
 on the right). Compact activities spring into a camera-centered pill; expanded
-activities morph into a card that covers the whole screen width. The app-to-island
-flight uses the SwiftUI view in `Sources/IslandMorphUI`; Skip exports it as an
-Android library that is packaged into the APK.
+activities morph into a card that covers the whole screen width. Returning from an app,
+the island grows back out of the camera on its own springs.
 When the wallpaper theme is enabled, the pill's body takes a very dark version of the
 wallpaper's main colour. It temporarily grows for an expanded activity, automatically
 collapses after a few seconds, and the idle pill lets touches fall through to the app
@@ -67,7 +63,7 @@ landing. Cached notification-card content fades before the narrow flight so text
 through the final opening. Reduced motion and interruptible spring behavior are retained.
 
 CI runs the full instrumentation suite on API 36 and a native navigation/standard-overlay
-compatibility check on API 26 and 30, in addition to JVM and SwiftUI checks.
+compatibility check on API 26 and 30, in addition to JVM unit tests.
 
 ## Personalization (v1.5)
 
