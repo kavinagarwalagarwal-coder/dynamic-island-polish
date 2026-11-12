@@ -120,9 +120,15 @@ def main():
         listeners = adb("shell", "dumpsys", "notification", timeout=40)
         a11y = adb("shell", "dumpsys", "accessibility", timeout=40)
         return (PACKAGE + "/" + CODE + ".IslandNotificationListener") in listeners and "Bound services:{Service" in a11y
-    end = time.time() + 30
+    end = time.time() + 45
+    tries = 0
     while time.time() < end and not bound():
+        tries += 1
         time.sleep(1)
+        if tries % 5 == 0:
+            # Android 17 emulators sometimes drop the first grant: ask again.
+            adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + CODE + ".IslandNotificationListener")
+    assert bound(), "The notification listener never connected"
     time.sleep(1)
     fixture = "com.dynamicdroid.fixture/.FixtureActivity"
     adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "custom")
