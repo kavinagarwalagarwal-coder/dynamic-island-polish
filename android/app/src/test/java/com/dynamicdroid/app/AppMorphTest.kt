@@ -4,37 +4,52 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AppMorphTest {
-    @Test fun cardPinchesTravelsAndWidensWithoutLeavingTheScreen() {
+    @Test fun cardShrinksRisesAndLandsExactlyOnTheIslandWithoutLeavingTheScreen() {
         val g = AppMorphGeometry()
-        fun step(p: Float) = g.update(p, 360f, 800f, 180f, 8f, 232f, 36f, 1f)
-        step(0f); val original = g.width
-        step(.45f)
-        assertTrue(g.width < original / 4)
-        assertTrue(g.height > g.width * 3)
-        val lowTop = g.top
-        step(.8f); assertTrue(g.top < lowTop)
-        step(.85f); assertTrue(g.width < 20f)
-        step(1f)
-        assertEquals(232f, g.width, .001f); assertEquals(36f, g.height, .001f)
-        assertEquals(8f, g.top, .001f); assertEquals(1f, g.reveal, 0f)
-        for (i in 0..100) {
-            step(i / 100f)
+        fun step(p: Float) = g.update(p, 360f, 800f, 180f, 8f, 232f, 36f, 1f, 40f)
+        step(0f)
+        assertEquals(360f * AppMorphGeometry.START_SCALE, g.width, .01f)
+        assertEquals(800f * AppMorphGeometry.START_SCALE, g.height, .01f)
+        assertEquals(1f, g.face, 0f); assertEquals(0f, g.reveal, 0f)
+        var lastW = g.width; var lastH = g.height; var lastCy = g.top + g.height / 2f
+        for (i in 1..200) {
+            step(i / 200f)
+            // One continuous move: never grows back, never sinks, always on screen.
+            assertTrue(g.width <= lastW + .001f); assertTrue(g.height <= lastH + .001f)
+            val cy = g.top + g.height / 2f
+            assertTrue(cy <= lastCy + .001f)
             assertTrue(g.left >= 0f); assertTrue(g.left + g.width <= 360.001f)
             assertTrue(g.top >= 0f); assertTrue(g.top + g.height <= 800f)
+            assertTrue(g.radius <= kotlin.math.min(g.width, g.height) / 2f + .001f)
+            lastW = g.width; lastH = g.height; lastCy = cy
         }
+        step(1f)
+        assertEquals(232f, g.width, .001f); assertEquals(36f, g.height, .001f)
+        assertEquals(8f, g.top, .001f); assertEquals(18f, g.radius, .001f)
+        assertEquals(1f, g.reveal, 0f); assertEquals(0f, g.face, 0f)
     }
-    @Test fun flightArrivesWithoutTheOldVerticalVelocityDiscontinuity() {
+
+    @Test fun cardTurnsIntoAPillOnTheWayInsteadOfATinyRectangle() {
         val g = AppMorphGeometry()
-        fun center(p: Float): Float {
-            g.update(p, 360f, 800f, 180f, 8f, 232f, 36f, 1f)
-            return g.top + g.height / 2f
+        g.update(.7f, 360f, 800f, 180f, 8f, 232f, 36f, 1f, 40f)
+        // Height gives way faster than width: well before landing it is already wider than tall.
+        assertTrue(g.width > g.height * 1.5f)
+        // And the art has mostly dissolved into the black body by then.
+        assertTrue(g.face < .35f)
+    }
+
+    @Test fun flightIsSmoothWithNoJumpsBetweenNeighbouringFrames() {
+        val g = AppMorphGeometry()
+        fun state(p: Float): FloatArray {
+            g.update(p, 360f, 800f, 180f, 8f, 232f, 36f, 1f, 40f)
+            return floatArrayOf(g.left, g.top, g.width, g.height, g.radius)
         }
-        val before = center(.849f)
-        val landing = center(.85f)
-        val after = center(.851f)
-        assertEquals(26f, landing, .01f)
-        assertTrue(kotlin.math.abs(landing - before) < .1f)
-        assertTrue(kotlin.math.abs(after - landing) < .1f)
+        var prev = state(0f)
+        for (i in 1..1000) {
+            val next = state(i / 1000f)
+            for (k in prev.indices) assertTrue("jump in $k at ${i / 1000f}", kotlin.math.abs(next[k] - prev[k]) < 3f)
+            prev = next
+        }
     }
 
     @Test fun leavingAHiddenOwnerForHomeCanAnimateButOtherSwitchesCannot() {
