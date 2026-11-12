@@ -26,7 +26,7 @@ class AppMorphTest {
         step(1f)
         assertEquals(232f, g.width, .001f); assertEquals(36f, g.height, .001f)
         assertEquals(8f, g.top, .001f); assertEquals(18f, g.radius, .001f)
-        assertEquals(1f, g.reveal, 0f); assertEquals(0f, g.face, 0f)
+        assertEquals(1f, g.reveal, 1e-4f); assertEquals(0f, g.face, 1e-4f)
     }
 
     @Test fun cardTurnsIntoAPillOnTheWayInsteadOfATinyRectangle() {

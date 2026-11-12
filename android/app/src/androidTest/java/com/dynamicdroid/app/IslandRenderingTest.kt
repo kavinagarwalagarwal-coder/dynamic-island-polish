@@ -159,6 +159,8 @@ class IslandRenderingTest {
             launchPlayground().use { scenario ->
                 scenario.onActivity { activity ->
                     val view = findIsland(activity.window.decorView)!!
+                    // The camera-grow return is what plays when the fly-in is switched off.
+                    view.applyFeatures(IslandFeatures.read(activity).copy(appMorph = false))
                     view.applyFit(IslandFit(alignCamera = false)); view.setSecondary(null); view.show(music, Presentation.COMPACT)
                 }
                 SystemClock.sleep(1000)
@@ -368,11 +370,13 @@ class IslandRenderingTest {
                 var frames = 0
                 val callback = object : android.view.Choreographer.FrameCallback {
                     override fun doFrame(frameTimeNanos: Long) {
-                        val rect = RectF(field<RectF>(view, "rect"))
-                        if (view.isAbsorbing) { heights += rect.height(); centers += rect.centerY() }
+                        // Draw this frame first, then read the shape it drew.
+                        val flying = view.isAbsorbing
                         val t0 = System.nanoTime()
                         val c = node.beginRecording(); view.draw(c); node.endRecording()
-                        if (view.isAbsorbing) costs += System.nanoTime() - t0
+                        if (flying) costs += System.nanoTime() - t0
+                        val rect = RectF(field<RectF>(view, "rect"))
+                        if (flying && view.isAbsorbing) { heights += rect.height(); centers += rect.centerY() }
                         if ((!view.isAbsorbing && frames > 5) || ++frames > 180) {
                             landed = rect
                             compactH = view.resources.displayMetrics.density * IslandFeatures.read(view.context).compactHeightDp
