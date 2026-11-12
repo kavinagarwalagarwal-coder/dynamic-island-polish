@@ -390,6 +390,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     /** Fly-in from an app: start time (uptime ms), 0 when not flying. Time-driven, so it is exact. */
     private var morphStart = 0L
     private var morphQueuedAt = 0L
+    /** The flight's screen, fixed when it starts so a window resize mid-flight can't jolt it. */
+    private var morphScreenW = 0f
+    private var morphSceneH = 0f
     private var morphSpec: Spec? = null
     /** Where the card's art sits, as a fraction of its height; the crop keeps it in view. */
     private var morphFocusY = .42f
@@ -788,6 +791,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         setContentTargets(p)
         val screenW = width / fit.scale
         val sceneH = (if (anchorToCutout) resources.displayMetrics.heightPixels else height).toFloat() / fit.scale
+        morphScreenW = screenW; morphSceneH = sceneH
         morphCard = makeMorphCard(next, if (screenW > 0f) sceneH / screenW else 2f)
         morphSpec = spec
         morphStart = SystemClock.uptimeMillis()
@@ -1263,7 +1267,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val absorb = absorbS.value.coerceIn(0f, 1f)
         if (isAbsorbing) {
             val sceneHeight = (if (anchorToCutout) resources.displayMetrics.heightPixels else height).toFloat() / fit.scale
-            appMorph.update(1f - absorb, width / fit.scale, sceneHeight, cx, top, w, h, density, screenCorner / fit.scale)
+            val flightW = if (morphStart != 0L && morphScreenW > 0f) morphScreenW else width / fit.scale
+            val flightH = if (morphStart != 0L && morphSceneH > 0f) morphSceneH else sceneHeight
+            appMorph.update(1f - absorb, flightW, flightH, cx, top, w, h, density, screenCorner / fit.scale)
             // The resting pill stays at the camera until the card arrives and merges into it.
             if (morphStart != 0L && features.idlePill && appMorph.top > top + h) {
                 val pill = specFor(Presentation.IDLE, null)
