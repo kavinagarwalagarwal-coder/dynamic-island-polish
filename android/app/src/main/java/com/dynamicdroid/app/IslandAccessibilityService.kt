@@ -15,6 +15,7 @@ import android.content.Intent
 import android.provider.Settings
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.core.content.ContextCompat
 
 /**
@@ -49,6 +50,13 @@ class IslandAccessibilityService : AccessibilityService() {
         // Package metadata only; never event text. Window content is read only by the two
         // features documented on this class (pop-ups, and full-screen video and photos).
         event ?: return
+        // Opening and closing apps: follow the app whose window is actually active. Events of one
+        // kind arrive at most every 500 ms and only the newest is kept, so a slow app still
+        // settling (Settings, say) can hide the event of the app that opened after it.
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            if (event.windowChanges and APP_WINDOW_CHANGES != 0) activeAppPackage()?.let(::reportFront)
+            return
+        }
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName || pkg == SYSTEM_UI) {
             if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
@@ -60,7 +68,7 @@ class IslandAccessibilityService : AccessibilityService() {
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 ensureIsland()
-                onForegroundPackage?.invoke(pkg)
+                reportFront(activeAppPackage() ?: pkg)
                 scheduleMediaCheck(150L)
                 // Screen changes animate; look again once the new screen has settled.
                 if (mediaThreadLazy.isInitialized()) {
@@ -76,6 +84,17 @@ class IslandAccessibilityService : AccessibilityService() {
     }
 
     private var lastIslandStart = 0L
+
+    /** Package of the active full-screen app window; package metadata only, never content. */
+    private fun activeAppPackage(): String? = runCatching {
+        windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isActive }
+            ?.root?.packageName?.toString()
+    }.getOrNull()
+
+    private fun reportFront(front: String) {
+        if (front == SYSTEM_UI) return
+        onForegroundPackage?.invoke(front)
+    }
 
     /** If Android ever stopped the island while we kept running, bring it back. */
     private fun ensureIsland() {
@@ -341,6 +360,10 @@ class IslandAccessibilityService : AccessibilityService() {
     }
 
     companion object {
+        /** A window opened, closed or became active: maybe a different app is in front. */
+        private const val APP_WINDOW_CHANGES = AccessibilityEvent.WINDOWS_CHANGE_ADDED or
+            AccessibilityEvent.WINDOWS_CHANGE_REMOVED or AccessibilityEvent.WINDOWS_CHANGE_ACTIVE
+
         private const val SYSTEM_UI = "com.android.systemui"
         private const val POPUP_SEARCH_MS = 3500L
         private const val POPUP_RETRY_MS = 650L
