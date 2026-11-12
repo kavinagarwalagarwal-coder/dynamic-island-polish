@@ -50,6 +50,7 @@ object IslandCustomization {
         IslandMode.CALL -> 100; IslandMode.TIMER -> 80; IslandMode.MUSIC -> 70
         IslandMode.NAVIGATION -> 60; IslandMode.MESSAGE -> 30; IslandMode.CHARGING -> 20
         IslandMode.ALARM -> 95; IslandMode.DOWNLOAD -> 40; IslandMode.VOLUME -> 10; IslandMode.DEVICE -> 25; IslandMode.RINGER -> 15
+        IslandMode.EVENT -> 22; IslandMode.TORCH -> 50; IslandMode.SLEEP -> 12; IslandMode.HOME -> 5
     }
 
     fun customAccent(context: Context, pkg: String): Int? =

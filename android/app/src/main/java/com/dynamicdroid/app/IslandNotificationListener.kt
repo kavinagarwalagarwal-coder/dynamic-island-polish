@@ -133,6 +133,16 @@ class IslandNotificationListener : NotificationListenerService() {
                 recognizedTimer, n.contentView != null || n.bigContentView != null)
         }
         val features = IslandFeatures.read(this)
+        // A payment from a wallet or UPI app: a short "Paid" notice instead of a message card.
+        if (features.payments && !sbn.isOngoing && IslandSignals.isPayment(sbn.packageName, title, text)) {
+            IslandBus.post(LiveActivity(
+                key = "event:pay:${sbn.key}", packageName = sbn.packageName, mode = IslandMode.EVENT,
+                title = title.ifBlank { getString(R.string.event_paid) }, subtitle = text,
+                appLabel = AppStyle.label(this, sbn.packageName), appIcon = AppStyle.icon(this, sbn.packageName),
+                artwork = null, accent = AppStyle.GREEN, glyph = Glyph.PAY, contentIntent = n.contentIntent,
+            ))
+            return
+        }
         val actionLabels = n.actions.orEmpty().map { it.title?.toString().orEmpty() }
         val progress = IslandSignals.progressFraction(extras.getInt(Notification.EXTRA_PROGRESS),
             extras.getInt(Notification.EXTRA_PROGRESS_MAX), extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))

@@ -193,6 +193,12 @@ private fun MainActivity.PlaygroundPage(flow: Flow) {
             }
             Chip(stringResource(R.string.dot_open_short)) { startActivity(Intent(this@PlaygroundPage, DotPlayerActivity::class.java)) }
         }
+        ChipRow {
+            Chip(stringResource(R.string.demo_event)) { preview.setSecondary(null); showDemo(demoEvent(), Presentation.EXPANDED) }
+            Chip(stringResource(R.string.mode_torch)) { preview.setSecondary(null); showDemo(demoTorch(), Presentation.EXPANDED) }
+            Chip(stringResource(R.string.mode_sleep)) { preview.setSecondary(null); showDemo(demoSleep(), Presentation.EXPANDED) }
+            Chip(stringResource(R.string.mode_home)) { preview.setSecondary(null); showDemo(demoHome(), Presentation.EXPANDED) }
+        }
     }
     Column(flow.next()) {
         OutlinedTextField(
@@ -423,6 +429,23 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_alarms, "alarms", f.alarms)
         toggle(R.string.feature_ringer, "ringer", f.ringer, R.string.feature_ringer_note)
         toggle(R.string.feature_ringer_controls, "ringer_controls", f.ringerControls, R.string.feature_ringer_controls_note)
+        toggle(R.string.feature_torch, "show_torch", f.torch, R.string.feature_torch_note)
+        toggle(R.string.feature_sleep, "show_sleep", f.sleep, R.string.feature_sleep_note)
+        toggle(R.string.feature_home_card, "home_card", f.homeCard, R.string.feature_home_card_note)
+        toggle(R.string.feature_swipe_tracks, "swipe_tracks", f.swipeTracks, R.string.feature_swipe_tracks_note)
+    }
+    Column(flow.next()) {
+        Heading(stringResource(R.string.features_events))
+        Note(stringResource(R.string.features_events_note), size = 14)
+        toggle(R.string.event_switch_unplugged, "event_unplugged", f.eventUnplugged)
+        toggle(R.string.event_switch_low_battery, "event_low_battery", f.eventLowBattery)
+        toggle(R.string.event_switch_wifi, "event_wifi", f.eventWifi)
+        toggle(R.string.event_switch_airplane, "event_airplane", f.eventAirplane)
+        toggle(R.string.event_switch_usb, "event_usb", f.eventUsb)
+        toggle(R.string.event_switch_unlock, "event_unlock", f.eventUnlock)
+        toggle(R.string.event_switch_brightness, "event_brightness", f.eventBrightness)
+        toggle(R.string.event_switch_alarm_set, "event_alarm_set", f.eventAlarmSet)
+        toggle(R.string.event_switch_payments, "event_payments", f.payments, R.string.event_switch_payments_note)
     }
     Column(flow.next()) {
         Heading(stringResource(R.string.features_messages))
@@ -453,6 +476,13 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_glow_open, "glow_open_only", f.glowOpenOnly)
         toggle(R.string.feature_camera_fade, "camera_fade", f.cameraFade, R.string.feature_camera_fade_note)
         toggle(R.string.feature_landscape, "landscape_see_through", f.landscapeSeeThrough, R.string.feature_landscape_note)
+        Label(stringResource(R.string.feature_motion))
+        Choices(listOf(MotionStyle.LIQUID to stringResource(R.string.motion_liquid), MotionStyle.BOUNCY to stringResource(R.string.motion_bouncy),
+            MotionStyle.SMOOTH to stringResource(R.string.motion_smooth)), f.motion, horizontal = true) {
+            IslandFeatures.setMotion(this@FeaturesPage, it); applyFeaturesUpdate()
+            // Show the new motion straight away in the preview.
+            showDemo(demoMusic(true), if (preview.presentation == Presentation.EXPANDED) Presentation.COMPACT else Presentation.EXPANDED)
+        }
         toggle(R.string.feature_full_width, "full_width_open", f.fullWidthOpen, R.string.feature_full_width_note)
         toggle(R.string.feature_art_backdrop, "artwork_backdrop", f.artworkBackdrop, R.string.feature_art_backdrop_note)
         toggle(R.string.feature_idle_pill, "idle_pill", f.idlePill, R.string.feature_idle_pill_note)

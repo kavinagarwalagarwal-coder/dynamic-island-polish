@@ -7,7 +7,20 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 
-enum class IslandMode { MUSIC, CALL, TIMER, NAVIGATION, CHARGING, MESSAGE, VOLUME, DEVICE, DOWNLOAD, ALARM, RINGER }
+enum class IslandMode {
+    MUSIC, CALL, TIMER, NAVIGATION, CHARGING, MESSAGE, VOLUME, DEVICE, DOWNLOAD, ALARM, RINGER,
+    /** A short system notice: Wi-Fi, low battery, unplugged, airplane mode, USB, alarm set, paid… */
+    EVENT,
+    /** The flashlight is on. */
+    TORCH,
+    /** The next alarm is within 12 hours: when you wake up and how much sleep is left. */
+    SLEEP,
+    /** Tapping the resting pill: the time, date and battery, with quick buttons. */
+    HOME,
+}
+
+/** The little picture an event island shows. */
+enum class Glyph { WIFI, WIFI_OFF, BATTERY_LOW, UNPLUGGED, PLANE, USB, UNLOCK, BRIGHTNESS, ALARM, PAY, TORCH, MOON, STOPWATCH, CAMERA }
 
 /** What the ringer switch or Do Not Disturb just changed to. */
 enum class RingerState { RING, VIBRATE, SILENT, DND_ON, DND_OFF }
@@ -58,9 +71,14 @@ data class LiveActivity(
     val ringer: RingerState? = null,
     /** Volume island: Do Not Disturb is on (shown on its button). */
     val dndOn: Boolean = false,
+    /** Event islands: which picture to show. */
+    val glyph: Glyph? = null,
+    /** Sleep island: when the alarm rings (wall clock, ms). */
+    val alarmAt: Long? = null,
 ) {
     val isTransient: Boolean get() = mode == IslandMode.MESSAGE || mode == IslandMode.CHARGING ||
-        mode == IslandMode.VOLUME || mode == IslandMode.DEVICE || mode == IslandMode.RINGER
+        mode == IslandMode.VOLUME || mode == IslandMode.DEVICE || mode == IslandMode.RINGER ||
+        mode == IslandMode.EVENT || mode == IslandMode.HOME
 
     fun livePositionMs(now: Long = SystemClock.elapsedRealtime()): Long {
         val p = if (isPlaying) positionMs + ((now - positionUpdatedAt) * playbackSpeed).toLong() else positionMs

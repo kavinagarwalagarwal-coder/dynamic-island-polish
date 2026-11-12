@@ -349,6 +349,42 @@ class MainActivity : AppCompatActivity() {
 
     /** Each tap of the demo chip shows the next ringer state. */
     internal var demoRingerStep = 0
+    private var demoEventStep = 0
+
+    internal fun demoEvent(): LiveActivity {
+        val kinds = listOf(
+            Triple(Glyph.WIFI, R.string.event_wifi_on, R.string.event_wifi_on_note) to AppStyle.BLUE,
+            Triple(Glyph.BATTERY_LOW, R.string.event_battery_low, R.string.event_demo_low) to NothingStyle.red,
+            Triple(Glyph.PLANE, R.string.event_airplane_on, R.string.event_airplane_on_note) to AppStyle.ORANGE,
+            Triple(Glyph.PAY, R.string.event_paid, R.string.event_demo_paid) to AppStyle.GREEN,
+            Triple(Glyph.ALARM, R.string.event_demo_alarm, R.string.event_demo_sleep) to AppStyle.PURPLE,
+        )
+        val (k, accent) = kinds[demoEventStep++ % kinds.size]
+        return LiveActivity("demo-event", packageName, IslandMode.EVENT, getString(k.second), getString(k.third),
+            getString(R.string.app_name), null, null, accent, glyph = k.first)
+    }
+
+    internal fun demoTorch() = LiveActivity("demo-torch", packageName, IslandMode.TORCH, getString(R.string.torch_title),
+        getString(R.string.torch_note_levels), getString(R.string.torch_title), null, null, SystemEvents.TORCH_YELLOW, progress = 0.6f)
+
+    internal fun demoSleep(): LiveActivity {
+        val at = System.currentTimeMillis() + (7 * 60 + 25) * 60_000L
+        return LiveActivity("demo-sleep", packageName, IslandMode.SLEEP,
+            android.text.format.DateFormat.getTimeFormat(this).format(java.util.Date(at)),
+            getString(R.string.sleep_left, getString(R.string.duration_hm, 7, 25)), getString(R.string.sleep_title),
+            null, null, AppStyle.PURPLE, alarmAt = at)
+    }
+
+    internal fun demoHome(): LiveActivity {
+        val now = java.util.Date()
+        val noop = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
+        return LiveActivity("demo-home", packageName, IslandMode.HOME,
+            android.text.format.DateFormat.getTimeFormat(this).format(now),
+            android.text.format.DateFormat.format("EEEE, d MMMM", now).toString(), getString(R.string.app_name),
+            null, null, AppStyle.GREEN, progress = 0.72f,
+            actions = listOf(R.string.home_timer, R.string.home_stopwatch, R.string.home_torch, R.string.home_shot)
+                .map { IslandAction(getString(it), noop) })
+    }
 
     internal fun demoDevice(lost: Boolean) = LiveActivity(
         key = "demo-device", packageName = packageName, mode = IslandMode.DEVICE,
@@ -775,6 +811,10 @@ class MainActivity : AppCompatActivity() {
         IslandMode.DOWNLOAD -> R.string.mode_download
         IslandMode.ALARM -> R.string.mode_alarm
         IslandMode.RINGER -> R.string.mode_ringer
+        IslandMode.EVENT -> R.string.mode_event
+        IslandMode.TORCH -> R.string.mode_torch
+        IslandMode.SLEEP -> R.string.mode_sleep
+        IslandMode.HOME -> R.string.mode_home
     })
 
     private fun accentName(index: Int) = getString(when (index) {

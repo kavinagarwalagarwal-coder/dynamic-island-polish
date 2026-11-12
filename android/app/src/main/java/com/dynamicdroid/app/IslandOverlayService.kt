@@ -54,6 +54,11 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     /** A medium message island the user held open into its full card. */
     private var transientExpanded = false
     private var devices: DeviceMonitor? = null
+    private var events: SystemEvents? = null
+    /** The island's own stopwatch: when it started (elapsed) and, while paused, how far it got. */
+    private var stopwatchStart = 0L
+    private var stopwatchPausedAt: Long? = null
+    private var shooting = false
     private var reply: ReplyPanel? = null
     private var lockShown = false
     private val audio by lazy { getSystemService(AudioManager::class.java) }
@@ -298,6 +303,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         IslandBus.listener = this
         if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)
         devices = DeviceMonitor(this) { onActivity(it) }.also { it.start() }
+        events = SystemEvents(this, ::onActivity, ::onRemoved).also { it.start() }
         reply = ReplyPanel(this, ::onReplySent) { armTransientTimeout(transient) }
         IslandAccessibilityService.onVolumeKey = ::handleVolumeKey
         IslandBus.listenerChanged = { HeadsUpControl.sync(this, island != null) }
@@ -331,11 +337,13 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             island?.applyFeatures(IslandFeatures.read(this))
             HeadsUpControl.sync(this, island != null)
             devices?.stop(); devices?.start()
+            events?.refresh()
             handler.removeCallbacks(refreshQuietRules)
             if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)
             IslandNotificationListener.instance?.refreshAllowedApps()
             render()
         }
+        if (intent?.action == ACTION_QUICK) handleQuick(intent.getStringExtra(EXTRA_WHAT).orEmpty(), intent)
         if (intent?.action == ACTION_THEME) {
             island?.applyTheme(IslandPreferences.readTheme(this))
         }
@@ -478,11 +486,16 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // they never do: the phone's own call screen or pop-up handles them.
         val landscape = resources.configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
         val callShows = a?.mode == IslandMode.CALL && features.callsOverFullscreen && !landscape
-        val concealed = (fullscreen || immersiveMedia) && !callShows && a?.mode != IslandMode.ALARM && a?.mode != IslandMode.VOLUME
+        val paused = IslandFeatures.paused(this)
+        if (paused) { handler.removeCallbacks(pauseEnded); handler.postDelayed(pauseEnded, IslandFeatures.pausedUntil(this) - System.currentTimeMillis() + 50L) }
+        val concealed = shooting || paused ||
+            (fullscreen || immersiveMedia) && !callShows && a?.mode != IslandMode.ALARM && a?.mode != IslandMode.VOLUME
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
         params?.let { lp ->
-            val touchable = a != null && !concealed && !absorb && !view.isAbsorbing && !passingTouches
+            // The resting pill is touchable only when tapping it opens the home card.
+            val idleTappable = a == null && features.idlePill && features.homeCard
+            val touchable = (a != null || idleTappable) && !concealed && !absorb && !view.isAbsorbing && !passingTouches
             val isOff = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0
             if (touchable == isOff) {
                 lp.flags = if (touchable) lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
@@ -518,6 +531,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             IslandMode.VOLUME -> VOLUME_TIMEOUT_MS
             IslandMode.DEVICE -> DEVICE_TIMEOUT_MS
             IslandMode.RINGER -> RINGER_TIMEOUT_MS
+            IslandMode.EVENT -> DEVICE_TIMEOUT_MS
+            IslandMode.HOME -> HOME_TIMEOUT_MS
             else -> if (transientExpanded) MESSAGE_TIMEOUT_MS * 2 else MESSAGE_TIMEOUT_MS
         })
     }
@@ -708,6 +723,109 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     override fun onDismiss(activity: LiveActivity) = onCollapseRequest()
+
+    // ---------------------------------------------------------------- home card, stopwatch, flashlight, screenshots
+
+    private val pauseEnded = Runnable { render() }
+
+    private fun quick(what: String, extra: Float? = null): PendingIntent = PendingIntent.getService(
+        this, what.hashCode(), Intent(this, IslandOverlayService::class.java).setAction(ACTION_QUICK)
+            .putExtra(EXTRA_WHAT, what).also { if (extra != null) it.putExtra(EXTRA_VALUE, extra) },
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE)
+
+    /** The resting pill was tapped: the time, date and battery, with quick buttons. */
+    override fun onIdleTap() {
+        if (!IslandFeatures.read(this).homeCard) return
+        val level = getSystemService(BatteryManager::class.java)?.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY) ?: 0
+        val now = java.util.Date()
+        val torchOn = events?.isTorchOn == true
+        onActivity(LiveActivity(
+            key = HOME_KEY, packageName = packageName, mode = IslandMode.HOME,
+            title = android.text.format.DateFormat.getTimeFormat(this).format(now),
+            subtitle = android.text.format.DateFormat.format("EEEE, d MMMM", now).toString(),
+            appLabel = getString(R.string.app_name), appIcon = null, artwork = null, accent = AppStyle.GREEN,
+            progress = level / 100f,
+            actions = listOfNotNull(
+                IslandAction(getString(R.string.home_timer), quick("timer5")),
+                IslandAction(getString(R.string.home_stopwatch), quick("stopwatch")),
+                IslandAction(getString(if (torchOn) R.string.home_torch_off else R.string.home_torch), quick("torch")),
+                if (Build.VERSION.SDK_INT >= 28) IslandAction(getString(R.string.home_shot), quick("shot")) else null,
+            ),
+        ))
+    }
+
+    private fun handleQuick(what: String, intent: Intent) {
+        // Buttons on the home card close it as they act.
+        if (transient?.key == HOME_KEY && what != "torch-level") { transient = null; handler.removeCallbacks(clearTransient) }
+        when (what) {
+            "timer5" -> {
+                val timer = Intent(android.provider.AlarmClock.ACTION_SET_TIMER)
+                    .putExtra(android.provider.AlarmClock.EXTRA_LENGTH, 5 * 60)
+                    .putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                runCatching { startActivity(timer) }
+            }
+            "stopwatch" -> { stopwatchStart = SystemClock.elapsedRealtime(); stopwatchPausedAt = null; publishStopwatch(expand = true) }
+            "stopwatch-pause" -> { stopwatchPausedAt = SystemClock.elapsedRealtime(); publishStopwatch() }
+            "stopwatch-resume" -> {
+                val paused = stopwatchPausedAt ?: return
+                stopwatchStart += SystemClock.elapsedRealtime() - paused
+                stopwatchPausedAt = null
+                publishStopwatch()
+            }
+            "stopwatch-stop" -> { stopwatchPausedAt = null; stopwatchStart = 0L; onRemoved(STOPWATCH_KEY) }
+            "torch" -> events?.toggleTorch()
+            "torch-off" -> events?.setTorch(false)
+            "torch-level" -> events?.setTorchLevel(intent.getFloatExtra(EXTRA_VALUE, 1f))
+            "shot" -> cleanScreenshot(fromShade = false)
+            "pause" -> Unit // the tile stores the pause; render() below applies it
+            "shot-tile" -> cleanScreenshot(fromShade = true)
+        }
+        render()
+    }
+
+    private fun publishStopwatch(expand: Boolean = false) {
+        if (stopwatchStart == 0L) return
+        val paused = stopwatchPausedAt
+        val elapsed = (paused ?: SystemClock.elapsedRealtime()) - stopwatchStart
+        val activity = LiveActivity(
+            key = STOPWATCH_KEY, packageName = packageName, mode = IslandMode.TIMER,
+            title = getString(R.string.home_stopwatch), subtitle = "", appLabel = getString(R.string.home_stopwatch),
+            appIcon = null, artwork = null, accent = AppStyle.ORANGE,
+            chronometerBase = System.currentTimeMillis() - elapsed, chronometerCountDown = false,
+            pausedTimerMs = if (paused != null) elapsed else null,
+            actions = listOf(
+                if (paused == null) IslandAction(getString(R.string.stopwatch_pause), quick("stopwatch-pause"))
+                else IslandAction(getString(R.string.stopwatch_resume), quick("stopwatch-resume")),
+                IslandAction(getString(R.string.stopwatch_stop), quick("stopwatch-stop")),
+            ),
+        )
+        onActivity(activity)
+        if (expand) { activities.select(STOPWATCH_KEY); presentation = Presentation.EXPANDED; timerPeek = true }
+    }
+
+    /** Hides the island, takes the screenshot through the accessibility service, then shows it again. */
+    private fun cleanScreenshot(fromShade: Boolean) {
+        val a11y = IslandAccessibilityService.instance
+        if (Build.VERSION.SDK_INT < 28 || a11y == null) {
+            android.widget.Toast.makeText(this, R.string.shot_needs_a11y, android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        shooting = true
+        render()
+        // From Quick Settings the shade must slide away first.
+        if (fromShade && Build.VERSION.SDK_INT >= 31)
+            a11y.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_DISMISS_NOTIFICATION_SHADE)
+        handler.postDelayed({
+            a11y.performGlobalAction(android.accessibilityservice.AccessibilityService.GLOBAL_ACTION_TAKE_SCREENSHOT)
+            handler.postDelayed({ shooting = false; render() }, 1_400L)
+        }, if (fromShade) 900L else 380L)
+    }
+
+    /** The flashlight card's bar was dragged. */
+    override fun onTorchLevel(fraction: Float) { events?.setTorchLevel(fraction) }
+
+    override fun onTorchOff() { events?.setTorch(false) }
 
     /** Real beats for the island's dot record, only while the music card is open and the setting is on. */
     private val dotBeat by lazy { BeatListener(this) { bands -> island?.dotSpectrum = bands } }
@@ -1048,6 +1166,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // The island is going away: the phone's own pop-ups must come back.
         HeadsUpControl.restore(this)
         devices?.stop()
+        events?.stop()
         watcher?.stop()
         status?.stop()
         handler.removeCallbacksAndMessages(null)
@@ -1074,6 +1193,13 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         const val ACTION_FIT = "com.dynamicdroid.app.UPDATE_FIT"
         const val ACTION_WALLPAPER = "com.dynamicdroid.app.UPDATE_WALLPAPER"
         const val ACTION_THEME = "com.dynamicdroid.app.UPDATE_THEME"
+        const val ACTION_QUICK = "com.dynamicdroid.app.QUICK"
+        const val EXTRA_WHAT = "what"
+        const val EXTRA_VALUE = "value"
+        const val HOME_KEY = "own:home"
+        const val STOPWATCH_KEY = "own:stopwatch"
+        private const val HOME_TIMEOUT_MS = 8_000L
+        const val PAUSE_MS = 15 * 60 * 1000L
         private const val CHANNEL_ID = "dynamic_island"
         private const val NOTIFICATION_ID = 7104
         private const val EXPANDED_TIMEOUT_MS = 6_000L
