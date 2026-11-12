@@ -440,4 +440,9 @@
     <string name="torch_note_levels">Przesuń, by zmienić jasność, dotknij, by wyłączyć</string>
     <string name="torch_on">Włączona</string>
     <string name="torch_title">Latarka</string>
+    <string name="look_title">Styl wyspy</string>
+    <string name="look_apple">Apple</string>
+    <string name="look_nothing">Nothing</string>
+    <string name="motion_apple">Apple</string>
+    <string name="look_note">Apple naśladuje Dynamic Island z iPhone’a: czcionkę, kolory, rozmiary i sprężynę. Nothing to oryginalny, monochromatyczny wygląd z matrycy punktów. Zmiana ustawia też muzykę, tło, uśpioną pigułkę i ruch; każde z nich można dalej zmienić.</string>
 </resources>

@@ -440,4 +440,9 @@
     <string name="torch_note_levels">Geser untuk kecerahan, ketuk untuk mematikan</string>
     <string name="torch_on">Nyala</string>
     <string name="torch_title">Senter</string>
+    <string name="look_title">Gaya pulau</string>
+    <string name="look_apple">Apple</string>
+    <string name="look_nothing">Nothing</string>
+    <string name="motion_apple">Apple</string>
+    <string name="look_note">Apple mengikuti Dynamic Island iPhone: huruf, warna, ukuran, dan pegasnya. Nothing adalah tampilan asli monokrom bermatriks titik. Mengganti gaya juga menyesuaikan musik, latar, pil diam, dan gerakan; masing-masing tetap bisa diubah.</string>
 </resources>

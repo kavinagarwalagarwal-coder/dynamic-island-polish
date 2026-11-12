@@ -440,4 +440,9 @@
     <string name="torch_note_levels">Сдвиньте для яркости, нажмите, чтобы выключить</string>
     <string name="torch_on">Вкл.</string>
     <string name="torch_title">Фонарик</string>
+    <string name="look_title">Стиль острова</string>
+    <string name="look_apple">Apple</string>
+    <string name="look_nothing">Nothing</string>
+    <string name="motion_apple">Apple</string>
+    <string name="look_note">Apple повторяет Dynamic Island iPhone: шрифт, цвета, размеры и пружину. Nothing — исходный монохромный точечный вид. При смене также настраиваются музыка, фон, спящая пилюля и движение; каждое можно изменить отдельно.</string>
 </resources>

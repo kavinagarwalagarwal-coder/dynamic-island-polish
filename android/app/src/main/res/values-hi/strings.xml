@@ -440,4 +440,9 @@
     <string name="torch_note_levels">ब्राइटनेस के लिए खिसकाएँ, बंद करने के लिए टैप</string>
     <string name="torch_on">चालू</string>
     <string name="torch_title">फ़्लैशलाइट</string>
+    <string name="look_title">आइलैंड स्टाइल</string>
+    <string name="look_apple">Apple</string>
+    <string name="look_nothing">Nothing</string>
+    <string name="motion_apple">Apple</string>
+    <string name="look_note">Apple अपनाता है iPhone के Dynamic Island को: उसके अक्षर, रंग, आकार और स्प्रिंग। Nothing मूल मोनोक्रोम, डॉट-मैट्रिक्स लुक है। बदलने पर म्यूज़िक, बैकड्रॉप, आराम वाली पिल और मोशन की सेटिंग भी उसी हिसाब से हो जाती हैं; आप हर एक को फिर भी बदल सकते हैं।</string>
 </resources>

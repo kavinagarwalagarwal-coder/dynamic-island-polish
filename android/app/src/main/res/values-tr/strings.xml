@@ -440,4 +440,9 @@
     <string name="torch_note_levels">Parlaklık için kaydır, kapatmak için dokun</string>
     <string name="torch_on">Açık</string>
     <string name="torch_title">El feneri</string>
+    <string name="look_title">Ada stili</string>
+    <string name="look_apple">Apple</string>
+    <string name="look_nothing">Nothing</string>
+    <string name="motion_apple">Apple</string>
+    <string name="look_note">Apple, iPhone’un Dynamic Island’ını izler: yazı tipi, renkler, boyutlar ve yay. Nothing, orijinal tek renkli nokta matris görünümüdür. Değiştirmek müzik, arka plan, dinlenen hap ve hareket ayarlarını da uyarlar; her birini yine değiştirebilirsiniz.</string>
 </resources>

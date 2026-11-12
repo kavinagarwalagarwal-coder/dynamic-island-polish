@@ -440,4 +440,9 @@
     <string name="torch_note_levels">スライドで明るさ、タップでオフ</string>
     <string name="torch_on">オン</string>
     <string name="torch_title">ライト</string>
+    <string name="look_title">アイランドのスタイル</string>
+    <string name="look_apple">Apple</string>
+    <string name="look_nothing">Nothing</string>
+    <string name="motion_apple">Apple</string>
+    <string name="look_note">Apple は iPhone の Dynamic Island に合わせます：文字、色、サイズ、スプリング。Nothing は元のモノクロのドットマトリクス表示です。切り替えると音楽、背景、待機中のピル、動きの設定も合わせて変わります。それぞれ後から変更できます。</string>
 </resources>

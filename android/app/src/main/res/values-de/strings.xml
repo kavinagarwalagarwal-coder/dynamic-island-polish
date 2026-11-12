@@ -440,4 +440,9 @@
     <string name="torch_note_levels">Für Helligkeit schieben, zum Ausschalten tippen</string>
     <string name="torch_on">An</string>
     <string name="torch_title">Taschenlampe</string>
+    <string name="look_title">Inselstil</string>
+    <string name="look_apple">Apple</string>
+    <string name="look_nothing">Nothing</string>
+    <string name="motion_apple">Apple</string>
+    <string name="look_note">Apple folgt der Dynamic Island des iPhone: Schrift, Farben, Größen und Feder. Nothing ist der ursprüngliche einfarbige Punktmatrix-Look. Beim Wechsel werden auch Musik, Hintergrund, ruhende Pille und Bewegung angepasst; jede Einstellung bleibt änderbar.</string>
 </resources>

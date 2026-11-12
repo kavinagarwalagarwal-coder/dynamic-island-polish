@@ -440,4 +440,9 @@
     <string name="torch_note_levels">Deslize para o brilho, toque para apagar</string>
     <string name="torch_on">Acesa</string>
     <string name="torch_title">Lanterna</string>
+    <string name="look_title">Estilo da ilha</string>
+    <string name="look_apple">Apple</string>
+    <string name="look_nothing">Nothing</string>
+    <string name="motion_apple">Apple</string>
+    <string name="look_note">Apple segue a Dynamic Island do iPhone: tipografia, cores, tamanhos e mola. Nothing é o visual original monocromático de matriz de pontos. Ao trocar, música, fundo, pílula em repouso e movimento também se ajustam; você ainda pode mudar cada um.</string>
 </resources>

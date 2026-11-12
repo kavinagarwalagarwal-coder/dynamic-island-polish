@@ -465,6 +465,14 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
     }
     Column(flow.next()) {
         Heading(stringResource(R.string.features_look))
+        // Apple (Dynamic Island) or Nothing (the original monochrome, dot-matrix look).
+        Label(stringResource(R.string.look_title))
+        Choices(listOf(IslandLook.APPLE to stringResource(R.string.look_apple), IslandLook.NOTHING to stringResource(R.string.look_nothing)),
+            f.look, horizontal = true) {
+            IslandFeatures.setLook(this@FeaturesPage, it); applyFeaturesUpdate()
+            showDemo(demoMusic(true), if (preview.presentation == Presentation.EXPANDED) Presentation.COMPACT else Presentation.EXPANDED)
+        }
+        Note(stringResource(R.string.look_note))
         toggle(R.string.feature_short, "short_compact", f.shortCompact, R.string.feature_short_note)
         SliderSetting({ stringResource(R.string.slider_title, stringResource(R.string.feature_height), it, "dp") }, f.compactHeightDp.toInt(),
             IslandFeatureSet.MIN_COMPACT_DP.toInt()..IslandFeatureSet.MAX_COMPACT_DP.toInt(),
@@ -477,7 +485,7 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_camera_fade, "camera_fade", f.cameraFade, R.string.feature_camera_fade_note)
         toggle(R.string.feature_landscape, "landscape_see_through", f.landscapeSeeThrough, R.string.feature_landscape_note)
         Label(stringResource(R.string.feature_motion))
-        Choices(listOf(MotionStyle.LIQUID to stringResource(R.string.motion_liquid), MotionStyle.BOUNCY to stringResource(R.string.motion_bouncy),
+        Choices(listOf(MotionStyle.APPLE to stringResource(R.string.motion_apple), MotionStyle.LIQUID to stringResource(R.string.motion_liquid), MotionStyle.BOUNCY to stringResource(R.string.motion_bouncy),
             MotionStyle.SMOOTH to stringResource(R.string.motion_smooth)), f.motion, horizontal = true) {
             IslandFeatures.setMotion(this@FeaturesPage, it); applyFeaturesUpdate()
             // Show the new motion straight away in the preview.

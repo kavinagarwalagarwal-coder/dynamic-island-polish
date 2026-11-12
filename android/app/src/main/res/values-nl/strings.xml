@@ -440,4 +440,9 @@
     <string name="torch_note_levels">Schuif voor helderheid, tik om uit te zetten</string>
     <string name="torch_on">Aan</string>
     <string name="torch_title">Zaklamp</string>
+    <string name="look_title">Eilandstijl</string>
+    <string name="look_apple">Apple</string>
+    <string name="look_nothing">Nothing</string>
+    <string name="motion_apple">Apple</string>
+    <string name="look_note">Apple volgt het Dynamic Island van de iPhone: letters, kleuren, maten en veer. Nothing is de oorspronkelijke monochrome puntmatrix-look. Wisselen past ook muziek, achtergrond, rustende pil en beweging aan; je kunt elk ervan nog wijzigen.</string>
 </resources>
