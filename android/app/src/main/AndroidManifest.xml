@@ -85,7 +85,7 @@
             android:name=".DotPlayerActivity"
             android:exported="false"
             android:launchMode="singleTask"
-            android:taskAffinity="com.dynamicdroid.app.dots"
+            android:taskAffinity="${applicationId}.dots"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar.Fullscreen" />
 
         <service

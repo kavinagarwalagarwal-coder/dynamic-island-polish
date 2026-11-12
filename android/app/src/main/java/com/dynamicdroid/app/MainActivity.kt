@@ -65,6 +65,13 @@ class MainActivity : AppCompatActivity() {
 
     internal var headerLogo: LogoMarkView? = null
     private var onboarding: OnboardingOverlay? = null
+    /**
+     * Back goes to the tour while it shows. A callback, not onBackPressed: from Android 16 on,
+     * apps built for it get predictive back and onBackPressed is no longer called.
+     */
+    private val tourBack = object : androidx.activity.OnBackPressedCallback(false) {
+        override fun handleOnBackPressed() { onboarding?.back() ?: run { isEnabled = false } }
+    }
     internal lateinit var preview: IslandView
     internal var wallpaperPreview: IslandView? = null
     private var demo: LiveActivity? = null
@@ -113,6 +120,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        onBackPressedDispatcher.addCallback(this, tourBack)
         super.onCreate(savedInstanceState)
         fit = IslandPreferences.read(this)
         theme = IslandPreferences.readTheme(this)
@@ -214,20 +222,16 @@ class MainActivity : AppCompatActivity() {
         val connected = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
         val tour = OnboardingOverlay(this, features, connected) { openSetup ->
             onboarding = null
+            tourBack.isEnabled = false
             getSharedPreferences("onboarding", MODE_PRIVATE).edit().putBoolean("seen", true).apply()
             if (openSetup) selectPage("Setup") else headerLogo?.play(0L, 800L)
             askNotificationPermission()
         }
         onboarding = tour
+        tourBack.isEnabled = true
         root.addView(tour, FrameLayout.LayoutParams(-1, -1))
         tour.requestApplyInsets()
         tour.enter()
-    }
-
-    @Deprecated("Back is routed to the tour while it is showing.")
-    override fun onBackPressed() {
-        val tour = onboarding
-        if (tour != null) tour.back() else @Suppress("DEPRECATION") super.onBackPressed()
     }
 
     override fun onResume() {
@@ -825,11 +829,11 @@ class MainActivity : AppCompatActivity() {
     internal fun explainPopupGrant() {
         android.app.AlertDialog.Builder(this, R.style.IslandDialog)
             .setTitle(getString(R.string.popups_grant_title))
-            .setMessage(getString(R.string.popups_grant_body, HeadsUpControl.GRANT_COMMAND))
+            .setMessage(getString(R.string.popups_grant_body, HeadsUpControl.grantCommand(this)))
             .setNegativeButton(getString(R.string.common_done), null)
             .setPositiveButton(getString(R.string.popups_copy)) { _, _ ->
                 getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(
-                    android.content.ClipData.newPlainText("adb", HeadsUpControl.GRANT_COMMAND))
+                    android.content.ClipData.newPlainText("adb", HeadsUpControl.grantCommand(this)))
                 toast(getString(R.string.popups_copied))
             }.show()
     }

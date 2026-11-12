@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The Android 17 build is named "Dynamic Droid 17" so it can be told apart from the standard one. -->
+<resources>
+    <string name="accessibility_label">Остров Dynamic Droid 17</string>
+</resources>

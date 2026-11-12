@@ -48,12 +48,12 @@ class LiveOverlayTest {
         b.recycle()
     }
     @Test fun customClockTimerShowsBesideMusicInActualAndroid16Overlay() {
-        shell("pm grant com.dynamicdroid.app android.permission.POST_NOTIFICATIONS")
-        shell("appops set com.dynamicdroid.app SYSTEM_ALERT_WINDOW allow")
+        shell("pm grant ${APP_ID} android.permission.POST_NOTIFICATIONS")
+        shell("appops set ${APP_ID} SYSTEM_ALERT_WINDOW allow")
         ActivityScenario.launch(MainActivity::class.java).use {
             try {
-                shell("cmd notification allow_listener com.dynamicdroid.app/com.dynamicdroid.app.IslandNotificationListener")
-                shell("settings put secure enabled_accessibility_services com.dynamicdroid.app/com.dynamicdroid.app.IslandAccessibilityService")
+                shell("cmd notification allow_listener ${APP_ID}/com.dynamicdroid.app.IslandNotificationListener")
+                shell("settings put secure enabled_accessibility_services ${APP_ID}/com.dynamicdroid.app.IslandAccessibilityService")
                 shell("settings put secure accessibility_enabled 1")
                 await("Overlay service not attached") { IslandBus.listener is IslandOverlayService && IslandAccessibilityService.instance != null }
                 shell("am broadcast -f 32 -n com.dynamicdroid.fixture/.FixtureReceiver --es kind custom")
@@ -108,11 +108,11 @@ class LiveOverlayTest {
                 }
             } finally {
                 shell("am broadcast -f 32 -n com.dynamicdroid.fixture/.FixtureReceiver --es kind clear")
-                shell("cmd notification disallow_listener com.dynamicdroid.app/com.dynamicdroid.app.IslandNotificationListener")
+                shell("cmd notification disallow_listener ${APP_ID}/com.dynamicdroid.app.IslandNotificationListener")
                 shell("settings delete secure enabled_accessibility_services")
                 shell("settings put secure accessibility_enabled 0")
                 instrumentation.targetContext.stopService(Intent(instrumentation.targetContext, IslandOverlayService::class.java))
-                shell("appops set com.dynamicdroid.app SYSTEM_ALERT_WINDOW deny")
+                shell("appops set ${APP_ID} SYSTEM_ALERT_WINDOW deny")
             }
         }
     }

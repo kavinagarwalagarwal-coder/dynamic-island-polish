@@ -1,11 +1,14 @@
 """Exercise the installed optimized APK without adding an instrumentation runtime to it."""
+import os
 import pathlib
 import re
 import subprocess
 import time
 import xml.etree.ElementTree as ET
 
-PACKAGE = "com.dynamicdroid.app"
+# The app ID differs per build (standard or android17); CI passes it in.
+PACKAGE = os.environ.get("APP_ID", "io.github.kavinagarwalagarwal.dynamicdroid")
+CODE = "com.dynamicdroid.app"
 recording = None
 
 def adb(*args, timeout=25):
@@ -13,8 +16,16 @@ def adb(*args, timeout=25):
 
 def hierarchy():
     for attempt in range(3):
-        adb("shell", "uiautomator", "dump", "/sdcard/optimized-ui.xml")
-        root = ET.fromstring(adb("exec-out", "cat", "/sdcard/optimized-ui.xml"))
+        # A busy emulator sometimes writes an empty or partial dump: try again.
+        for _ in range(5):
+            try:
+                adb("shell", "uiautomator", "dump", "/sdcard/optimized-ui.xml")
+                root = ET.fromstring(adb("exec-out", "cat", "/sdcard/optimized-ui.xml"))
+                break
+            except (ET.ParseError, subprocess.SubprocessError):
+                time.sleep(1)
+        else:
+            raise AssertionError("uiautomator could not read the screen")
         labels = [node.get("text", "").casefold() for node in root.iter("node")]
         launcher_anr = any(("quickstep" in text or "launcher" in text) and
                            ("isn't responding" in text or "is not responding" in text)
@@ -66,14 +77,16 @@ def click_if_present(label, wait=6.0):
     return False
 
 def check_crash():
-    assert "FATAL EXCEPTION" not in adb("logcat", "-d", "-s", "AndroidRuntime:E"), "Optimized app crashed"
+    # Only our own crashes count: Google Play services sometimes dies on the emulator images.
+    log = adb("logcat", "-d", "-s", "AndroidRuntime:E")
+    assert not ("FATAL EXCEPTION" in log and "Process: " + PACKAGE + "," in log), "Optimized app crashed"
 
 def main():
     global recording
     adb("shell", "am", "force-stop", PACKAGE)
     adb("logcat", "-c")
     adb("shell", "pm", "grant", PACKAGE, "android.permission.POST_NOTIFICATIONS")
-    adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.MainActivity")
+    adb("shell", "am", "start", "-W", "-n", PACKAGE + "/" + CODE + ".MainActivity")
     # Launch flourish, then the first-run tour on a fresh install.
     time.sleep(2.5)
     check_crash()
@@ -90,7 +103,7 @@ def main():
         else:
             adb("shell", "am", "broadcast", "-a", "android.intent.action.CLOSE_SYSTEM_DIALOGS")
             if attempt in (5, 9):
-                adb("shell", "am", "start", "-W", "-n", PACKAGE + "/.MainActivity")
+                adb("shell", "am", "start", "-W", "-n", PACKAGE + "/" + CODE + ".MainActivity")
         time.sleep(1)
     else:
         raise AssertionError("Main screen never showed 'Playground'; visible: " + ", ".join(l for l in labels if l)[:600])
@@ -100,9 +113,24 @@ def main():
     assert adb("shell", "pidof", PACKAGE).strip(), "Optimized app stopped on the Playground"
     adb("shell", "pm", "grant", "com.dynamicdroid.fixture", "android.permission.POST_NOTIFICATIONS")
     adb("shell", "appops", "set", PACKAGE, "SYSTEM_ALERT_WINDOW", "allow")
-    adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + PACKAGE + ".IslandNotificationListener")
-    adb("shell", "settings", "put", "secure", "enabled_accessibility_services", PACKAGE + "/" + PACKAGE + ".IslandAccessibilityService")
+    adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + CODE + ".IslandNotificationListener")
+    adb("shell", "settings", "put", "secure", "enabled_accessibility_services", PACKAGE + "/" + CODE + ".IslandAccessibilityService")
     adb("shell", "settings", "put", "secure", "accessibility_enabled", "1")
+    # Binding is asynchronous and slow on a busy emulator (Android 17 images especially): wait
+    # until the phone reports both services connected instead of trusting a fixed sleep.
+    def bound():
+        listeners = adb("shell", "dumpsys", "notification", timeout=40)
+        a11y = adb("shell", "dumpsys", "accessibility", timeout=40)
+        return (PACKAGE + "/" + CODE + ".IslandNotificationListener") in listeners and "Bound services:{Service" in a11y
+    end = time.time() + 45
+    tries = 0
+    while time.time() < end and not bound():
+        tries += 1
+        time.sleep(1)
+        if tries % 5 == 0:
+            # Android 17 emulators sometimes drop the first grant: ask again.
+            adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + CODE + ".IslandNotificationListener")
+    assert bound(), "The notification listener never connected"
     time.sleep(1)
     fixture = "com.dynamicdroid.fixture/.FixtureActivity"
     adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "custom")
@@ -115,10 +143,14 @@ def main():
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     time.sleep(.3)
     adb("shell", "input", "keyevent", "KEYCODE_HOME")
-    time.sleep(2)
+    returned = False
+    end = time.time() + 8
+    while time.time() < end and not returned:
+        time.sleep(.5)
+        returned = "Native return started" in adb("logcat", "-d", "-s", "IslandHandoff:I")
     check_crash()
     assert adb("shell", "pidof", PACKAGE).strip() == before, "App restarted during the live handoff"
-    assert "Native return started" in adb("logcat", "-d", "-s", "IslandHandoff:I"), "The island did not grow back after leaving the player"
+    assert returned, "The island did not grow back after leaving the player"
     print("Optimized standalone APK: Playground and real player-to-Home return passed.")
 
 try:
@@ -130,6 +162,18 @@ except Exception as error:
         crash = adb("logcat", "-d", "-s", "AndroidRuntime:E")[-1500:]
     except Exception:
         pass
+    try:
+        pid = adb("shell", "pidof", PACKAGE).strip()
+        app_log = adb("logcat", "-d", "--pid=" + pid) if pid else ""
+        print("---- app log (last 120 lines) ----")
+        print("\n".join(app_log.splitlines()[-120:]))
+        a11y = adb("shell", "dumpsys", "accessibility")
+        print("---- accessibility ----")
+        print("\n".join(l for l in a11y.splitlines() if "dynamicdroid" in l or "Bound services" in l or "Enabled services" in l)[:3000])
+        print("---- notification listeners ----")
+        print("\n".join(l for l in adb("shell", "dumpsys", "notification").splitlines() if "dynamicdroid" in l)[:3000])
+    except Exception as diag:
+        print("diagnostics:", diag)
     summary = f"{type(error).__name__}: {error} | {crash}".replace("%", "%25").replace("\n", " | ")
     print(f"::error title=Optimized smoke failed::{summary[:3800]}")
     raise
@@ -147,6 +191,9 @@ finally:
         ("optimized-swiftui-morph.png", ["adb", "exec-out", "screencap", "-p"]),
         ("optimized-logcat.txt", ["adb", "logcat", "-d", "-s", "AndroidRuntime:E"]),
         ("optimized-activity.txt", ["adb", "shell", "dumpsys", "activity", "activities"]),
+        ("optimized-full-logcat.txt", ["adb", "logcat", "-d", "-t", "4000"]),
+        ("optimized-services.txt", ["adb", "shell", "dumpsys", "activity", "services", PACKAGE]),
+        ("optimized-a11y.txt", ["adb", "shell", "dumpsys", "accessibility"]),
     ]:
         try:
             (output / name).write_bytes(subprocess.check_output(command, timeout=25))

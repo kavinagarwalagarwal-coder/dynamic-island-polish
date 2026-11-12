@@ -630,6 +630,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false
         val morph = AppReturnPolicy.shouldMorph(source?.packageName, previous, pkg, pkg in homePackages,
             source?.key != island?.activity?.key, unlocked)
+        android.util.Log.d("IslandHandoff", "foreground $previous -> $pkg source=${source?.packageName} " +
+            "home=${pkg in homePackages} unlocked=$unlocked morph=$morph")
         if (morph) { presentation = Presentation.COMPACT; fullscreen = false }
         if (IslandCustomization.isHiddenForForeground(this, pkg)) island?.cancelAppMorph()
         render(absorb = morph && !IslandCustomization.isHiddenForForeground(this, pkg))
@@ -907,10 +909,16 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         val am = audio ?: return false
         if (am.mode == AudioManager.MODE_RINGTONE) return false
         val stream = volumeStream(am)
+        val before = am.getStreamVolume(stream)
         val ok = runCatching {
             am.adjustStreamVolume(stream, if (up) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER, 0)
         }.isSuccess
         if (!ok) return false
+        // Android 17 can turn volume changes from a background app into silent no-ops. If the
+        // level did not move although it could, hand the key back so the phone changes it.
+        val min = if (Build.VERSION.SDK_INT >= 28) am.getStreamMinVolume(stream) else 0
+        val couldMove = if (up) before < am.getStreamMaxVolume(stream) else before > min
+        if (couldMove && am.getStreamVolume(stream) == before) return false
         showVolume(am, stream)
         return true
     }
@@ -1140,7 +1148,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         return try {
             if (Build.VERSION.SDK_INT >= 34) {
                 val options = ActivityOptions.makeBasic()
-                    .setPendingIntentBackgroundActivityStartMode(ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
+                    .setPendingIntentBackgroundActivityStartMode(
+                        if (Build.VERSION.SDK_INT >= 36) ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOW_ALWAYS
+                        else @Suppress("DEPRECATION") ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED)
                 pendingIntent.send(this, 0, null, null, null, null, options.toBundle())
             } else {
                 pendingIntent.send()
