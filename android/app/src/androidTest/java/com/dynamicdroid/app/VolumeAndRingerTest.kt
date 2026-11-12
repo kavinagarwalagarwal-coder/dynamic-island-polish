@@ -64,7 +64,7 @@ class VolumeAndRingerTest {
     }
 
     @Test fun heldVolumeKeyKeepsSteppingAndRingerChangesShow() {
-        shell("appops set com.dynamicdroid.app SYSTEM_ALERT_WINDOW allow")
+        shell("appops set ${APP_ID} SYSTEM_ALERT_WINDOW allow")
         val startVolume = audio.getStreamVolume(AudioManager.STREAM_MUSIC)
         val startRinger = audio.ringerMode
         ActivityScenario.launch(MainActivity::class.java).use {
@@ -132,7 +132,7 @@ class VolumeAndRingerTest {
                 shell("settings delete secure enabled_accessibility_services")
                 shell("settings put secure accessibility_enabled 0")
                 context.stopService(Intent(context, IslandOverlayService::class.java))
-                shell("appops set com.dynamicdroid.app SYSTEM_ALERT_WINDOW deny")
+                shell("appops set ${APP_ID} SYSTEM_ALERT_WINDOW deny")
             }
         }
     }

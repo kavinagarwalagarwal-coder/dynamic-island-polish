@@ -38,7 +38,7 @@ class ImmersiveMediaOverlayTest {
     } == true
 
     @Test fun fullScreenVideoHidesTheIslandAndHomeBringsItBack() {
-        shell("appops set com.dynamicdroid.app SYSTEM_ALERT_WINDOW allow")
+        shell("appops set ${APP_ID} SYSTEM_ALERT_WINDOW allow")
         IslandFeatures.setBoolean(context, "hide_for_media", true)
         ActivityScenario.launch(MainActivity::class.java).use {
             try {
@@ -74,7 +74,7 @@ class ImmersiveMediaOverlayTest {
                 shell("settings delete secure enabled_accessibility_services")
                 shell("settings put secure accessibility_enabled 0")
                 context.stopService(Intent(context, IslandOverlayService::class.java))
-                shell("appops set com.dynamicdroid.app SYSTEM_ALERT_WINDOW deny")
+                shell("appops set ${APP_ID} SYSTEM_ALERT_WINDOW deny")
             }
         }
     }

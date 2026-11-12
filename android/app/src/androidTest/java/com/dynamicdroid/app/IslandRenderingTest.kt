@@ -290,7 +290,7 @@ class IslandRenderingTest {
             0xFFFF9F0A.toInt(), chronometerCountDown = true,
             clockBaseElapsed = SystemClock.elapsedRealtime() + 300_000L)
         instrumentation.uiAutomation.executeShellCommand(
-            "pm grant com.dynamicdroid.app android.permission.POST_NOTIFICATIONS"
+            "pm grant ${APP_ID} android.permission.POST_NOTIFICATIONS"
         ).let { android.os.ParcelFileDescriptor.AutoCloseInputStream(it).use { input -> input.readBytes() } }
         launchPlayground().use { scenario ->
             fun present(primary: LiveActivity?, secondary: LiveActivity?, p: Presentation, scale: Float = 1f) {

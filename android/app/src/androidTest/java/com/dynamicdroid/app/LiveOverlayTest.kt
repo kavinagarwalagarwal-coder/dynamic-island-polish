@@ -48,8 +48,8 @@ class LiveOverlayTest {
         b.recycle()
     }
     @Test fun customClockTimerShowsBesideMusicInActualAndroid16Overlay() {
-        shell("pm grant com.dynamicdroid.app android.permission.POST_NOTIFICATIONS")
-        shell("appops set com.dynamicdroid.app SYSTEM_ALERT_WINDOW allow")
+        shell("pm grant ${APP_ID} android.permission.POST_NOTIFICATIONS")
+        shell("appops set ${APP_ID} SYSTEM_ALERT_WINDOW allow")
         ActivityScenario.launch(MainActivity::class.java).use {
             try {
                 shell("cmd notification allow_listener ${APP_ID}/com.dynamicdroid.app.IslandNotificationListener")
@@ -112,7 +112,7 @@ class LiveOverlayTest {
                 shell("settings delete secure enabled_accessibility_services")
                 shell("settings put secure accessibility_enabled 0")
                 instrumentation.targetContext.stopService(Intent(instrumentation.targetContext, IslandOverlayService::class.java))
-                shell("appops set com.dynamicdroid.app SYSTEM_ALERT_WINDOW deny")
+                shell("appops set ${APP_ID} SYSTEM_ALERT_WINDOW deny")
             }
         }
     }

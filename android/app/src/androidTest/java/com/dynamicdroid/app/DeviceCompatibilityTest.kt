@@ -29,8 +29,8 @@ class DeviceCompatibilityTest {
     }
     @Test fun pagesAndStandardOverlayRemainUsableOnLegacyAndCurrentAndroid() {
         val context = instrumentation.targetContext
-        shell("appops set com.dynamicdroid.app SYSTEM_ALERT_WINDOW allow")
-        if (android.os.Build.VERSION.SDK_INT >= 33) shell("pm grant com.dynamicdroid.app android.permission.POST_NOTIFICATIONS")
+        shell("appops set ${APP_ID} SYSTEM_ALERT_WINDOW allow")
+        if (android.os.Build.VERSION.SDK_INT >= 33) shell("pm grant ${APP_ID} android.permission.POST_NOTIFICATIONS")
         try {
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
                 for (page in listOf("Playground", "Setup", "Appearance", "Phone fit")) {

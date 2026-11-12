@@ -57,7 +57,7 @@ class ShadeAndTimerTest {
         automation.serviceInfo = automation.serviceInfo.apply {
             flags = flags or android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
         }
-        shell("appops set com.dynamicdroid.app SYSTEM_ALERT_WINDOW allow")
+        shell("appops set ${APP_ID} SYSTEM_ALERT_WINDOW allow")
         ActivityScenario.launch(MainActivity::class.java).use {
             try {
                 shell("cmd notification allow_listener ${APP_ID}/com.dynamicdroid.app.IslandNotificationListener")
@@ -112,7 +112,7 @@ class ShadeAndTimerTest {
                 shell("settings delete secure enabled_accessibility_services")
                 shell("settings put secure accessibility_enabled 0")
                 context.stopService(Intent(context, IslandOverlayService::class.java))
-                shell("appops set com.dynamicdroid.app SYSTEM_ALERT_WINDOW deny")
+                shell("appops set ${APP_ID} SYSTEM_ALERT_WINDOW deny")
             }
         }
     }
