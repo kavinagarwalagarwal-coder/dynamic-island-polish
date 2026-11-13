@@ -131,9 +131,13 @@ class IslandAccessibilityService : AccessibilityService() {
         return android.graphics.Rect(cell.centerX() - s / 2, top, cell.centerX() + s / 2, top + s)
     }
 
-    /** Package of the active full-screen app window; package metadata only, never content. */
+    /**
+     * Package of the app window on top, the one the user sees; package metadata only, never
+     * content. Windows come topmost first. Not "the active window": an app that is slow to let
+     * go (Settings, seen on a busy phone) can stay active after another app has opened over it.
+     */
     private fun activeAppPackage(): String? = runCatching {
-        windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isActive }
+        windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && !it.isInPictureInPictureMode }
             ?.root?.packageName?.toString()
     }.getOrNull()
 
