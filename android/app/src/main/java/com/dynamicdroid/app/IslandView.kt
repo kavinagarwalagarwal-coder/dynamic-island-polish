@@ -392,6 +392,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var morphQueuedAt = 0L
     /** The flight's screen, fixed when it starts so a window resize mid-flight can't jolt it. */
     private var morphScreenW = 0f
+    /** The app's icon on the home screen, in island coordinates; where the flight lifts off. */
+    private var morphOrigin: RectF? = null
     private var morphSceneH = 0f
     private var morphSpec: Spec? = null
     /** Where the card's art sits, as a fraction of its height; the crop keeps it in view. */
@@ -618,9 +620,20 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         presenceS.stiffness = 110f
     }
 
+    /**
+     * Where the app's icon is on screen (from the launcher, via accessibility), or null when it
+     * isn't on the home screen. Set before showing with absorb; used by the next flight only.
+     */
+    fun setMorphOrigin(screen: android.graphics.Rect?) {
+        if (screen == null || screen.isEmpty) { morphOrigin = null; return }
+        val at = IntArray(2).also { getLocationOnScreen(it) }
+        morphOrigin = RectF((screen.left - at[0]) / fit.scale, (screen.top - at[1]) / fit.scale,
+            (screen.right - at[0]) / fit.scale, (screen.bottom - at[1]) / fit.scale)
+    }
+
     fun cancelAppMorph() {
         if (!isAbsorbing) return
-        absorbS.snap(0f); morphCard = null; softMorphCard = null; morphStart = 0L
+        absorbS.snap(0f); morphCard = null; softMorphCard = null; morphStart = 0L; morphOrigin = null
         settled = false; kick(); invalidate()
     }
 
@@ -792,7 +805,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val screenW = width / fit.scale
         val sceneH = (if (anchorToCutout) resources.displayMetrics.heightPixels else height).toFloat() / fit.scale
         morphScreenW = screenW; morphSceneH = sceneH
-        morphCard = makeMorphCard(next, if (screenW > 0f) sceneH / screenW else 2f)
+        morphCard = makeMorphCard(next)
         morphSpec = spec
         morphStart = SystemClock.uptimeMillis()
         morphQueuedAt = morphStart
@@ -816,6 +829,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         morphStart = 0L
         absorbS.snap(0f)
         morphCard = null
+        morphOrigin = null
         morphSpec?.let { spec ->
             widthS.snap(spec.w * 1.06f); widthS.target = spec.w
             heightS.snap(spec.h * 0.94f); heightS.target = spec.h
@@ -826,44 +840,20 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     /**
-     * The card's face. Android won't let an app capture another app's screen, so the card shows
-     * what identifies it: a song's cover on a soft wash of its own colours (like a player's Now
-     * Playing screen), or the app's icon on its colour (like its splash screen).
+     * The card's face: the app's own icon, because that is exactly what Android's close animation
+     * just shrank the app into, so the flight starts looking like the thing the eye is following.
+     * (A song's cover stands in when the app's icon is missing.)
      */
-    private fun makeMorphCard(a: LiveActivity, aspect: Float): Bitmap? = runCatching {
-        val w = 360
-        val h = (w * aspect.coerceIn(1.2f, 2.6f)).toInt()
-        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+    private fun makeMorphCard(a: LiveActivity): Bitmap? = runCatching {
+        val src = a.appIcon ?: a.artwork ?: return@runCatching null
+        val size = 192
+        val out = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val c = Canvas(out)
+        // Icons with transparent edges sit on the app's colour, like a home-screen icon.
+        c.drawColor(ColorUtils.blendARGB(a.accent, Color.BLACK, .35f))
         val paint = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
-        val art = a.artwork
-        if (art != null) {
-            // A tiny copy stretched up is a smooth, cheap blur of the cover's colours.
-            val tiny = Bitmap.createScaledBitmap(art, 8, 8, true)
-            c.drawBitmap(tiny, null, Rect(-w / 4, -h / 8, w + w / 4, h + h / 8), paint)
-            c.drawColor(Color.argb(110, 0, 0, 0))
-            val s = w * .7f
-            val l = (w - s) / 2f
-            val t = h * .4f - s / 2f
-            morphFocusY = .4f
-            val dst = RectF(l, t, l + s, t + s)
-            val save = c.save()
-            val clipPath = Path().apply { addRoundRect(dst, s * .06f, s * .06f, Path.Direction.CW) }
-            c.clipPath(clipPath)
-            c.drawBitmap(art, null, dst, paint)
-            c.restoreToCount(save)
-        } else {
-            val base = ColorUtils.blendARGB(a.accent, Color.BLACK, .55f)
-            paint.shader = LinearGradient(0f, 0f, 0f, h.toFloat(), base,
-                ColorUtils.blendARGB(base, Color.BLACK, .5f), Shader.TileMode.CLAMP)
-            c.drawRect(0f, 0f, w.toFloat(), h.toFloat(), paint)
-            paint.shader = null
-            morphFocusY = .5f
-            a.appIcon?.let { icon ->
-                val s = w * .3f
-                c.drawBitmap(icon, null, RectF((w - s) / 2f, h * .5f - s / 2f, (w + s) / 2f, h * .5f + s / 2f), paint)
-            }
-        }
+        c.drawBitmap(src, null, Rect(0, 0, size, size), paint)
+        morphFocusY = .5f
         out
     }.getOrNull()
 
@@ -1269,7 +1259,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             val sceneHeight = (if (anchorToCutout) resources.displayMetrics.heightPixels else height).toFloat() / fit.scale
             val flightW = if (morphStart != 0L && morphScreenW > 0f) morphScreenW else width / fit.scale
             val flightH = if (morphStart != 0L && morphSceneH > 0f) morphSceneH else sceneHeight
-            appMorph.update(1f - absorb, flightW, flightH, cx, top, w, h, density, screenCorner / fit.scale)
+            appMorph.update(1f - absorb, flightW, flightH, cx, top, w, h, density, morphOrigin)
             // The resting pill stays at the camera until the card arrives and merges into it.
             if (morphStart != 0L && features.idlePill && appMorph.top > top + h) {
                 val pill = specFor(Presentation.IDLE, null)
@@ -2639,37 +2629,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
 
 
-    /** Small notification-derived replica, not a screenshot of the third-party app. */
-    private fun makeMorphCard(a: LiveActivity): Bitmap? = try {
-        val bitmap = Bitmap.createBitmap(320, 560, Bitmap.Config.ARGB_8888)
-        val c = Canvas(bitmap)
-        c.drawColor(Color.rgb(20, 20, 22))
-        val title = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
-            typeface = NothingStyle.body; color = Color.WHITE; textSize = 22f; textAlign = Paint.Align.CENTER
-        }
-        val small = TextPaint(title).apply { textSize = 14f; color = Color.LTGRAY }
-        fun label(value: String, y: Float, paint: TextPaint) {
-            c.drawText(TextUtils.ellipsize(value, paint, 280f, TextUtils.TruncateAt.END).toString(), 160f, y, paint)
-        }
-        label(a.appLabel, 42f, small)
-        val image = a.artwork ?: a.appIcon
-        if (image != null) drawImage(c, image, 48f, 100f, 224f, if (a.mode == IslandMode.CALL) 112f else 16f, 255)
-        else {
-            val tile = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.DKGRAY }
-            c.drawRoundRect(48f, 100f, 272f, 324f, 24f, 24f, tile)
-            label(a.appLabel.take(1), 222f, title)
-        }
-        label(a.title, 374f, title)
-        label(a.subtitle.ifBlank { a.appLabel }, 404f, small)
-        c.save(); c.scale(1f / density, 1f / density)
-        if (a.mode == IslandMode.MUSIC) {
-            drawSkip(c, 84f * density, 493f * density, false, 255)
-            drawPlayPause(c, 160f * density, 493f * density, a.isPlaying, 255)
-            drawSkip(c, 236f * density, 493f * density, true, 255)
-        } else drawPhone(c, 160f * density, 493f * density, dp(28f), 255, false)
-        c.restore()
-        bitmap
-    } catch (_: OutOfMemoryError) { null } catch (_: RuntimeException) { null }
 
     private fun drawAbsorb(canvas: Canvas, absorb: Float) {
         val image = morphCard ?: return

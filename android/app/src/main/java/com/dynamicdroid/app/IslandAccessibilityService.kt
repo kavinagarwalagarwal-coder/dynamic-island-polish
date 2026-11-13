@@ -98,6 +98,39 @@ class IslandAccessibilityService : AccessibilityService() {
         runCatching { serviceInfo = info }
     }
 
+    /**
+     * Where an app's icon sits on the home screen, found by its label in the launcher's layout
+     * (no other content is read). Android's close animation shrinks the app into this icon, so
+     * the island's fly-in lifts off from here. Null when it isn't on the home screen.
+     */
+    fun launcherIconBounds(label: String): android.graphics.Rect? = runCatching {
+        if (label.isBlank()) return@runCatching null
+        val root = windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isActive }?.root
+            ?: rootInActiveWindow ?: return@runCatching null
+        val d = resources.displayMetrics.density
+        val screen = android.graphics.Rect(0, 0, resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels)
+        root.findAccessibilityNodeInfosByText(label)
+            .filter { it.isVisibleToUser && (it.text?.toString() ?: it.contentDescription?.toString()).equals(label, ignoreCase = true) }
+            .mapNotNull { node ->
+                val r = android.graphics.Rect().also(node::getBoundsInScreen)
+                if (!screen.contains(r) || r.width() < 28 * d || r.width() > 160 * d || r.height() > 200 * d) null
+                else iconWithin(r)
+            }
+            // On both the grid and the dock, the dock (lowest) is the one apps usually close into.
+            .maxByOrNull { it.top }
+    }.getOrNull()
+
+    /** A launcher cell is the icon with its label under it; the icon is the square on top. */
+    private fun iconWithin(cell: android.graphics.Rect): android.graphics.Rect {
+        if (cell.height() < cell.width() * 1.15f) {
+            val s = (minOf(cell.width(), cell.height()) * .82f).toInt()
+            return android.graphics.Rect(cell.centerX() - s / 2, cell.centerY() - s / 2, cell.centerX() + s / 2, cell.centerY() + s / 2)
+        }
+        val s = (cell.width() * .66f).toInt()
+        val top = cell.top + ((cell.height() * .78f - s) / 2f).toInt().coerceAtLeast(0)
+        return android.graphics.Rect(cell.centerX() - s / 2, top, cell.centerX() + s / 2, top + s)
+    }
+
     /** Package of the active full-screen app window; package metadata only, never content. */
     private fun activeAppPackage(): String? = runCatching {
         windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isActive }

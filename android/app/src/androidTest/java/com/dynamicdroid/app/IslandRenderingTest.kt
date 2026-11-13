@@ -347,9 +347,9 @@ class IslandRenderingTest {
     }
 
     /**
-     * Going home from the playing app: the card starts big near the middle of the screen, shrinks
-     * and rises without ever growing back or dropping, lands as the compact island and stays cheap
-     * to draw on every frame.
+     * Going home from the playing app: the card lifts off from the app's icon (where Android's own
+     * close animation leaves it), only ever rises, lands as the compact island and stays cheap to
+     * draw on every frame.
      */
     @Test fun appFliesIntoTheIsland() {
         val art = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).also { b ->
@@ -358,13 +358,19 @@ class IslandRenderingTest {
         val music = LiveActivity("fly", "music.test", IslandMode.MUSIC, "Fly song", "Artist", "Player", null, art,
             0xFFFF5A36.toInt(), isPlaying = true, durationMs = 200_000L)
         val heights = ArrayList<Float>(); val centers = ArrayList<Float>(); val costs = ArrayList<Long>()
-        var landed = RectF(); var compactH = 0f
+        var landed = RectF(); var compactH = 0f; var iconSize = 0f
         launchPlayground().use { scenario ->
             val done = CountDownLatch(1)
             scenario.onActivity { activity ->
                 val view = findIsland(activity.window.decorView)!!
                 view.applyFeatures(IslandFeatures.read(activity).copy(appMorph = true, idlePill = true))
                 view.applyFit(IslandFit(alignCamera = false)); view.setSecondary(null)
+                // An icon low on the right of the preview, as a launcher would report it.
+                val at = IntArray(2).also { view.getLocationOnScreen(it) }
+                val d = view.resources.displayMetrics.density
+                iconSize = 56f * d
+                val iconLeft = at[0] + (view.width * .7f).toInt(); val iconTop = at[1] + view.height - (110f * d).toInt()
+                view.setMorphOrigin(android.graphics.Rect(iconLeft, iconTop, iconLeft + iconSize.toInt(), iconTop + iconSize.toInt()))
                 view.show(music, Presentation.COMPACT, absorb = true)
                 val node = android.graphics.RenderNode("fly").apply { setPosition(0, 0, view.width, view.height) }
                 var frames = 0
@@ -390,11 +396,11 @@ class IslandRenderingTest {
         }
         val diag = "frames=${heights.size} h=${heights.take(3)}..${heights.takeLast(3)} cy=${centers.take(2)}..${centers.takeLast(2)} landed=$landed"
         assertTrue("Fly-in had too few frames to be seen: $diag", heights.size >= 12)
-        assertTrue("Card did not start big: $diag", heights.first() > compactH * 3f)
-        // Shrinking and rising, never growing back or dropping by more than a pixel or two.
+        // Lifts off icon-sized (the swell adds a little), not as a big card popping in.
+        assertTrue("Did not start on the icon: $diag icon=$iconSize", heights.first() in iconSize * .85f..iconSize * 1.2f)
         val px = 2f * InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
-        assertTrue("Card grew back on the way: $diag", heights.zipWithNext().all { (a, b) -> b <= a + px })
         assertTrue("Card dropped on the way: $diag", centers.zipWithNext().all { (a, b) -> b <= a + px })
+        assertTrue("Card never rose: $diag", centers.first() - centers.last() > iconSize)
         assertTrue("Did not land as the compact island: $diag", kotlin.math.abs(landed.height() - compactH) < compactH * .2f)
         val avgMs = costs.average() / 1e6
         assertTrue("Fly-in frames too costly: avg=${"%.2f".format(avgMs)}ms $diag", avgMs < 6.0)

@@ -654,7 +654,11 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             source?.key != island?.activity?.key, unlocked)
         android.util.Log.d("IslandHandoff", "foreground $previous -> $pkg source=${source?.packageName} " +
             "home=${pkg in homePackages} unlocked=$unlocked morph=$morph")
-        if (morph) { presentation = Presentation.COMPACT; fullscreen = false }
+        if (morph) {
+            presentation = Presentation.COMPACT; fullscreen = false
+            // Lift off from the app's icon, where Android's own close animation leaves it.
+            island?.setMorphOrigin(source?.let { IslandAccessibilityService.instance?.launcherIconBounds(it.appLabel) })
+        }
         if (IslandCustomization.isHiddenForForeground(this, pkg)) island?.cancelAppMorph()
         render(absorb = morph && !IslandCustomization.isHiddenForForeground(this, pkg))
     }

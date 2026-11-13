@@ -4,52 +4,55 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AppMorphTest {
-    @Test fun cardShrinksRisesAndLandsExactlyOnTheIslandWithoutLeavingTheScreen() {
+    private val icon = android.graphics.RectF(250f, 600f, 310f, 660f)
+
+    @Test fun flightLiftsOffFromTheAppIconAndLandsExactlyOnTheIsland() {
         val g = AppMorphGeometry()
-        fun step(p: Float) = g.update(p, 360f, 800f, 180f, 8f, 232f, 36f, 1f, 40f)
-        step(0f)
-        assertEquals(360f * AppMorphGeometry.START_SCALE, g.width, .01f)
-        assertEquals(800f * AppMorphGeometry.START_SCALE, g.height, .01f)
+        g.update(0f, 360f, 800f, 180f, 8f, 232f, 36f, 1f, icon)
+        // Starts exactly where Android's close animation left the app: on its icon.
+        assertEquals(250f, g.left, .01f); assertEquals(600f, g.top, .01f)
+        assertEquals(60f, g.width, .01f); assertEquals(60f, g.height, .01f)
         assertEquals(1f, g.face, 0f); assertEquals(0f, g.reveal, 0f)
-        var lastW = g.width; var lastH = g.height; var lastCy = g.top + g.height / 2f
-        for (i in 1..200) {
-            step(i / 200f)
-            // One continuous move: never grows back, never sinks, always on screen.
-            assertTrue(g.width <= lastW + .001f); assertTrue(g.height <= lastH + .001f)
-            val cy = g.top + g.height / 2f
-            assertTrue(cy <= lastCy + .001f)
-            assertTrue(g.left >= 0f); assertTrue(g.left + g.width <= 360.001f)
-            assertTrue(g.top >= 0f); assertTrue(g.top + g.height <= 800f)
-            assertTrue(g.radius <= kotlin.math.min(g.width, g.height) / 2f + .001f)
-            lastW = g.width; lastH = g.height; lastCy = cy
-        }
-        step(1f)
+        g.update(1f, 360f, 800f, 180f, 8f, 232f, 36f, 1f, icon)
         assertEquals(232f, g.width, .001f); assertEquals(36f, g.height, .001f)
-        assertEquals(8f, g.top, .001f); assertEquals(18f, g.radius, .001f)
+        assertEquals(64f, g.left, .001f); assertEquals(8f, g.top, .001f); assertEquals(18f, g.radius, .001f)
         assertEquals(1f, g.reveal, 1e-4f); assertEquals(0f, g.face, 1e-4f)
     }
 
-    @Test fun cardTurnsIntoAPillOnTheWayInsteadOfATinyRectangle() {
+    @Test fun withoutAnIconItStartsIconSizedWhereTheHomeGestureEnds() {
         val g = AppMorphGeometry()
-        g.update(.7f, 360f, 800f, 180f, 8f, 232f, 36f, 1f, 40f)
-        // Height gives way faster than width: well before landing it is already wider than tall.
-        assertTrue(g.width > g.height * 1.5f)
-        // And the art has mostly dissolved into the black body by then.
-        assertTrue(g.face < .35f)
+        g.update(0f, 360f, 800f, 180f, 8f, 232f, 36f, 2f, null)
+        assertEquals(120f, g.width, .01f)
+        assertEquals(180f, g.left + g.width / 2f, .01f)
+        assertEquals(640f, g.top + g.height / 2f, .01f)
     }
 
-    @Test fun flightIsSmoothWithNoJumpsBetweenNeighbouringFrames() {
+    @Test fun flightOnlyRisesStaysOnScreenAndHasNoJumps() {
         val g = AppMorphGeometry()
         fun state(p: Float): FloatArray {
-            g.update(p, 360f, 800f, 180f, 8f, 232f, 36f, 1f, 40f)
-            return floatArrayOf(g.left, g.top, g.width, g.height, g.radius)
+            g.update(p, 360f, 800f, 180f, 8f, 232f, 36f, 1f, icon)
+            return floatArrayOf(g.left, g.top, g.width, g.height, g.radius, g.top + g.height / 2f)
         }
         var prev = state(0f)
         for (i in 1..1000) {
             val next = state(i / 1000f)
-            for (k in prev.indices) assertTrue("jump in $k at ${i / 1000f}", kotlin.math.abs(next[k] - prev[k]) < 3f)
+            for (k in 0..4) assertTrue("jump in $k at ${i / 1000f}", kotlin.math.abs(next[k] - prev[k]) < 3f)
+            assertTrue("sank at ${i / 1000f}", next[5] <= prev[5] + .001f)
+            assertTrue(next[0] >= 0f && next[0] + next[2] <= 360.001f && next[1] >= 0f && next[1] + next[3] <= 800.001f)
+            assertTrue(next[4] <= kotlin.math.min(next[2], next[3]) / 2f + .001f)
             prev = next
         }
+    }
+
+    @Test fun pathArcsAndTheIconSwellsAsItLiftsOff() {
+        val g = AppMorphGeometry()
+        g.update(.3f, 360f, 800f, 180f, 8f, 232f, 36f, 1f, icon)
+        val dx = (280f - (g.left + g.width / 2f)) / (280f - 180f)
+        val dy = (630f - (g.top + g.height / 2f)) / (630f - 26f)
+        // Sideways settles sooner than upwards: a curve, not a straight line.
+        assertTrue("dx=$dx dy=$dy", dx > dy + .1f)
+        g.update(.1f, 360f, 800f, 180f, 8f, 232f, 36f, 1f, icon)
+        assertTrue("no swell: ${g.width}", g.width > 60f && g.height > 60f * .98f)
     }
 
     @Test fun leavingAHiddenOwnerForHomeCanAnimateButOtherSwitchesCannot() {
