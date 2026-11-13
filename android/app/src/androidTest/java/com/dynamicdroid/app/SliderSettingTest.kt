@@ -35,14 +35,20 @@ class SliderSettingTest {
             SliderSetting({ "Size $it" }, value, 0..100, { "$it" },
                 onDone = { done = it }, onChange = { value = it; changes++ })
         }
-        compose.onNode(slider).performTouchInput { swipeRight(startX = left + width * .2f, endX = right - 2f, durationMillis = 600) }
+        // Each drag starts on the thumb, as a finger would, and runs past the end of the track.
+        fun thumbX(left: Float, width: Float) = left + width * (.04f + .92f * value / 100f)
+        compose.onNode(slider).performTouchInput { swipeRight(startX = thumbX(left, width), endX = right, durationMillis = 600) }
         compose.waitForIdle()
         assertTrue("Drag stopped early: value=$value after $changes changes", value >= 95)
         assertTrue("Value did not follow the drag step by step: $changes changes", changes > 20)
         assertEquals(value, done)
-        compose.onNode(slider).performTouchInput { swipeLeft(startX = right - 2f, endX = left + 2f, durationMillis = 600) }
+        compose.onNode(slider).performTouchInput { swipeLeft(startX = thumbX(left, width), endX = left, durationMillis = 600) }
         compose.waitForIdle()
         assertTrue("Drag back stopped early: value=$value", value <= 5)
+        // And again: a slider that has been dragged once still drags.
+        compose.onNode(slider).performTouchInput { swipeRight(startX = thumbX(left, width), endX = left + width * .5f, durationMillis = 400) }
+        compose.waitForIdle()
+        assertTrue("Third drag did not follow: value=$value", value in 40..60)
     }
 
     @Test fun sliderFollowsAValueChangedFromOutside() {

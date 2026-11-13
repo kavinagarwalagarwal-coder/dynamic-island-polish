@@ -131,6 +131,10 @@ def main():
             # Android 17 emulators sometimes drop the first grant: ask again.
             adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + CODE + ".IslandNotificationListener")
     assert bound(), "The notification listener never connected"
+    # Granting these on Android 17 images can leave Settings open and hung for 10+ seconds,
+    # swallowing every window event; the app itself never opens Settings unless a setup button is
+    # tapped. Close it so the run starts from a phone that is not stuck.
+    adb("shell", "am", "force-stop", "com.android.settings")
     time.sleep(1)
     fixture = "com.dynamicdroid.fixture/.FixtureActivity"
     adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "custom")
