@@ -4,7 +4,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class AppMorphTest {
-    private val icon = android.graphics.RectF(250f, 600f, 310f, 660f)
+    private val icon = IconSpot(280f, 630f, 60f, 60f)
 
     @Test fun flightLiftsOffFromTheAppIconAndLandsExactlyOnTheIsland() {
         val g = AppMorphGeometry()

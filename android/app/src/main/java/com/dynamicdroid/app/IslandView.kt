@@ -393,7 +393,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     /** The flight's screen, fixed when it starts so a window resize mid-flight can't jolt it. */
     private var morphScreenW = 0f
     /** The app's icon on the home screen, in island coordinates; where the flight lifts off. */
-    private var morphOrigin: RectF? = null
+    private var morphOrigin: IconSpot? = null
     private var morphSceneH = 0f
     private var morphSpec: Spec? = null
     /** Where the card's art sits, as a fraction of its height; the crop keeps it in view. */
@@ -627,8 +627,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     fun setMorphOrigin(screen: android.graphics.Rect?) {
         if (screen == null || screen.isEmpty) { morphOrigin = null; return }
         val at = IntArray(2).also { getLocationOnScreen(it) }
-        morphOrigin = RectF((screen.left - at[0]) / fit.scale, (screen.top - at[1]) / fit.scale,
-            (screen.right - at[0]) / fit.scale, (screen.bottom - at[1]) / fit.scale)
+        morphOrigin = IconSpot((screen.exactCenterX() - at[0]) / fit.scale, (screen.exactCenterY() - at[1]) / fit.scale,
+            screen.width() / fit.scale, screen.height() / fit.scale)
     }
 
     fun cancelAppMorph() {

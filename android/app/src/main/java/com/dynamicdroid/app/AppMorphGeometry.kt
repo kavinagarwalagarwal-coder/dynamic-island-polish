@@ -1,11 +1,13 @@
 package com.dynamicdroid.app
 
-import android.graphics.RectF
 import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sin
+
+/** The app's icon on screen (centre and size), in the island's coordinates. */
+data class IconSpot(val cx: Float, val cy: Float, val width: Float, val height: Float)
 
 /**
  * The app flying into the island when you go home from it.
@@ -34,13 +36,13 @@ class AppMorphGeometry {
      */
     fun update(progress: Float, screenWidth: Float, screenHeight: Float, targetX: Float,
                targetTop: Float, targetWidth: Float, targetHeight: Float, density: Float,
-               origin: RectF? = null) {
+               origin: IconSpot? = null) {
         val p = progress.coerceIn(0f, 1f)
         val size = ICON_DP * density
-        val sx = origin?.centerX() ?: (screenWidth / 2f)
-        val sy = origin?.centerY() ?: (screenHeight * .8f)
-        val sw = origin?.width()?.takeIf { it > 1f } ?: size
-        val sh = origin?.height()?.takeIf { it > 1f } ?: size
+        val sx = origin?.cx ?: (screenWidth / 2f)
+        val sy = origin?.cy ?: (screenHeight * .8f)
+        val sw = origin?.width?.takeIf { it > 1f } ?: size
+        val sh = origin?.height?.takeIf { it > 1f } ?: size
         val sr = min(sw, sh) * ICON_CORNER
 
         // Path: an arc. Sideways settles early, upwards eases in and out.
