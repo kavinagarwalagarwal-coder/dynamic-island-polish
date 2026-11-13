@@ -119,6 +119,10 @@ dependencies {
     implementation("org.jetbrains.kotlin:kotlin-reflect:2.3.10")
     implementation("io.coil-kt.coil3:coil-compose:3.4.0")
 
+    // Compose UI tests (drags on real settings controls); the manifest only ships in debug builds.
+    androidTestImplementation(composeBom)
+    androidTestImplementation("androidx.compose.ui:ui-test-junit4")
+    debugImplementation("androidx.compose.ui:ui-test-manifest")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:core:1.6.1")

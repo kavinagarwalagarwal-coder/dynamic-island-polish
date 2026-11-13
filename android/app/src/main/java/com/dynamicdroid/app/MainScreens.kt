@@ -390,8 +390,9 @@ private fun MainActivity.FitPage(flow: Flow) {
     Column(flow.next()) {
         val percent = stringResource(R.string.unit_percent)
         val dpUnit = stringResource(R.string.unit_dp)
-        // Keyed on the whole fit so loading a profile or resetting moves every slider.
-        key(fit) {
+        // Sliders follow profile loads and resets themselves; no key here, as rebuilding a
+        // slider at every step cancelled the drag.
+        run {
             SliderSetting({ stringResource(R.string.slider_title, stringResource(R.string.fit_size), it, "%") }, (fit.scale * 100).toInt(), 70..130,
                 { stringResource(R.string.slider_state, it, percent) }, onChange = { fit = fit.copy(scale = it / 100f); updateFit() })
             SliderSetting({ stringResource(R.string.slider_title, stringResource(R.string.fit_width), it, "%") }, (fit.pillWidth * 100).toInt(), 70..150,
