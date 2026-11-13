@@ -136,6 +136,14 @@ def main():
     adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "custom")
     time.sleep(1)
     adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "player")
+    # A busy emulator can take many seconds to actually show the player (seen: 8.6 s on
+    # Android 17); going home before it is on screen leaves nothing to come back from.
+    end = time.time() + 20
+    while time.time() < end:
+        top = [l for l in adb("shell", "dumpsys", "activity", "activities", timeout=40).splitlines() if "topResumedActivity" in l or "ResumedActivity:" in l]
+        if any("com.dynamicdroid.fixture" in l for l in top):
+            break
+        time.sleep(.5)
     time.sleep(1)
     before = adb("shell", "pidof", PACKAGE).strip()
     recording = subprocess.Popen(
