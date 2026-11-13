@@ -511,9 +511,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
         params?.let { lp ->
-            // The resting pill is touchable only when tapping it opens the home card.
-            val idleTappable = a == null && features.idlePill && features.homeCard
-            val touchable = (a != null || idleTappable) && !concealed && !absorb && !view.isAbsorbing && !passingTouches
+            val touchable = IslandTouchPolicy.takesTouches(a != null, features.idlePill, features.homeCard,
+                concealed = concealed, flying = absorb || view.isAbsorbing, passing = passingTouches)
             val isOff = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0
             if (touchable == isOff) {
                 lp.flags = if (touchable) lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
@@ -1037,9 +1036,14 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             lp.height = h
             changed = true
         }
-        // Idle island: the window still spans the top for the next intro, so let touches
-        // fall through to the app underneath instead of deadening that strip.
-        if ((a == null || view.isConcealed) && lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
+        // Idle island: the window still spans the top for the next intro, so let touches fall
+        // through to the app underneath instead of deadening that strip, unless the resting pill
+        // is there to be tapped. (This used to switch touches off for any idle island, so once
+        // another island had come and gone the pill stopped answering taps.)
+        val f = IslandFeatures.read(this)
+        val takes = IslandTouchPolicy.takesTouches(a != null, f.idlePill, f.homeCard,
+            concealed = view.isConcealed, flying = view.isAbsorbing, passing = passingTouches)
+        if (!takes && lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
             lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             changed = true
         }
