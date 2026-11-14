@@ -131,11 +131,23 @@ def main():
             # Android 17 emulators sometimes drop the first grant: ask again.
             adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + CODE + ".IslandNotificationListener")
     assert bound(), "The notification listener never connected"
+    # Granting these on Android 17 images can leave Settings open and hung for 10+ seconds,
+    # swallowing every window event; the app itself never opens Settings unless a setup button is
+    # tapped. Close it so the run starts from a phone that is not stuck.
+    adb("shell", "am", "force-stop", "com.android.settings")
     time.sleep(1)
     fixture = "com.dynamicdroid.fixture/.FixtureActivity"
     adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "custom")
     time.sleep(1)
     adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "player")
+    # A busy emulator can take many seconds to actually show the player (seen: 8.6 s on
+    # Android 17); going home before it is on screen leaves nothing to come back from.
+    end = time.time() + 20
+    while time.time() < end:
+        top = [l for l in adb("shell", "dumpsys", "activity", "activities", timeout=40).splitlines() if "topResumedActivity" in l or "ResumedActivity:" in l]
+        if any("com.dynamicdroid.fixture" in l for l in top):
+            break
+        time.sleep(.5)
     time.sleep(1)
     before = adb("shell", "pidof", PACKAGE).strip()
     recording = subprocess.Popen(
@@ -168,6 +180,9 @@ except Exception as error:
         print("---- app log (last 120 lines) ----")
         print("\n".join(app_log.splitlines()[-120:]))
         a11y = adb("shell", "dumpsys", "accessibility")
+        print("---- activity starts ----")
+        starts = adb("logcat", "-d", "-s", "ActivityTaskManager:I", "ActivityManager:I", "WindowManager:W")
+        print("\n".join(l for l in starts.splitlines() if "START" in l or "Displayed" in l or "fixture" in l or "settings" in l)[-4000:])
         print("---- accessibility ----")
         print("\n".join(l for l in a11y.splitlines() if "dynamicdroid" in l or "Bound services" in l or "Enabled services" in l)[:3000])
         print("---- notification listeners ----")

@@ -15,6 +15,7 @@ import android.content.Intent
 import android.provider.Settings
 import android.view.KeyEvent
 import android.view.accessibility.AccessibilityEvent
+import android.view.accessibility.AccessibilityWindowInfo
 import androidx.core.content.ContextCompat
 
 /**
@@ -49,6 +50,13 @@ class IslandAccessibilityService : AccessibilityService() {
         // Package metadata only; never event text. Window content is read only by the two
         // features documented on this class (pop-ups, and full-screen video and photos).
         event ?: return
+        // Opening and closing apps: follow the app whose window is actually active. Events of one
+        // kind arrive at most every 500 ms and only the newest is kept, so a slow app still
+        // settling (Settings, say) can hide the event of the app that opened after it.
+        if (event.eventType == AccessibilityEvent.TYPE_WINDOWS_CHANGED) {
+            if (event.windowChanges and APP_WINDOW_CHANGES != 0) activeAppPackage()?.let(::reportFront)
+            return
+        }
         val pkg = event.packageName?.toString() ?: return
         if (pkg == packageName || pkg == SYSTEM_UI) {
             if (event.eventType == AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
@@ -60,7 +68,7 @@ class IslandAccessibilityService : AccessibilityService() {
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
                 ensureIsland()
-                onForegroundPackage?.invoke(pkg)
+                reportFront(activeAppPackage() ?: pkg)
                 scheduleMediaCheck(150L)
                 // Screen changes animate; look again once the new screen has settled.
                 if (mediaThreadLazy.isInitialized()) {
@@ -76,6 +84,67 @@ class IslandAccessibilityService : AccessibilityService() {
     }
 
     private var lastIslandStart = 0L
+
+    /**
+     * Accessibility normally waits half a second after the last event of a kind before passing
+     * it on. While the playing app is open we want its closing right away, so the fly-in starts
+     * with Android's own close animation instead of after it.
+     */
+    fun fastWindowEvents(fast: Boolean) {
+        val info = serviceInfo ?: return
+        val want = if (fast) FAST_EVENTS_MS else NORMAL_EVENTS_MS
+        if (info.notificationTimeout == want) return
+        info.notificationTimeout = want
+        runCatching { serviceInfo = info }
+    }
+
+    /**
+     * Where an app's icon sits on the home screen, found by its label in the launcher's layout
+     * (no other content is read). Android's close animation shrinks the app into this icon, so
+     * the island's fly-in lifts off from here. Null when it isn't on the home screen.
+     */
+    fun launcherIconBounds(label: String): android.graphics.Rect? = runCatching {
+        if (label.isBlank()) return@runCatching null
+        val root = windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && it.isActive }?.root
+            ?: rootInActiveWindow ?: return@runCatching null
+        val d = resources.displayMetrics.density
+        val screen = android.graphics.Rect(0, 0, resources.displayMetrics.widthPixels, resources.displayMetrics.heightPixels)
+        root.findAccessibilityNodeInfosByText(label)
+            .filter { it.isVisibleToUser && (it.text?.toString() ?: it.contentDescription?.toString()).equals(label, ignoreCase = true) }
+            .mapNotNull { node ->
+                val r = android.graphics.Rect().also(node::getBoundsInScreen)
+                if (!screen.contains(r) || r.width() < 28 * d || r.width() > 160 * d || r.height() > 200 * d) null
+                else iconWithin(r)
+            }
+            // On both the grid and the dock, the dock (lowest) is the one apps usually close into.
+            .maxByOrNull { it.top }
+    }.getOrNull()
+
+    /** A launcher cell is the icon with its label under it; the icon is the square on top. */
+    private fun iconWithin(cell: android.graphics.Rect): android.graphics.Rect {
+        if (cell.height() < cell.width() * 1.15f) {
+            val s = (minOf(cell.width(), cell.height()) * .82f).toInt()
+            return android.graphics.Rect(cell.centerX() - s / 2, cell.centerY() - s / 2, cell.centerX() + s / 2, cell.centerY() + s / 2)
+        }
+        val s = (cell.width() * .66f).toInt()
+        val top = cell.top + ((cell.height() * .78f - s) / 2f).toInt().coerceAtLeast(0)
+        return android.graphics.Rect(cell.centerX() - s / 2, top, cell.centerX() + s / 2, top + s)
+    }
+
+    /**
+     * Package of the app window on top, the one the user sees; package metadata only, never
+     * content. Windows come topmost first. Not "the active window": an app that is slow to let
+     * go (Settings, seen on a busy phone) can stay active after another app has opened over it.
+     */
+    private fun activeAppPackage(): String? = runCatching {
+        windows.firstOrNull { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && !it.isInPictureInPictureMode }
+            ?.root?.packageName?.toString()
+    }.getOrNull()
+
+    private fun reportFront(front: String) {
+        if (front == SYSTEM_UI) return
+        onForegroundPackage?.invoke(front)
+    }
 
     /** If Android ever stopped the island while we kept running, bring it back. */
     private fun ensureIsland() {
@@ -341,6 +410,12 @@ class IslandAccessibilityService : AccessibilityService() {
     }
 
     companion object {
+        private const val FAST_EVENTS_MS = 60L
+        private const val NORMAL_EVENTS_MS = 500L
+        /** A window opened, closed or became active: maybe a different app is in front. */
+        private const val APP_WINDOW_CHANGES = AccessibilityEvent.WINDOWS_CHANGE_ADDED or
+            AccessibilityEvent.WINDOWS_CHANGE_REMOVED or AccessibilityEvent.WINDOWS_CHANGE_ACTIVE
+
         private const val SYSTEM_UI = "com.android.systemui"
         private const val POPUP_SEARCH_MS = 3500L
         private const val POPUP_RETRY_MS = 650L

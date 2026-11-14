@@ -5,8 +5,17 @@ import android.content.Context
 
 enum class OutlineMode { OFF, EVENTS, ALWAYS }
 
-/** How the island's shape moves: liquid (default), bouncy like jelly, or smooth with no overshoot. */
-enum class MotionStyle { LIQUID, BOUNCY, SMOOTH }
+/**
+ * How the island's shape moves: Apple's (default: one soft overshoot, no squash), liquid
+ * (flows and squashes like a drop), bouncy like jelly, or smooth with no overshoot.
+ */
+enum class MotionStyle { APPLE, LIQUID, BOUNCY, SMOOTH }
+
+/**
+ * The island's overall look. APPLE follows Apple's Dynamic Island (SF-like semibold type, app
+ * colours, plain black body); NOTHING is the original monochrome, monospace, dot-matrix look.
+ */
+enum class IslandLook { APPLE, NOTHING }
 enum class HapticGesture { TAP, HOLD, SWIPE, UP }
 
 /**
@@ -27,13 +36,13 @@ data class IslandFeatureSet(
     /** Opened islands (messages, volume, devices) span the screen instead of sitting at the camera. */
     val fullWidthOpen: Boolean = true,
     /** While a song plays, the pill's background is its album cover, blurred and dimmed. */
-    val artworkBackdrop: Boolean = true,
+    val artworkBackdrop: Boolean = false,
     /** With nothing going on, keep a small black pill at the camera instead of disappearing. */
-    val idlePill: Boolean = false,
+    val idlePill: Boolean = true,
     /** Step aside for Shorts, Reels, full-screen players and photo viewers, not just true fullscreen. */
     val hideForMedia: Boolean = true,
     /** Music in the island as a spinning, rippling record of dots (Dot music) instead of plain art. */
-    val dotMusic: Boolean = true,
+    val dotMusic: Boolean = false,
     /** Off by default: it takes over from the phone's own pop-ups. */
     val hidePhonePopups: Boolean = false,
     val messagesMediumFirst: Boolean = true,
@@ -66,7 +75,8 @@ data class IslandFeatureSet(
     val landscapeSeeThrough: Boolean = true,
     /** Content fades to black around the camera hole, so nothing sits behind it. */
     val cameraFade: Boolean = true,
-    val motion: MotionStyle = MotionStyle.LIQUID,
+    val motion: MotionStyle = MotionStyle.APPLE,
+    val look: IslandLook = IslandLook.APPLE,
     // Short notices for system events, each on its own switch.
     val eventUnplugged: Boolean = true,
     val eventLowBattery: Boolean = true,
@@ -85,6 +95,8 @@ data class IslandFeatureSet(
     val homeCard: Boolean = true,
     /** Swipe the small music island sideways to skip tracks. */
     val swipeTracks: Boolean = true,
+    /** Going home from the app that's playing: the app flies up into the island. */
+    val appMorph: Boolean = true,
 ) {
     /** False when the user turned this kind of activity off. */
     fun shows(mode: IslandMode): Boolean = when (mode) {
@@ -168,6 +180,8 @@ object IslandFeatures {
             cameraFade = p.getBoolean("camera_fade", d.cameraFade),
             motion = runCatching { MotionStyle.valueOf(p.getString("motion", d.motion.name) ?: d.motion.name) }
                 .getOrDefault(d.motion),
+            look = runCatching { IslandLook.valueOf(p.getString("look", d.look.name) ?: d.look.name) }
+                .getOrDefault(d.look),
             eventUnplugged = p.getBoolean("event_unplugged", d.eventUnplugged),
             eventLowBattery = p.getBoolean("event_low_battery", d.eventLowBattery),
             eventWifi = p.getBoolean("event_wifi", d.eventWifi),
@@ -181,6 +195,7 @@ object IslandFeatures {
             sleep = p.getBoolean("show_sleep", d.sleep),
             homeCard = p.getBoolean("home_card", d.homeCard),
             swipeTracks = p.getBoolean("swipe_tracks", d.swipeTracks),
+            appMorph = p.getBoolean("app_morph", d.appMorph),
         ).safe()
     }
 
@@ -189,6 +204,23 @@ object IslandFeatures {
         .putFloat("compact_height", dp.coerceIn(IslandFeatureSet.MIN_COMPACT_DP, IslandFeatureSet.MAX_COMPACT_DP)).apply()
     fun setOutline(context: Context, mode: OutlineMode) = p(context).edit().putString("outline", mode.name).apply()
     fun setMotion(context: Context, style: MotionStyle) = p(context).edit().putString("motion", style.name).apply()
+
+    /**
+     * Switching the look also sets the switches that belong to it; each can still be changed
+     * afterwards. Apple: plain black body with the album art in its corner, a resting pill and
+     * Apple's spring. Nothing: dot-matrix music, blurred art behind it, liquid motion.
+     */
+    fun setLook(context: Context, look: IslandLook) {
+        val apple = look == IslandLook.APPLE
+        p(context).edit()
+            .putString("look", look.name)
+            .putBoolean("dot_music", !apple)
+            .putBoolean("artwork_backdrop", !apple)
+            .putBoolean("idle_pill", apple)
+            .putBoolean("edge_glow", false)
+            .putString("motion", (if (apple) MotionStyle.APPLE else MotionStyle.LIQUID).name)
+            .apply()
+    }
 
     /** The island is paused (Quick Settings tile) until this wall-clock time; 0 = not paused. */
     fun pausedUntil(context: Context) = p(context).getLong("paused_until", 0L)

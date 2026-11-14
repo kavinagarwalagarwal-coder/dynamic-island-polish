@@ -37,6 +37,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -55,6 +56,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 
 /** Colours, type and the springs every settings control moves on. */
 object Fluid {
@@ -195,8 +197,13 @@ fun ChipRow(content: @Composable RowScope.() -> Unit) =
     Row(Modifier.fillMaxWidth().padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(0.dp), content = content)
 
 /**
- * A titled slider over whole-number steps. The thumb follows the finger at once; [onChange] runs
- * while dragging, [onDone] when the finger lifts.
+ * A titled slider over whole-number steps. The thumb follows the finger smoothly; [onChange] runs
+ * each time the whole-number value changes while dragging, [onDone] when the finger lifts.
+ *
+ * The thumb's position lives here and is never reset while a finger is on it: [onChange] changes
+ * [value] at every step, and resetting from it (or rebuilding the slider) used to cancel the drag
+ * after one step, so the slider only jumped to where it was tapped. Changes from outside (a
+ * profile loaded, a reset) still move it once the finger is up.
  */
 @Composable
 fun SliderSetting(
@@ -207,15 +214,26 @@ fun SliderSetting(
     onDone: (Int) -> Unit = {},
     onChange: (Int) -> Unit = {},
 ) {
-    var live by remember(value) { mutableFloatStateOf(value.toFloat()) }
-    val current = live.toInt()
+    var live by remember { mutableFloatStateOf(value.toFloat()) }
+    var dragging by remember { mutableStateOf(false) }
+    LaunchedEffect(value) { if (!dragging) live = value.toFloat() }
+    val current = live.roundToInt()
     val said = spoken(current)
     Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
         Text(title(current), style = TextStyle(fontFamily = Fluid.body, fontSize = 16.sp, color = Fluid.foreground))
         Slider(
             value = live,
-            onValueChange = { v -> val step = v.toInt(); if (step != live.toInt()) onChange(step); live = v },
-            onValueChangeFinished = { onDone(live.toInt()) },
+            onValueChange = { v ->
+                dragging = true
+                val step = v.roundToInt()
+                if (step != live.roundToInt()) onChange(step)
+                live = v
+            },
+            onValueChangeFinished = {
+                dragging = false
+                live = live.roundToInt().toFloat()
+                onDone(live.roundToInt())
+            },
             valueRange = range.first.toFloat()..range.last.toFloat(),
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
                 .semantics { stateDescription = said },

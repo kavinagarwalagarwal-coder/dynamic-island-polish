@@ -102,6 +102,8 @@ class IslandRenderingTest {
         launchPlayground().use { scenario ->
             scenario.onActivity { activity ->
                 val view = findIsland(activity.window.decorView)!!
+                // Dot music is part of the Nothing look; the Apple look (the default) turns it off.
+                view.applyFeatures(IslandFeatures.read(activity).copy(dotMusic = true))
                 view.applyFit(IslandFit(alignCamera = false)); view.setSecondary(null); view.show(music, Presentation.COMPACT)
             }
             SystemClock.sleep(1500)
@@ -157,6 +159,8 @@ class IslandRenderingTest {
             launchPlayground().use { scenario ->
                 scenario.onActivity { activity ->
                     val view = findIsland(activity.window.decorView)!!
+                    // The camera-grow return is what plays when the fly-in is switched off.
+                    view.applyFeatures(IslandFeatures.read(activity).copy(appMorph = false))
                     view.applyFit(IslandFit(alignCamera = false)); view.setSecondary(null); view.show(music, Presentation.COMPACT)
                 }
                 SystemClock.sleep(1000)
@@ -328,6 +332,10 @@ class IslandRenderingTest {
                 assertTrue(field<RectF>(view, "secondaryRect").isEmpty)
             }
             capture("merged-single")
+            // The camera-only idle: the resting pill (on by default since the Apple look) is off here.
+            scenario.onActivity { activity ->
+                findIsland(activity.window.decorView)!!.applyFeatures(IslandFeatures.read(activity).copy(idlePill = false))
+            }
             present(null, null, Presentation.IDLE)
             scenario.onActivity { activity ->
                 val view = findIsland(activity.window.decorView)!!
@@ -337,4 +345,65 @@ class IslandRenderingTest {
             capture("hidden-camera-idle")
         }
     }
+
+    /**
+     * Going home from the playing app: the card lifts off from the app's icon (where Android's own
+     * close animation leaves it), only ever rises, lands as the compact island and stays cheap to
+     * draw on every frame.
+     */
+    @Test fun appFliesIntoTheIsland() {
+        val art = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888).also { b ->
+            for (y in 0 until 64) for (x in 0 until 64) b.setPixel(x, y, android.graphics.Color.rgb(200, 60 + x * 2, 40 + y * 3))
+        }
+        val music = LiveActivity("fly", "music.test", IslandMode.MUSIC, "Fly song", "Artist", "Player", null, art,
+            0xFFFF5A36.toInt(), isPlaying = true, durationMs = 200_000L)
+        val heights = ArrayList<Float>(); val centers = ArrayList<Float>(); val costs = ArrayList<Long>()
+        var landed = RectF(); var compactH = 0f; var iconSize = 0f
+        launchPlayground().use { scenario ->
+            val done = CountDownLatch(1)
+            scenario.onActivity { activity ->
+                val view = findIsland(activity.window.decorView)!!
+                view.applyFeatures(IslandFeatures.read(activity).copy(appMorph = true, idlePill = true))
+                view.applyFit(IslandFit(alignCamera = false)); view.setSecondary(null)
+                // An icon low on the right of the preview, as a launcher would report it.
+                val at = IntArray(2).also { view.getLocationOnScreen(it) }
+                val d = view.resources.displayMetrics.density
+                iconSize = 56f * d
+                val iconLeft = at[0] + (view.width * .7f).toInt(); val iconTop = at[1] + view.height - (110f * d).toInt()
+                view.setMorphOrigin(android.graphics.Rect(iconLeft, iconTop, iconLeft + iconSize.toInt(), iconTop + iconSize.toInt()))
+                view.show(music, Presentation.COMPACT, absorb = true)
+                val node = android.graphics.RenderNode("fly").apply { setPosition(0, 0, view.width, view.height) }
+                var frames = 0
+                val callback = object : android.view.Choreographer.FrameCallback {
+                    override fun doFrame(frameTimeNanos: Long) {
+                        // Draw this frame first, then read the shape it drew.
+                        val flying = view.isAbsorbing
+                        val t0 = System.nanoTime()
+                        val c = node.beginRecording(); view.draw(c); node.endRecording()
+                        if (flying) costs += System.nanoTime() - t0
+                        val rect = RectF(field<RectF>(view, "rect"))
+                        if (flying && view.isAbsorbing) { heights += rect.height(); centers += rect.centerY() }
+                        if ((!view.isAbsorbing && frames > 5) || ++frames > 180) {
+                            landed = rect
+                            compactH = view.resources.displayMetrics.density * IslandFeatures.read(view.context).compactHeightDp
+                            done.countDown()
+                        } else android.view.Choreographer.getInstance().postFrameCallback(this)
+                    }
+                }
+                android.view.Choreographer.getInstance().postFrameCallback(callback)
+            }
+            assertTrue("Fly-in never finished", done.await(8, TimeUnit.SECONDS))
+        }
+        val diag = "frames=${heights.size} h=${heights.take(3)}..${heights.takeLast(3)} cy=${centers.take(2)}..${centers.takeLast(2)} landed=$landed"
+        assertTrue("Fly-in had too few frames to be seen: $diag", heights.size >= 12)
+        // Lifts off icon-sized (the swell adds a little), not as a big card popping in.
+        assertTrue("Did not start on the icon: $diag icon=$iconSize", heights.first() in iconSize * .85f..iconSize * 1.2f)
+        val px = 2f * InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
+        assertTrue("Card dropped on the way: $diag", centers.zipWithNext().all { (a, b) -> b <= a + px })
+        assertTrue("Card never rose: $diag", centers.first() - centers.last() > iconSize)
+        assertTrue("Did not land as the compact island: $diag", kotlin.math.abs(landed.height() - compactH) < compactH * .2f)
+        val avgMs = costs.average() / 1e6
+        assertTrue("Fly-in frames too costly: avg=${"%.2f".format(avgMs)}ms $diag", avgMs < 6.0)
+    }
+
 }

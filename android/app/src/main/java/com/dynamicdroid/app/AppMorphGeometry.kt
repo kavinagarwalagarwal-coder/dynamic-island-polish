@@ -1,61 +1,82 @@
 package com.dynamicdroid.app
 
+import kotlin.math.PI
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.pow
+import kotlin.math.sin
 
-/** Reference sequence: portrait card pinches, travels upward, then opens into the pill. */
+/** The app's icon on screen (centre and size), in the island's coordinates. */
+data class IconSpot(val cx: Float, val cy: Float, val width: Float, val height: Float)
+
+/**
+ * The app flying into the island when you go home from it.
+ *
+ * Android's own close animation shrinks the app into its icon on the home screen; the flight
+ * picks up exactly there. The icon lifts off with a small swell, arcs up (sideways quickly,
+ * upwards smoothly), reshapes into a pill on the way and lands as the island. Starting where
+ * Android left the app is what makes it read as one motion instead of a second animation popping
+ * in. Everything is a pure function of [progress] (0 → 1), identical on every phone and frame rate.
+ */
 class AppMorphGeometry {
     var left = 0f; private set
     var top = 0f; private set
     var width = 0f; private set
     var height = 0f; private set
     var radius = 0f; private set
+    /** How much of the island's own content shows (it fades in as the card lands). */
     var reveal = 0f; private set
+    /** How much of the app's face (its icon) still shows on the card. */
+    var face = 1f; private set
 
+    /**
+     * @param origin the app's icon on screen, in the island's coordinates, or null when it isn't
+     *   on the home screen (in a folder, say): the flight then starts icon-sized near the bottom,
+     *   where the home gesture ends.
+     */
     fun update(progress: Float, screenWidth: Float, screenHeight: Float, targetX: Float,
-               targetTop: Float, targetWidth: Float, targetHeight: Float, density: Float) {
+               targetTop: Float, targetWidth: Float, targetHeight: Float, density: Float,
+               origin: IconSpot? = null) {
         val p = progress.coerceIn(0f, 1f)
-        val needleWidth = min(14f * density, targetHeight * .5f)
-        val needleHeight = targetHeight * .65f
-        var cx = screenWidth / 2f
-        val flight = smooth((p / .85f).coerceIn(0f, 1f))
-        val startY = screenHeight * .47f
-        val endY = targetTop + targetHeight / 2f
-        val u = 1f - flight
-        val cy = u*u*u*startY + 3f*u*u*flight*(screenHeight * .64f) +
-            3f*u*flight*flight*(endY + screenHeight * .10f) + flight*flight*flight*endY
-        when {
-            p < .45f -> {
-                val t = smooth(p / .45f)
-                width = mix(screenWidth * .88f, screenWidth * .14f, t)
-                height = mix(screenHeight * .84f, screenHeight * .28f, t)
-                radius = mix(36f * density, 12f * density, t)
-            }
-            p < .85f -> {
-                val t = (p - .45f) / .40f
-                width = mix(screenWidth * .14f, needleWidth, smooth(t))
-                height = mix(screenHeight * .28f, needleHeight, smooth(t))
-                cx = mix(cx, targetX, smooth(t))
-                radius = mix(12f * density, needleWidth / 2f, smooth(t))
-            }
-            else -> {
-                val t = (p - .85f) / .15f
-                val open = smooth(t)
-                val settle = kotlin.math.sin(t * Math.PI).toFloat() * t * (1f - t) * .10f
-                width = mix(needleWidth, targetWidth, open) + targetWidth * settle
-                height = mix(needleHeight, targetHeight, open)
-                cx = targetX
-                radius = mix(needleWidth / 2f, targetHeight / 2f, open)
-            }
-        }
-        val low = width / 2f
-        cx = cx.coerceIn(low, max(low, screenWidth - width / 2f))
-        left = cx - width / 2f; top = max(0f, cy - height / 2f)
-        radius = radius.coerceIn(0f, min(width, height) / 2f)
-        reveal = smooth(((p - .90f) / .10f).coerceIn(0f, 1f))
+        val size = ICON_DP * density
+        val sx = origin?.cx ?: (screenWidth / 2f)
+        val sy = origin?.cy ?: (screenHeight * .8f)
+        val sw = origin?.width?.takeIf { it > 1f } ?: size
+        val sh = origin?.height?.takeIf { it > 1f } ?: size
+        val sr = min(sw, sh) * ICON_CORNER
+
+        // Path: an arc. Sideways settles early, upwards eases in and out.
+        val tx = 1f - (1f - p).pow(2.4f)
+        val ty = smoother(p)
+        val cx = mix(sx, targetX, tx)
+        val cy = mix(sy, targetTop + targetHeight / 2f, ty)
+
+        // Shape: lifts off with a gentle swell, then becomes the pill while it travels.
+        val shapeT = smoother(((p - .12f) / .80f).coerceIn(0f, 1f))
+        val swell = 1f + LIFT_SWELL * sin(PI.toFloat() * (p / .5f).coerceIn(0f, 1f))
+        width = mix(sw, targetWidth, shapeT) * swell
+        height = mix(sh, targetHeight, shapeT) * swell
+        radius = mix(sr, targetHeight / 2f, shapeT).coerceIn(0f, min(width, height) / 2f)
+
+        val half = width / 2f
+        val x = cx.coerceIn(half, max(half, screenWidth - half))
+        left = x - half
+        top = (cy - height / 2f).coerceIn(0f, max(0f, screenHeight - height))
+        face = 1f - smoother(((p - .38f) / .40f).coerceIn(0f, 1f))
+        reveal = smoother(((p - .80f) / .20f).coerceIn(0f, 1f))
     }
+
     private fun mix(a: Float, b: Float, t: Float) = a + (b - a) * t
-    private fun smooth(t: Float) = t.coerceIn(0f, 1f).let { it * it * it * (it * (it * 6f - 15f) + 10f) }
+    private fun smoother(t: Float) = t.coerceIn(0f, 1f).let { it * it * it * (it * (it * 6f - 15f) + 10f) }
+
+    companion object {
+        /** Icon size when the real icon can't be found. */
+        const val ICON_DP = 60f
+        /** Home-screen icons are rounded squares (or circles) about this round. */
+        const val ICON_CORNER = .3f
+        /** How much the icon swells as it lifts off. */
+        const val LIFT_SWELL = .12f
+    }
 }
 
 object AppReturnPolicy {

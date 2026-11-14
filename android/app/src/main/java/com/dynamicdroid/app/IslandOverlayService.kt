@@ -71,8 +71,26 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             .enabledInputMethodList.map { it.packageName }.toSet() }.getOrDefault(emptySet())
     }
     private val homePackages by lazy {
+        // Settings registers a FallbackHome that only runs while the phone boots; it is not a
+        // home screen, so leaving Settings must not count as going home.
         packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME), 0)
+            .filterNot { it.activityInfo.name.endsWith("FallbackHome") }
             .map { it.activityInfo.packageName }.toSet()
+    }
+    /**
+     * The last app the accessibility service saw come to the front, even while nothing was live.
+     * A player's window often appears a moment before its music notification does; without this,
+     * that moment was dropped and leaving the player did not bring the island back.
+     */
+    private var seenForeground: String? = null
+
+    private fun foregroundQualifies(pkg: String) = pkg !in keyboardPackages && (pkg in homePackages ||
+        activities.all().any { it.packageName == pkg } || packageManager.getLaunchIntentForPackage(pkg) != null)
+
+    /** Start following the foreground app, catching up on the one already in front. */
+    private fun startWatcher() {
+        watcher?.start()
+        seenForeground?.let { if (foregroundQualifies(it)) watcher?.hint(it) }
     }
     private var watcher: ForegroundWatcher? = null
     /** A newly started timer opens briefly, then morphs up into the pill. */
@@ -290,14 +308,14 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 (activities.all().isNotEmpty() || transient != null || IslandFeatures.read(this).idlePill)
         }
         IslandAccessibilityService.onForegroundPackage = { pkg ->
-            if (pkg !in keyboardPackages && (pkg in homePackages || activities.all().any { it.packageName == pkg } ||
-                    packageManager.getLaunchIntentForPackage(pkg) != null)) watcher?.hint(pkg)
+            if (pkg !in keyboardPackages) seenForeground = pkg
+            if (foregroundQualifies(pkg)) watcher?.hint(pkg)
         }
         status = StatusMonitor(this) { info -> island?.applyStatus(info) }.also { it.start() }
         IslandAccessibilityService.onChanged = { handler.post {
             syncForeground()
             reattach()
-            if (activities.all().isNotEmpty()) watcher?.start()
+            if (activities.all().isNotEmpty()) startWatcher()
         } }
         attachWindow()
         IslandBus.listener = this
@@ -350,7 +368,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         if (intent?.action == ACTION_WALLPAPER) {
             island?.applyWallpaper(WallpaperSkinStore.read(this), WallpaperSkinStore.image(this))
         }
-        if (ongoing != null) watcher?.start()
+        if (ongoing != null) startWatcher()
         return START_STICKY
     }
 
@@ -493,9 +511,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         view.setConcealed(concealed)
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
         params?.let { lp ->
-            // The resting pill is touchable only when tapping it opens the home card.
-            val idleTappable = a == null && features.idlePill && features.homeCard
-            val touchable = (a != null || idleTappable) && !concealed && !absorb && !view.isAbsorbing && !passingTouches
+            val touchable = IslandTouchPolicy.takesTouches(a != null, features.idlePill, features.homeCard,
+                concealed = concealed, flying = absorb || view.isAbsorbing, passing = passingTouches)
             val isOff = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0
             if (touchable == isOff) {
                 lp.flags = if (touchable) lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
@@ -512,8 +529,10 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 handler.postDelayed(autoCollapse, delay)
             }
         }
-        growWindow(view.windowSizeFor(a, p), false)
-        view.show(a?.let { appTint(this, it) }, p, false)
+        // Flying in from the app: the window briefly covers the screen (touch-through) for the card.
+        val fly = absorb && features.appMorph
+        growWindow(view.windowSizeFor(a, p), fly)
+        view.show(a?.let { appTint(this, it) }, p, fly)
         updateTouchWindow()
         syncDotBeat(a, p)
     }
@@ -569,7 +588,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                         Presentation.EXPANDED else Presentation.COMPACT
                 }
             }
-            watcher?.start()
+            startWatcher()
         }
         render()
     }
@@ -625,6 +644,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // Use the unfiltered shelf: the owner was deliberately hidden while its app was open.
         val source = activities.pair().first?.takeIf { it.mode == IslandMode.MUSIC || it.mode == IslandMode.CALL }
         foregroundPkg = pkg
+        // While the playing app is open, hear about window changes at once rather than after
+        // accessibility's usual half-second wait, so the fly-in starts as the app closes.
+        IslandAccessibilityService.instance?.fastWindowEvents(source?.packageName == pkg && IslandFeatures.read(this).appMorph)
         if (pkg !in homePackages) island?.cancelAppMorph()
         val unlocked = getSystemService(PowerManager::class.java)?.isInteractive == true &&
             getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == false
@@ -632,7 +654,11 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             source?.key != island?.activity?.key, unlocked)
         android.util.Log.d("IslandHandoff", "foreground $previous -> $pkg source=${source?.packageName} " +
             "home=${pkg in homePackages} unlocked=$unlocked morph=$morph")
-        if (morph) { presentation = Presentation.COMPACT; fullscreen = false }
+        if (morph) {
+            presentation = Presentation.COMPACT; fullscreen = false
+            // Lift off from the app's icon, where Android's own close animation leaves it.
+            island?.setMorphOrigin(source?.let { IslandAccessibilityService.instance?.launcherIconBounds(it.appLabel) })
+        }
         if (IslandCustomization.isHiddenForForeground(this, pkg)) island?.cancelAppMorph()
         render(absorb = morph && !IslandCustomization.isHiddenForForeground(this, pkg))
     }
@@ -1014,9 +1040,14 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             lp.height = h
             changed = true
         }
-        // Idle island: the window still spans the top for the next intro, so let touches
-        // fall through to the app underneath instead of deadening that strip.
-        if ((a == null || view.isConcealed) && lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
+        // Idle island: the window still spans the top for the next intro, so let touches fall
+        // through to the app underneath instead of deadening that strip, unless the resting pill
+        // is there to be tapped. (This used to switch touches off for any idle island, so once
+        // another island had come and gone the pill stopped answering taps.)
+        val f = IslandFeatures.read(this)
+        val takes = IslandTouchPolicy.takesTouches(a != null, f.idlePill, f.homeCard,
+            concealed = view.isConcealed, flying = view.isAbsorbing, passing = passingTouches)
+        if (!takes && lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
             lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             changed = true
         }
