@@ -246,3 +246,47 @@ jobs:
         with:
           name: optimized-app-smoke-api-${{ matrix.api }}-${{ matrix.file }}
           path: island-screenshots/optimized*
+
+  # Every merge to main publishes the APKs as a GitHub release, so the newest build is always one
+  # link away (no sign-in, no zip):
+  #   .../releases/latest/download/DynamicDroid.apk            (standard)
+  #   .../releases/latest/download/DynamicDroid-Android17.apk  (Android 17)
+  # Only builds signed with the permanent key are published, so each one installs as an update.
+  # The 10 newest stay, to go back a version if one misbehaves.
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: dynamic-droid-optimized-apk
+          path: out/standard
+      - uses: actions/download-artifact@v7
+        with:
+          name: dynamic-droid-android17-optimized-apk
+          path: out/android17
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNED: ${{ secrets.DD_KEYSTORE_BASE64 != '' && secrets.DD_KEYSTORE_PASSWORD != '' }}
+        run: |
+          if [ "$SIGNED" != "true" ]; then
+            echo "::warning title=Not released::Add the DD_KEYSTORE secrets so builds can be released as updates."
+            exit 0
+          fi
+          cp out/standard/*.apk DynamicDroid.apk
+          cp out/android17/*.apk DynamicDroid-Android17.apk
+          tag="build-${GITHUB_RUN_NUMBER}"
+          printf '%s\n' \
+            "Tap **DynamicDroid.apk** on your phone to install or update (settings and permissions stay)." \
+            "On Android 16 or 17 you can pick **DynamicDroid-Android17.apk** instead." \
+            "" "Built from ${GITHUB_SHA::7}." > notes.md
+          gh release create "$tag" DynamicDroid.apk DynamicDroid-Android17.apk \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Dynamic Droid 1.7.0.${GITHUB_RUN_NUMBER}" --notes-file notes.md --latest
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,createdAt \
+            -q '[.[] | select(.tagName | startswith("build-"))] | sort_by(.createdAt) | reverse | .[10:] | .[].tagName' |
+            while read -r old; do gh release delete "$old" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag; done

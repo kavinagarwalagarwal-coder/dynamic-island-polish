@@ -17,12 +17,14 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -33,6 +35,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -43,10 +46,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.heading
@@ -116,7 +122,9 @@ private fun MainActivity.Header() {
                 style = TextStyle(fontFamily = Fluid.body, fontSize = 28.sp, fontWeight = FontWeight.Bold, color = Fluid.foreground))
         }
         val color by animateColorAsState(if (ready) Fluid.good else Fluid.foreground, Fluid.liquid(), label = "ready")
-        Text(status, Modifier.padding(top = 6.dp, bottom = 12.dp),
+        // Not ready yet: the status line takes you to the setup guide.
+        Text(status, Modifier.padding(top = 6.dp, bottom = 12.dp)
+            .then(if (ready) Modifier else Modifier.clickable(role = Role.Button) { selectPage("Setup") }),
             style = TextStyle(fontFamily = Fluid.body, fontSize = 13.sp, color = color))
     }
 }
@@ -231,9 +239,9 @@ private fun MainActivity.PlaygroundPage(flow: Flow) {
 @Composable
 private fun MainActivity.SetupPage(flow: Flow) {
     tick // re-read when permissions or the service change
+    SetupGuideCard(flow)
     Column(flow.next()) {
-        Heading(stringResource(R.string.setup_heading), top = 0.dp)
-        Note(stringResource(R.string.setup_steps), size = 15)
+        Heading(stringResource(R.string.setup_manage_heading))
         Note(stringResource(R.string.setup_fallback), size = 14)
     }
     ActionButton(stringResource(R.string.play_tour), flow.next()) { showOnboarding() }
@@ -263,6 +271,101 @@ private fun MainActivity.SetupPage(flow: Flow) {
         }
     }
 }
+
+/**
+ * The guided setup: what's done, what's next, one tap to the exact page for each step. Coming
+ * back from Settings re-reads everything (onResume bumps tick), so finished steps tick off and
+ * Continue moves on by itself.
+ */
+@Composable
+private fun MainActivity.SetupGuideCard(flow: Flow) {
+    val sdk = android.os.Build.VERSION.SDK_INT
+    val state = remember(tick) { setupState() }
+    val steps = remember { SetupPlan.steps(sdk) }
+    val next = SetupPlan.next(state, sdk)
+    val ready = SetupPlan.ready(state, sdk)
+    // Say what just got done when the user comes back from Settings.
+    var seen by remember { mutableStateOf<Set<SetupStep>?>(null) }
+    LaunchedEffect(state) {
+        val done = steps.filter(state::done).toSet()
+        seen?.let { before -> (done - before).firstOrNull()?.let { toast(getString(R.string.guide_step_done, stepTitle(it))) } }
+        seen = done
+    }
+    Column(flow.next()) {
+        Heading(stringResource(R.string.guide_title), top = 0.dp)
+        Note(stringResource(R.string.guide_progress, SetupPlan.doneCount(state, sdk), steps.size), size = 15,
+            color = if (ready) Fluid.good else Fluid.foreground)
+        steps.forEach { step -> SetupStepRow(step, state.done(step), step == next) { openStep(step) } }
+        if (next != null) ActionButton(stringResource(R.string.guide_continue, stepTitle(next))) { openStep(next) }
+        else Note(stringResource(R.string.guide_all_set), size = 15, color = Fluid.good)
+    }
+    // Android 13+ blocks these two for apps installed outside an app store until allowed.
+    if ((!state.listener || !state.island) && remember(tick) { restrictedSettingsBlocked() } != false) {
+        Column(flow.next()) {
+            Heading(stringResource(R.string.guide_restricted_title))
+            Note(stringResource(R.string.guide_restricted_note), size = 14)
+            ActionButton(stringResource(R.string.guide_restricted_open)) { openAppInfo() }
+        }
+    }
+    Column(flow.next()) {
+        Heading(stringResource(R.string.guide_adb_title))
+        Note(stringResource(R.string.guide_adb_note), size = 14)
+        ActionButton(stringResource(R.string.guide_adb_copy)) {
+            getSystemService(android.content.ClipboardManager::class.java)?.setPrimaryClip(
+                android.content.ClipData.newPlainText("Dynamic Droid setup", SetupPlan.adbCommand(packageName)))
+            toast(getString(R.string.guide_adb_copied))
+        }
+    }
+    Column(flow.next()) {
+        Heading(stringResource(R.string.guide_update_title))
+        val version = remember { runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "?" }
+        Note(stringResource(R.string.guide_update_note, version), size = 14)
+        ActionButton(stringResource(R.string.guide_update_get)) { openLatestRelease() }
+    }
+}
+
+@Composable
+private fun MainActivity.SetupStepRow(step: SetupStep, done: Boolean, isNext: Boolean, onClick: () -> Unit) {
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    Row(
+        Modifier.fillMaxWidth().padding(top = 8.dp).pressSpring(source, 0.985f)
+            .defaultMinSize(minHeight = 56.dp)
+            .background(if (isNext) Fluid.surface else Color.Transparent, Fluid.pill)
+            .clickable(source, androidx.compose.material3.ripple(color = Fluid.foreground), !done, role = Role.Button, onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        val mark by animateColorAsState(if (done) Fluid.good else Fluid.line, Fluid.liquid(), label = "step")
+        Box(Modifier.size(26.dp).background(mark, CircleShape), contentAlignment = Alignment.Center) {
+            Text(if (done) "✓" else "${step.ordinal + 1}", style = TextStyle(fontFamily = Fluid.body, fontSize = 13.sp,
+                color = if (done) Color.Black else Fluid.foreground, fontWeight = FontWeight.Bold))
+        }
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(stepTitle(step) + if (step.required) "" else "  · " + stringResource(R.string.guide_optional),
+                style = TextStyle(fontFamily = Fluid.body, fontSize = 16.sp, color = if (done) Fluid.muted else Fluid.foreground))
+            if (!done) Text(stepNote(step), Modifier.padding(top = 2.dp),
+                style = TextStyle(fontFamily = Fluid.body, fontSize = 13.sp, color = Fluid.muted, lineHeight = 17.sp))
+        }
+    }
+}
+
+internal fun MainActivity.stepTitle(step: SetupStep) = getString(when (step) {
+    SetupStep.LISTENER -> R.string.guide_listener_title
+    SetupStep.ISLAND -> R.string.guide_island_title
+    SetupStep.POST_NOTIFICATIONS -> R.string.guide_post_title
+    SetupStep.BATTERY -> R.string.guide_battery_title
+    SetupStep.USAGE -> R.string.guide_usage_title
+})
+
+internal fun MainActivity.stepNote(step: SetupStep) = getString(when (step) {
+    SetupStep.LISTENER -> R.string.guide_listener_note
+    // On, but Android stopped it (after a force stop): only off and on again brings it back.
+    SetupStep.ISLAND -> if (IslandAccessibilityService.isEnabled(this)) R.string.setup_a11y_stuck else R.string.guide_island_note
+    SetupStep.POST_NOTIFICATIONS -> R.string.guide_post_note
+    SetupStep.BATTERY -> R.string.guide_battery_note
+    SetupStep.USAGE -> R.string.guide_usage_note
+})
 
 // -------------------------------------------------------------------- Appearance
 
