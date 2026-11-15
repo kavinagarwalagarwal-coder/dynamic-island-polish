@@ -496,4 +496,6 @@
     <string name="demo_rec_title">Gravação de tela</string>
     <string name="demo_score">Críquete</string>
     <string name="demo_score_text">IND precisa de 30 corridas em 47 bolas</string>
+    <string name="live_last_seen">Última notificação de placar:</string>
+    <string name="live_none">Nenhuma ainda. Ative o placar ao vivo ou fixado no seu app de críquete.</string>
 </resources>

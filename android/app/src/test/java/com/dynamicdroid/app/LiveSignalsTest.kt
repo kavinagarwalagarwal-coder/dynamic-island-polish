@@ -44,4 +44,12 @@ class LiveSignalsTest {
         assertNull(LiveSignals.shortText(null, "Looking for a driver", "Hang tight"))
         assertEquals(10, LiveSignals.shortText("A very long status chip", "", "")!!.length)
     }
+
+    @Test fun scoreAppsSilentNotificationsAndTeamNamesCount() {
+        // Cricbuzz-style: not ongoing, but silent and updated in place.
+        assertTrue(LiveSignals.isLiveScore("com.cricbuzz.android", false, false, listOf("India 245/3"), quiet = true))
+        // The same text from an app that isn't a score app is not enough.
+        assertFalse(LiveSignals.isLiveScore("com.example.app", false, false, listOf("India 245/3"), quiet = true))
+        assertFalse(LiveSignals.isLiveScore("com.example.app", true, false, listOf("Due 12/3")))
+    }
 }

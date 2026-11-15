@@ -536,6 +536,7 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_show_timers, "show_timers", f.timers)
         toggle(R.string.feature_show_navigation, "show_navigation", f.navigation)
         toggle(R.string.feature_live, "show_live", f.liveUpdates, R.string.feature_live_note)
+        Note(stringResource(R.string.live_last_seen) + " " + remember { LiveDiagnostics.read(this@FeaturesPage) }, size = 13)
         toggle(R.string.feature_recording, "show_recording", f.recording, R.string.feature_recording_note)
         Note(stringResource(R.string.feature_tuck_note), size = 14)
         toggle(R.string.feature_show_charging, "show_charging", f.charging)

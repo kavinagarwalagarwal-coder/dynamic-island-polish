@@ -496,4 +496,6 @@
     <string name="demo_rec_title">Schermopname</string>
     <string name="demo_score">Cricket</string>
     <string name="demo_score_text">IND heeft 30 runs nodig uit 47 ballen</string>
+    <string name="live_last_seen">Laatste scoremelding:</string>
+    <string name="live_none">Nog geen. Zet de live of vastgezette score aan in je cricketapp.</string>
 </resources>

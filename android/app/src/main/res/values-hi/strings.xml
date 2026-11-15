@@ -496,4 +496,6 @@
     <string name="demo_rec_title">स्क्रीन रिकॉर्डिंग</string>
     <string name="demo_score">क्रिकेट</string>
     <string name="demo_score_text">IND को 47 गेंदों में 30 रन चाहिए</string>
+    <string name="live_last_seen">पिछला स्कोर नोटिफ़िकेशन:</string>
+    <string name="live_none">अभी तक कोई नहीं। अपने क्रिकेट ऐप में लाइव या पिन किया गया स्कोर चालू करें।</string>
 </resources>

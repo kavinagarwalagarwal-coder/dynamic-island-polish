@@ -59,6 +59,8 @@ object LiveSignals {
     private val cricketRunsOvers = Regex("(?:\\b([A-Z]{2,5})\\s*:?\\s+)?\\b(\\d{1,3})\\s*\\(\\s*\\d{1,2}(?:\\.[0-5])?\\s*(?:ov|ovs|overs?)\\s*\\)",
         RegexOption.IGNORE_CASE)
     private val cricketTeam = Regex("\\b([A-Z]{2,5})\\s*:?\\s+(\\d{1,3}[/-]\\d{1,2})\\b")
+    // From a score app, a full team name counts too: "India 245/3", "Mumbai Indians 188-6".
+    private val namedTeam = Regex("\\b([A-Z][A-Za-z]+(?: [A-Z][A-Za-z]+)?)\\s*:?\\s+(\\d{1,3}[/-]\\d{1,2})\\b")
     private val chase = Regex("\\b(need|needs|require|requires|target|trail|lead)s?\\b.*\\b\\d+\\b.*\\b(runs?|balls?|overs?)\\b",
         RegexOption.IGNORE_CASE)
 
@@ -74,15 +76,16 @@ object LiveSignals {
 
     /** Text that reads as a live cricket score (or a chase: "need 30 runs in 18 balls"). */
     fun looksLikeScore(lines: List<String>, scoreApp: Boolean = true): Boolean =
-        cricketScore(lines) != null || scoreApp && lines.any { chase.containsMatchIn(it) }
+        cricketScore(lines) != null || scoreApp && lines.any { chase.containsMatchIn(it) || namedTeam.containsMatchIn(it) }
 
     /**
      * A live score notification: from a score app (or the Google app), or any app's ongoing one
      * whose text reads as a cricket score. Must be the kind that updates in place (ongoing, or
      * alerting only once), so wicket and boundary alerts stay ordinary notifications.
      */
-    fun isLiveScore(packageName: String, ongoing: Boolean, alertOnce: Boolean, lines: List<String>): Boolean {
-        if (!ongoing && !(alertOnce && packageName in scoreApps)) return false
+    fun isLiveScore(packageName: String, ongoing: Boolean, alertOnce: Boolean, lines: List<String>, quiet: Boolean = false): Boolean {
+        // A score app's silent notification that it keeps updating counts as well.
+        if (!ongoing && !((alertOnce || quiet) && packageName in scoreApps)) return false
         return looksLikeScore(lines, packageName in scoreApps)
     }
 

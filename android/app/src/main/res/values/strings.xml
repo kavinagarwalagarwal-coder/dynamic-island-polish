@@ -507,4 +507,6 @@
     <string name="demo_rec_title">Screen recording</string>
     <string name="demo_score">Cricket</string>
     <string name="demo_score_text">IND need 30 runs from 47 balls</string>
+    <string name="live_last_seen">Last score notification:</string>
+    <string name="live_none">None yet. Turn on the live or pinned score in your cricket app.</string>
 </resources>

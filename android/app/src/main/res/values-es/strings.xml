@@ -496,4 +496,6 @@
     <string name="demo_rec_title">Grabación de pantalla</string>
     <string name="demo_score">Críquet</string>
     <string name="demo_score_text">IND necesita 30 carreras en 47 bolas</string>
+    <string name="live_last_seen">Última notificación de marcador:</string>
+    <string name="live_none">Ninguna todavía. Activa el marcador en directo o fijado en tu app de críquet.</string>
 </resources>

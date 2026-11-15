@@ -496,4 +496,6 @@
     <string name="demo_rec_title">Nagrywanie ekranu</string>
     <string name="demo_score">Krykiet</string>
     <string name="demo_score_text">IND potrzebuje 30 runów z 47 piłek</string>
+    <string name="live_last_seen">Ostatnie powiadomienie o wyniku:</string>
+    <string name="live_none">Jeszcze żadnego. Włącz wynik na żywo lub przypięty w aplikacji do krykieta.</string>
 </resources>

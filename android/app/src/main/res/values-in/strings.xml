@@ -496,4 +496,6 @@
     <string name="demo_rec_title">Perekaman layar</string>
     <string name="demo_score">Kriket</string>
     <string name="demo_score_text">IND butuh 30 run dari 47 bola</string>
+    <string name="live_last_seen">Notifikasi skor terakhir:</string>
+    <string name="live_none">Belum ada. Aktifkan skor langsung atau skor yang disematkan di aplikasi kriket Anda.</string>
 </resources>

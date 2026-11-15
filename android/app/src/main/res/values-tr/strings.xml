@@ -496,4 +496,6 @@
     <string name="demo_rec_title">Ekran kaydı</string>
     <string name="demo_score">Kriket</string>
     <string name="demo_score_text">IND\'nin 47 topta 30 sayıya ihtiyacı var</string>
+    <string name="live_last_seen">Son skor bildirimi:</string>
+    <string name="live_none">Henüz yok. Kriket uygulamanızda canlı veya sabitlenmiş skoru açın.</string>
 </resources>

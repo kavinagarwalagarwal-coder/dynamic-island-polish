@@ -496,4 +496,6 @@
     <string name="demo_rec_title">Bildschirmaufnahme</string>
     <string name="demo_score">Cricket</string>
     <string name="demo_score_text">IND braucht 30 Runs aus 47 Bällen</string>
+    <string name="live_last_seen">Letzte Ergebnis-Benachrichtigung:</string>
+    <string name="live_none">Noch keine. Schalte in deiner Cricket-App den Live- oder angehefteten Spielstand ein.</string>
 </resources>

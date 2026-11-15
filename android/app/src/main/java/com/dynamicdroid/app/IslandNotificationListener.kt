@@ -164,15 +164,20 @@ class IslandNotificationListener : NotificationListenerService() {
         val alertOnce = n.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0
         var scoreLines = listOfNotNull(title, text, extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
             extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(), shortCritical?.toString()).filter { it.isNotBlank() }
-        val scoreCandidate = features.liveUpdates && (sbn.isOngoing || alertOnce) &&
+        val quiet = !sbn.isOngoing && !isAlerting(sbn)
+        val scoreCandidate = features.liveUpdates && (sbn.isOngoing || alertOnce || quiet) &&
             (sbn.packageName in LiveSignals.scoreApps || sbn.key in scores)
+        var readCustom = false
         if (scoreCandidate && !LiveSignals.looksLikeScore(scoreLines) && (n.contentView != null || n.bigContentView != null)) {
             val custom = runCatching { NotificationText.read(this, n) }.getOrDefault(emptyList())
-            if (custom.isNotEmpty()) scoreLines = custom
+            if (custom.isNotEmpty()) { scoreLines = custom; readCustom = true }
         }
         val liveScore = features.liveUpdates && n.category != Notification.CATEGORY_CALL &&
-            (LiveSignals.isLiveScore(sbn.packageName, sbn.isOngoing, alertOnce, scoreLines) ||
-                sbn.key in scores && (sbn.isOngoing || alertOnce))
+            (LiveSignals.isLiveScore(sbn.packageName, sbn.isOngoing, alertOnce, scoreLines, quiet) ||
+                sbn.key in scores && (sbn.isOngoing || alertOnce || quiet))
+        if (sbn.packageName in LiveSignals.scoreApps || liveScore) LiveDiagnostics.record(this, sbn.packageName, sbn.isOngoing,
+            alertOnce, quiet, readCustom, LiveSignals.looksLikeScore(scoreLines, sbn.packageName in LiveSignals.scoreApps),
+            liveScore && IslandFeatures.read(this).shows(IslandMode.LIVE))
         val live = features.liveUpdates && n.category != Notification.CATEGORY_CALL && sbn.packageName != LiveSignals.GOOGLE_APP && LiveSignals.isLiveUpdate(
             extras.getString(Notification.EXTRA_TEMPLATE), n.flags, extras.getBoolean(LiveSignals.EXTRA_REQUEST_PROMOTED),
             sbn.packageName, sbn.isOngoing, !shortCritical.isNullOrBlank())

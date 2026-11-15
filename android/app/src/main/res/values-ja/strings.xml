@@ -496,4 +496,6 @@
     <string name="demo_rec_title">画面録画</string>
     <string name="demo_score">クリケット</string>
     <string name="demo_score_text">IND は残り47球で30ラン必要</string>
+    <string name="live_last_seen">最後のスコア通知:</string>
+    <string name="live_none">まだありません。クリケットアプリでライブスコアまたはピン留めスコアをオンにしてください。</string>
 </resources>

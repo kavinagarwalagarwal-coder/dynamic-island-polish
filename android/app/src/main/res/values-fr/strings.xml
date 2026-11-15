@@ -496,4 +496,6 @@
     <string name="demo_rec_title">Enregistrement d\'écran</string>
     <string name="demo_score">Cricket</string>
     <string name="demo_score_text">IND a besoin de 30 points en 47 balles</string>
+    <string name="live_last_seen">Dernière notification de score :</string>
+    <string name="live_none">Aucune pour l\'instant. Active le score en direct ou épinglé dans ton app de cricket.</string>
 </resources>
