@@ -155,6 +155,20 @@ def main():
         if "com.dynamicdroid.fixture" in adb("shell", "dumpsys", "media_session", timeout=40):
             break
         time.sleep(.5)
+    # The island must have seen the player come to the front: busy Android 17 emulators sometimes
+    # drop that window event, and a phone that never saw the app open has nothing to fly back to.
+    # If it was dropped, bring the player to the front again.
+    def saw_player():
+        return "-> com.dynamicdroid.fixture" in adb("logcat", "-d", "-s", "IslandHandoff:D")
+    for attempt in range(3):
+        end = time.time() + 6
+        while time.time() < end and not saw_player():
+            time.sleep(.5)
+        if saw_player():
+            break
+        adb("shell", "input", "keyevent", "KEYCODE_HOME")
+        time.sleep(1.5)
+        adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "player")
     time.sleep(2)
     before = adb("shell", "pidof", PACKAGE).strip()
     recording = subprocess.Popen(
