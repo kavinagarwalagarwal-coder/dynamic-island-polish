@@ -494,4 +494,6 @@
     <string name="demo_nav_text">Skręć w prawo w MG Road</string>
     <string name="demo_nav_detail">12 min · 4,3 km · przyjazd 11:04</string>
     <string name="demo_rec_title">Nagrywanie ekranu</string>
+    <string name="demo_score">Krykiet</string>
+    <string name="demo_score_text">IND potrzebuje 30 runów z 47 piłek</string>
 </resources>

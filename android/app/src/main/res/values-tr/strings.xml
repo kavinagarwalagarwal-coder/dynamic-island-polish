@@ -494,4 +494,6 @@
     <string name="demo_nav_text">MG Road’a sağa dönün</string>
     <string name="demo_nav_detail">12 dk · 4,3 km · varış 11:04</string>
     <string name="demo_rec_title">Ekran kaydı</string>
+    <string name="demo_score">Kriket</string>
+    <string name="demo_score_text">IND\'nin 47 topta 30 sayıya ihtiyacı var</string>
 </resources>

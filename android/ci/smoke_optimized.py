@@ -147,7 +147,15 @@ def main():
         if any("com.dynamicdroid.fixture" in l for l in top):
             break
         time.sleep(.5)
-    time.sleep(1)
+    # The island only flies back for an app that is already playing on it: on a slow emulator the
+    # player's media notification can land after Home, which leaves nothing to fly back. Wait
+    # for the fixture's media session before leaving.
+    end = time.time() + 15
+    while time.time() < end:
+        if "com.dynamicdroid.fixture" in adb("shell", "dumpsys", "media_session", timeout=40):
+            break
+        time.sleep(.5)
+    time.sleep(2)
     before = adb("shell", "pidof", PACKAGE).strip()
     recording = subprocess.Popen(
         ["adb", "shell", "screenrecord", "--time-limit", "4", "/sdcard/island-return.mp4"],

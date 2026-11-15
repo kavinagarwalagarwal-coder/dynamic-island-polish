@@ -432,6 +432,13 @@ class MainActivity : AppCompatActivity() {
         actions = listOf(IslandAction(getString(R.string.demo_live_call), selfIntent()), IslandAction(getString(R.string.demo_live_message), selfIntent())),
     )
 
+    internal fun demoScore() = LiveActivity(
+        key = "demo-score", packageName = "com.cricbuzz.android", mode = IslandMode.LIVE,
+        title = "IND 245/3 (42.1 ov)  ·  AUS 274/8", subtitle = getString(R.string.demo_score_text),
+        appLabel = "Cricbuzz", appIcon = null, artwork = null, accent = AppStyle.GREEN,
+        shortText = LiveSignals.cricketScore(listOf("IND 245/3 (42.1 ov)")),
+    )
+
     internal fun demoNavigation() = LiveActivity(
         key = "demo-nav", packageName = "com.google.android.apps.maps", mode = IslandMode.NAVIGATION,
         title = getString(R.string.demo_nav_title), subtitle = getString(R.string.demo_nav_text),

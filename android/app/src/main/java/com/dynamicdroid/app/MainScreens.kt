@@ -213,6 +213,7 @@ private fun MainActivity.PlaygroundPage(flow: Flow) {
         }
         ChipRow {
             Chip(stringResource(R.string.demo_live)) { preview.setSecondary(null); showDemo(demoLive(), Presentation.EXPANDED) }
+            Chip(stringResource(R.string.demo_score)) { preview.setSecondary(null); showDemo(demoScore(), Presentation.COMPACT) }
             Chip(stringResource(R.string.demo_nav)) { preview.setSecondary(null); showDemo(demoNavigation(), Presentation.EXPANDED) }
             Chip(stringResource(R.string.mode_recording)) { preview.setSecondary(null); showDemo(demoRecording(), Presentation.EXPANDED) }
         }

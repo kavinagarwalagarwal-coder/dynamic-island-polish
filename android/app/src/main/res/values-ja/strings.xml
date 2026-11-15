@@ -494,4 +494,6 @@
     <string name="demo_nav_text">MG Road を右折</string>
     <string name="demo_nav_detail">12分 · 4.3 km · 11:04 到着</string>
     <string name="demo_rec_title">画面録画</string>
+    <string name="demo_score">クリケット</string>
+    <string name="demo_score_text">IND は残り47球で30ラン必要</string>
 </resources>

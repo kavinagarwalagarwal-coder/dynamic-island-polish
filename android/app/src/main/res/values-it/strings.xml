@@ -494,4 +494,6 @@
     <string name="demo_nav_text">Svolta a destra in MG Road</string>
     <string name="demo_nav_detail">12 min · 4,3 km · arrivo 11:04</string>
     <string name="demo_rec_title">Registrazione schermo</string>
+    <string name="demo_score">Cricket</string>
+    <string name="demo_score_text">IND ha bisogno di 30 punti in 47 palle</string>
 </resources>

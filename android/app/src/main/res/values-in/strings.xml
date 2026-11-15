@@ -494,4 +494,6 @@
     <string name="demo_nav_text">Belok kanan ke MG Road</string>
     <string name="demo_nav_detail">12 mnt · 4,3 km · tiba 11.04</string>
     <string name="demo_rec_title">Perekaman layar</string>
+    <string name="demo_score">Kriket</string>
+    <string name="demo_score_text">IND butuh 30 run dari 47 bola</string>
 </resources>

@@ -505,4 +505,6 @@
     <string name="demo_nav_text">Turn right onto MG Road</string>
     <string name="demo_nav_detail">12 min · 4.3 km · arrive 11:04</string>
     <string name="demo_rec_title">Screen recording</string>
+    <string name="demo_score">Cricket</string>
+    <string name="demo_score_text">IND need 30 runs from 47 balls</string>
 </resources>

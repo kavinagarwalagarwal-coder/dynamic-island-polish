@@ -494,4 +494,6 @@
     <string name="demo_nav_text">MG रोड पर दाएँ मुड़ें</string>
     <string name="demo_nav_detail">12 मि · 4.3 किमी · 11:04 पहुँचें</string>
     <string name="demo_rec_title">स्क्रीन रिकॉर्डिंग</string>
+    <string name="demo_score">क्रिकेट</string>
+    <string name="demo_score_text">IND को 47 गेंदों में 30 रन चाहिए</string>
 </resources>
