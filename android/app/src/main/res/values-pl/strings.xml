@@ -475,4 +475,23 @@
     <string name="guide_update_note">Masz wersję %1$s. Nowe instalują się na niej i zachowują ustawienia oraz uprawnienia.</string>
     <string name="guide_update_get">Pobierz najnowszą wersję</string>
     <string name="setup_manage_heading">WSZYSTKIE UPRAWNIENIA</string>
+    <string name="live_hotspot_short">Wł.</string>
+    <string name="mode_live">Aktualizacje na żywo</string>
+    <string name="mode_recording">Nagrywanie</string>
+    <string name="feature_live">Przejazdy, zamówienia i wyniki na żywo</string>
+    <string name="feature_live_note">Przejazdy, dostawy, wyniki, loty i hotspot mają własną wyspę, jak aktywności na żywo w iPhonie. Używa Live Updates z Androida 16, gdy aplikacje je udostępniają.</string>
+    <string name="feature_recording">Nagrywanie</string>
+    <string name="feature_recording_note">Nagrywanie ekranu i głosu pokazuje czerwoną kropkę i dotychczasowy czas.</string>
+    <string name="feature_tuck_note">Przesuń małą wyspę w górę, by ją schować; przesuń uśpioną pigułkę w dół, by ją przywrócić.</string>
+    <string name="demo_live">Przejazd</string>
+    <string name="demo_live_title">Kierowca jedzie</string>
+    <string name="demo_live_text">Biały hatchback · KA 01 AB 1234</string>
+    <string name="demo_live_short">4 min</string>
+    <string name="demo_live_call">Zadzwoń</string>
+    <string name="demo_live_message">Wiadomość</string>
+    <string name="demo_nav">Trasa</string>
+    <string name="demo_nav_title">200 m</string>
+    <string name="demo_nav_text">Skręć w prawo w MG Road</string>
+    <string name="demo_nav_detail">12 min · 4,3 km · przyjazd 11:04</string>
+    <string name="demo_rec_title">Nagrywanie ekranu</string>
 </resources>

@@ -475,4 +475,23 @@
     <string name="guide_update_note">Tienes la versión %1$s. Las nuevas se instalan encima y conservan tus ajustes y permisos.</string>
     <string name="guide_update_get">Obtener la última versión</string>
     <string name="setup_manage_heading">TODOS LOS PERMISOS</string>
+    <string name="live_hotspot_short">Activado</string>
+    <string name="mode_live">Actualizaciones en vivo</string>
+    <string name="mode_recording">Grabación</string>
+    <string name="feature_live">Viajes, pedidos y marcadores en vivo</string>
+    <string name="feature_live_note">Viajes, entregas, marcadores, vuelos y el punto de acceso tienen su propia isla, como las Actividades en vivo del iPhone. Usa las Live Updates de Android 16 cuando las apps las ofrecen.</string>
+    <string name="feature_recording">Grabación</string>
+    <string name="feature_recording_note">La grabación de pantalla y de voz muestran un punto rojo y el tiempo transcurrido.</string>
+    <string name="feature_tuck_note">Desliza hacia arriba la isla pequeña para apartarla; desliza hacia abajo la píldora en reposo para recuperarla.</string>
+    <string name="demo_live">Viaje</string>
+    <string name="demo_live_title">Tu conductor llega</string>
+    <string name="demo_live_text">Hatchback blanco · KA 01 AB 1234</string>
+    <string name="demo_live_short">4 min</string>
+    <string name="demo_live_call">Llamar</string>
+    <string name="demo_live_message">Mensaje</string>
+    <string name="demo_nav">Ruta</string>
+    <string name="demo_nav_title">200 m</string>
+    <string name="demo_nav_text">Gira a la derecha en MG Road</string>
+    <string name="demo_nav_detail">12 min · 4,3 km · llegada 11:04</string>
+    <string name="demo_rec_title">Grabación de pantalla</string>
 </resources>

@@ -146,11 +146,22 @@ class IslandNotificationListener : NotificationListenerService() {
         val actionLabels = n.actions.orEmpty().map { it.title?.toString().orEmpty() }
         val progress = IslandSignals.progressFraction(extras.getInt(Notification.EXTRA_PROGRESS),
             extras.getInt(Notification.EXTRA_PROGRESS_MAX), extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
+        val channel = if (Build.VERSION.SDK_INT >= 26) n.channelId else null
+        val shortCritical = extras.getCharSequence(LiveSignals.EXTRA_SHORT_CRITICAL_TEXT)
+        // Recordings first: a recorder's Pause/Stop stopwatch would otherwise pass for a timer.
+        val recording = features.recording && LiveSignals.isRecording(sbn.packageName, channel, title, text, sbn.isOngoing, chronometer)
+        val hotspot = features.liveUpdates && LiveSignals.isHotspot(sbn.packageName, channel, sbn.isOngoing)
+        val live = features.liveUpdates && n.category != Notification.CATEGORY_CALL && LiveSignals.isLiveUpdate(
+            extras.getString(Notification.EXTRA_TEMPLATE), n.flags, extras.getBoolean(LiveSignals.EXTRA_REQUEST_PROMOTED),
+            sbn.packageName, sbn.isOngoing, !shortCritical.isNullOrBlank())
         val mode = when {
             n.category == Notification.CATEGORY_CALL -> IslandMode.CALL
             features.alarms && IslandSignals.isRingingAlarm(n.category, clockApp, actionLabels) -> IslandMode.ALARM
             n.category == Notification.CATEGORY_NAVIGATION && sbn.isOngoing -> IslandMode.NAVIGATION
+            recording -> IslandMode.RECORDING
+            hotspot -> IslandMode.LIVE
             recognizedTimer -> IslandMode.TIMER
+            live && !(features.downloads && n.category == Notification.CATEGORY_PROGRESS) -> IslandMode.LIVE
             features.downloads && progress != null && progress < 1f &&
                 (sbn.isOngoing || n.category == Notification.CATEGORY_PROGRESS) -> IslandMode.DOWNLOAD
             sbn.key in lastProgress -> { finishProgress(sbn.key); if (sbn.isOngoing) return else IslandMode.MESSAGE }
@@ -218,9 +229,16 @@ class IslandNotificationListener : NotificationListenerService() {
                 SystemClock.elapsedRealtime() + (it - System.currentTimeMillis())
             },
             pausedTimerMs = if (paused) remaining else null,
-            progress = if (mode == IslandMode.DOWNLOAD) progress else null,
+            progress = if (mode == IslandMode.DOWNLOAD || mode == IslandMode.LIVE) progress else null,
             callState = callState,
             reply = reply,
+            glyph = when {
+                hotspot -> Glyph.HOTSPOT
+                mode == IslandMode.RECORDING -> if (LiveSignals.isScreenRecording(sbn.packageName, channel, title)) Glyph.SCREEN else Glyph.MIC
+                else -> null
+            },
+            detail = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString().orEmpty(),
+            shortText = if (mode == IslandMode.LIVE && !hotspot) LiveSignals.shortText(shortCritical, title, text) else null,
         )
         if (mode == IslandMode.TIMER) timers[sbn.key] = activity
         IslandBus.post(activity)

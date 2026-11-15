@@ -20,4 +20,10 @@ class IslandTouchPolicyTest {
         assertFalse(IslandTouchPolicy.takesTouches(true, idlePill = true, homeCard = true, concealed = false, flying = true, passing = false))
         assertFalse(IslandTouchPolicy.takesTouches(false, idlePill = true, homeCard = true, concealed = false, flying = false, passing = true))
     }
+
+    @Test fun somethingPutAwayKeepsThePillSwipeableEvenWithoutTheHomeCard() {
+        assertTrue(IslandTouchPolicy.takesTouches(false, idlePill = true, homeCard = false, concealed = false, flying = false, passing = false, tucked = true))
+        assertFalse(IslandTouchPolicy.takesTouches(false, idlePill = false, homeCard = false, concealed = false, flying = false, passing = false, tucked = true))
+    }
+
 }

@@ -475,4 +475,23 @@
     <string name="guide_update_note">आपके पास वर्ज़न %1$s है। नए वर्ज़न इसी के ऊपर इंस्टॉल होते हैं और आपकी सेटिंग व अनुमतियाँ रखते हैं।</string>
     <string name="guide_update_get">नया वर्ज़न पाएँ</string>
     <string name="setup_manage_heading">सभी अनुमतियाँ</string>
+    <string name="live_hotspot_short">चालू</string>
+    <string name="mode_live">लाइव अपडेट</string>
+    <string name="mode_recording">रिकॉर्डिंग</string>
+    <string name="feature_live">लाइव सफ़र, ऑर्डर और स्कोर</string>
+    <string name="feature_live_note">राइड, डिलीवरी, लाइव स्कोर, फ़्लाइट और हॉटस्पॉट को अपना आइलैंड मिलता है, iPhone की Live Activities जैसा। जहाँ ऐप दें, Android 16 के Live Updates इस्तेमाल होते हैं।</string>
+    <string name="feature_recording">रिकॉर्डिंग</string>
+    <string name="feature_recording_note">स्क्रीन और आवाज़ रिकॉर्डिंग में लाल बिंदु और अब तक का समय दिखता है।</string>
+    <string name="feature_tuck_note">छोटे आइलैंड को ऊपर स्वाइप करके हटाएँ; आराम वाली पिल पर नीचे स्वाइप करके वापस लाएँ।</string>
+    <string name="demo_live">राइड</string>
+    <string name="demo_live_title">ड्राइवर आ रहे हैं</string>
+    <string name="demo_live_text">सफ़ेद हैचबैक · KA 01 AB 1234</string>
+    <string name="demo_live_short">4 मि</string>
+    <string name="demo_live_call">कॉल</string>
+    <string name="demo_live_message">मैसेज</string>
+    <string name="demo_nav">रास्ता</string>
+    <string name="demo_nav_title">200 मी</string>
+    <string name="demo_nav_text">MG रोड पर दाएँ मुड़ें</string>
+    <string name="demo_nav_detail">12 मि · 4.3 किमी · 11:04 पहुँचें</string>
+    <string name="demo_rec_title">स्क्रीन रिकॉर्डिंग</string>
 </resources>

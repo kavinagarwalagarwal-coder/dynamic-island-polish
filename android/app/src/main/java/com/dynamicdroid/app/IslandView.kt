@@ -71,6 +71,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fun onVolumeChange(fraction: Float) {}
         /** The album art on the open music card was tapped: show the full-screen dot player. */
         fun onDotPlayer() {}
+        /** The music card's output button: choose where the sound plays (Android's AirPlay). */
+        fun onMediaOutput(activity: LiveActivity) {}
+        /** Swiped down on the resting pill: bring back what was put away. */
+        fun onUntuck() {}
         /** A ring / vibrate / silent / Do Not Disturb button, or the ringer island, was tapped. */
         fun onRingerMode(state: RingerState) {}
         /** The resting pill was tapped (home card). */
@@ -220,6 +224,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     /** The open music card's album art, which opens the dot player. */
     private val musicArtHit = RectF()
+    private val musicOutputHit = RectF()
+    private val recordingDot = RectF()
+
+    /** An activity was put away (swiped up); the resting pill can be swiped down to bring it back. */
+    var hasTucked = false
+        set(value) { field = value; invalidate() }
     private val bubbleLevelS = Spring(0f, 300f, 1f, 0.0015f)
     private val musicBarS = Spring(0f, 420f, 1f, 0.0008f)
     // A brief thickening of the volume bar on each key press.
@@ -1081,6 +1091,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 if (features.fullWidthOpen) Spec(w, h, h / 2f, screenCenter())
                 else Spec(want.coerceIn(dp(136f), w), h, h / 2f, cameraCenter())
             }
+            IslandMode.NAVIGATION -> Spec(w, dp(128f), cardRadius(dp(44f)), screenCenter())
+            IslandMode.LIVE -> {
+                val h = dp(LIVE_BASE_DP) + (if (a.progress != null) dp(26f) else 0f) +
+                    (if (visibleActions(a).isNotEmpty()) dp(52f) else 0f) + (if (a.detail.isNotBlank()) dp(18f) else 0f)
+                Spec(w, h, cardRadius(dp(44f)), screenCenter())
+            }
+            IslandMode.RECORDING -> Spec(w, dp(if (visibleActions(a).isEmpty()) 88f else 140f), cardRadius(dp(44f)), screenCenter())
             else -> Spec(w, dp(84f), cardRadius(dp(42f)), screenCenter())
         }
     }
@@ -1414,6 +1431,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 IslandMode.RINGER -> drawRingerExpanded(canvas, a, alpha)
                 IslandMode.DOWNLOAD -> drawDownloadExpanded(canvas, a, alpha, stagger(ea, 0.22f))
                 IslandMode.ALARM -> drawAlarmExpanded(canvas, a, alpha)
+                IslandMode.NAVIGATION -> drawNavigationExpanded(canvas, a, alpha, stagger(ea, 0.22f))
+                IslandMode.LIVE -> drawLiveExpanded(canvas, a, alpha, stagger(ea, 0.22f))
+                IslandMode.RECORDING -> drawRecordingExpanded(canvas, a, alpha, stagger(ea, 0.22f))
                 else -> drawGenericExpanded(canvas, a, alpha)
             }
             guardCamera = false
@@ -1704,6 +1724,16 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             }
             IslandMode.CHARGING -> drawBolt(canvas, l + s / 2, cy, dp(14f), withAlpha(cGreen, alpha))
             IslandMode.ALARM -> drawAlarmGlyph(canvas, l + s / 2, cy, dp(16f), withAlpha(ALARM, alpha))
+            IslandMode.RECORDING -> {
+                // A red recording dot that breathes, like the iPhone's screen-recording indicator.
+                fillPaint.color = withAlpha(REC_RED, pulse(alpha))
+                canvas.drawCircle(l + s / 2, cy, dp(6.5f), fillPaint)
+            }
+            IslandMode.LIVE -> a.glyph?.let { IslandGlyphs.draw(canvas, it, l + s / 2, cy, dp(17f), withAlpha(liveTint(a), alpha)) }
+                ?: run {
+                    val img = a.appIcon ?: a.artwork
+                    if (img != null) drawImage(canvas, img, l, cy - s / 2, s, s / 2, alpha) else drawLetterTile(canvas, a, l, cy - s / 2, s, s / 2, alpha)
+                }
             IslandMode.EVENT, IslandMode.TORCH, IslandMode.SLEEP -> {
                 val glyph = when (a.mode) { IslandMode.TORCH -> Glyph.TORCH; IslandMode.SLEEP -> Glyph.MOON; else -> a.glyph ?: Glyph.ALARM }
                 IslandGlyphs.draw(canvas, glyph, l + s / 2, cy, dp(17f), withAlpha(a.accent, alpha))
@@ -1750,6 +1780,20 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                         smallPaint, cFg, alpha, alignRight = true)
             }
             IslandMode.ALARM -> text(canvas, a.title, right, cy + dp(4.5f), roomRight, smallPaint, ALARM, alpha, alignRight = true)
+            IslandMode.RECORDING -> a.chronometerText()?.let {
+                rolling(canvas, "rec", it, right, cy + dp(4.5f), smallPaint, REC_RED, alpha, alignRight = true)
+            }
+            IslandMode.LIVE -> {
+                // The status chip ("5 min", "2–1"), else a progress ring, else the title.
+                val short = a.shortText ?: if (a.glyph == Glyph.HOTSPOT) context.getString(R.string.live_hotspot_short) else null
+                val progress = a.progress
+                when {
+                    short != null && smallPaint.measureText(short) <= roomRight ->
+                        rolling(canvas, "live", short, right, cy + dp(4.5f), smallPaint, liveTint(a), alpha, alignRight = true)
+                    progress != null -> drawMiniProgress(canvas, right - dp(9f), cy, dp(8.5f), progress, alpha)
+                    else -> text(canvas, a.title, right, cy + dp(4.5f), roomRight, smallPaint, cFg, alpha, alignRight = true)
+                }
+            }
             else -> {
                 val label = a.chronometerText() ?: a.title
                 text(canvas, label, right, cy + dp(4.5f), roomRight, smallPaint, cFg, alpha, alignRight = true)
@@ -1809,6 +1853,112 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             drawPlayPause(canvas, cx, cy, a.isPlaying, late)
         if (showsMediaAction(IslandBus.MEDIA_NEXT))
             drawSkip(canvas, cx + dp(72f), cy, true, late)
+        // Where the sound plays (Android's output switcher): Apple's AirPlay button, same place.
+        val ox = rect.right - dp(34f)
+        drawOutputGlyph(canvas, ox, cy, dp(20f), withAlpha(GREY, late))
+        musicOutputHit.set(ox - dp(22f), cy - dp(22f), ox + dp(22f), cy + dp(22f))
+    }
+
+    private val outputPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
+    private val outputTri = Path()
+
+    /** Speaker-to-screen output glyph: a triangle under nested arcs, like AirPlay audio. */
+    private fun drawOutputGlyph(canvas: Canvas, cx: Float, cy: Float, s: Float, color: Int) {
+        outputPaint.color = color; outputPaint.strokeWidth = s * .09f
+        for (k in 0..1) {
+            val r = s * (.28f + .2f * k)
+            canvas.drawArc(cx - r, cy - r - s * .08f, cx + r, cy + r - s * .08f, 200f, 140f, false, outputPaint)
+        }
+        fillPaint.color = color
+        outputTri.rewind()
+        outputTri.moveTo(cx, cy + s * .02f); outputTri.lineTo(cx + s * .26f, cy + s * .42f); outputTri.lineTo(cx - s * .26f, cy + s * .42f); outputTri.close()
+        canvas.drawPath(outputTri, fillPaint)
+    }
+
+    private fun liveTint(a: LiveActivity) = userAccent ?: if (a.glyph == Glyph.HOTSPOT) AppStyle.GREEN else
+        if (ColorUtils.calculateLuminance(a.accent) < 0.12) Color.WHITE else a.accent
+
+    /**
+     * Turn-by-turn directions: the next turn's arrow, how far it is, the street, and the ETA.
+     */
+    private fun drawNavigationExpanded(canvas: Canvas, a: LiveActivity, alpha: Int, late: Int) {
+        val pad = dp(22f)
+        val l = rect.left + pad
+        val rr = rect.right - pad
+        val top = rect.top + dp(20f)
+        val arrow = dp(56f)
+        val img = a.artwork ?: a.appIcon
+        if (img != null) drawImage(canvas, img, l, top, arrow, dp(14f), alpha)
+        else IslandGlyphs.draw(canvas, Glyph.PLANE, l + arrow / 2, top + arrow / 2, arrow * .6f, withAlpha(Color.WHITE, alpha))
+        val tx = l + arrow + dp(16f)
+        text(canvas, a.title, tx, top + dp(26f), rr - tx, bigPaint, Color.WHITE, alpha)
+        text(canvas, a.subtitle, tx, top + dp(48f), rr - tx, bodyPaint, GREY, alpha)
+        val bottom = rect.bottom - dp(20f)
+        text(canvas, a.detail.ifBlank { a.appLabel }, l, bottom, rr - l - dp(70f), smallPaint, cFg, late)
+        text(canvas, a.appLabel, rr, bottom, dp(70f), smallPaint, GREY, late, alignRight = true)
+    }
+
+    /**
+     * A live trip, order, score or flight: who and what at the top, the status chip on the right,
+     * a picture (the driver, the car, the teams) when the app gives one, the trip's progress with
+     * a marker riding along it, and the app's own buttons.
+     */
+    private fun drawLiveExpanded(canvas: Canvas, a: LiveActivity, alpha: Int, late: Int) {
+        val pad = dp(20f)
+        val l = rect.left + pad
+        val rr = rect.right - pad
+        val top = rect.top + dp(18f)
+        val tint = liveTint(a)
+        val icon = dp(20f)
+        val glyph = a.glyph
+        if (glyph != null) IslandGlyphs.draw(canvas, glyph, l + icon / 2, top + icon / 2, icon, withAlpha(tint, alpha))
+        else a.appIcon?.let { drawImage(canvas, it, l, top, icon, icon / 2, alpha) }
+        text(canvas, a.appLabel, l + icon + dp(8f), top + dp(14.5f), rr - l - icon - dp(90f), smallPaint, GREY, alpha)
+        val chip = a.shortText ?: if (glyph == Glyph.HOTSPOT) context.getString(R.string.live_hotspot_short) else null
+        chip?.let { rolling(canvas, "live-x", it, rr, top + dp(15f), titlePaint, tint, alpha, alignRight = true) }
+        val pic = a.artwork?.takeIf { it !== a.appIcon }
+        val picS = dp(46f)
+        val textR = if (pic != null) rr - picS - dp(12f) else rr
+        if (pic != null) drawImage(canvas, pic, rr - picS, top + dp(26f), picS, dp(12f), alpha)
+        text(canvas, a.title, l, top + dp(46f), textR - l, titlePaint, Color.WHITE, alpha)
+        text(canvas, a.subtitle, l, top + dp(66f), textR - l, bodyPaint, GREY, alpha)
+        var y = top + dp(LIVE_BASE_DP - 18f)
+        if (a.detail.isNotBlank()) {
+            text(canvas, a.detail, l, y + dp(4f), rr - l, smallPaint, cFg, late); y += dp(18f)
+        }
+        a.progress?.let { fraction ->
+            val barY = y + dp(10f)
+            drawBar(canvas, l, rr, barY, fraction, tint, late, dp(5f))
+            // The marker rides the bar, like the car on a ride's route.
+            val mx = l + (rr - l) * fraction.coerceIn(0f, 1f)
+            fillPaint.color = withAlpha(Color.BLACK, late)
+            canvas.drawCircle(mx, barY, dp(8f), fillPaint)
+            fillPaint.color = withAlpha(tint, late)
+            canvas.drawCircle(mx, barY, dp(5.5f), fillPaint)
+            y += dp(26f)
+        }
+        if (visibleActions(a).isNotEmpty()) drawActions(canvas, a, l, y + dp(4f), rr, late)
+    }
+
+    /** Recording the screen or a voice memo: a breathing red dot, the time so far, and Stop. */
+    private fun drawRecordingExpanded(canvas: Canvas, a: LiveActivity, alpha: Int, late: Int) {
+        val pad = dp(20f)
+        val l = rect.left + pad
+        val rr = rect.right - pad
+        val cy = rect.top + dp(44f)
+        val d = dp(44f)
+        fillPaint.color = withAlpha(REC_RED, alpha * 50 / 255)
+        canvas.drawCircle(l + d / 2, cy, d / 2, fillPaint)
+        IslandGlyphs.draw(canvas, a.glyph ?: Glyph.MIC, l + d / 2, cy, d * .5f, withAlpha(REC_RED, alpha))
+        fillPaint.color = withAlpha(REC_RED, pulse(alpha))
+        canvas.drawCircle(l + d - dp(4f), cy - d / 2 + dp(4f), dp(5f), fillPaint)
+        val tx = l + d + dp(14f)
+        val clock = a.chronometerText()
+        val clockW = if (clock != null) bigPaint.measureText(clock) else 0f
+        clock?.let { rolling(canvas, "rec-x", it, rr, cy + dp(12f), bigPaint, REC_RED, alpha, alignRight = true) }
+        text(canvas, a.title, tx, cy - dp(3f), rr - clockW - dp(12f) - tx, titlePaint, Color.WHITE, alpha)
+        text(canvas, a.appLabel, tx, cy + dp(17f), rr - clockW - dp(12f) - tx, bodyPaint, GREY, alpha)
+        if (visibleActions(a).isNotEmpty()) drawActions(canvas, a, l, rect.top + dp(88f), rr, late)
     }
 
     private fun drawMessageExpanded(canvas: Canvas, a: LiveActivity, alpha: Int, late: Int) {
@@ -3173,6 +3323,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                         callbacks?.onMedia(a, if (dx < 0f) IslandBus.MEDIA_NEXT else IslandBus.MEDIA_PREVIOUS)
                     }
                     dragging && swipe && dy < 0f -> swipeUp()
+                    dragging && swipe && dy > 0f && a == null && hasTucked -> {
+                        haptic(HapticGesture.SWIPE, HapticFeedbackConstants.CLOCK_TICK)
+                        callbacks?.onUntuck()
+                    }
                     dragging && swipe && dy > 0f && presentation == Presentation.COMPACT -> {
                         if (touchingSecondary) secondary?.let { callbacks?.onSecondaryExpand(it) }
                         else callbacks?.onExpandRequest()
@@ -3276,13 +3430,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     return
                 }
                 if (a.mode == IslandMode.HOME) { callbacks?.onDismiss(a); return }
+                if (a.mode == IslandMode.MUSIC && musicOutputHit.contains(x, y)) {
+                    haptic(HapticGesture.TAP, HapticFeedbackConstants.KEYBOARD_TAP)
+                    callbacks?.onMediaOutput(a)
+                    return
+                }
                 if (a.mode == IslandMode.MUSIC && musicArtHit.contains(x, y)) {
                     callbacks?.onDotPlayer()
                 } else if (a.mode == IslandMode.MUSIC && y > barY + dp(16f)) {
                     val cx = rect.centerX()
                     when {
                         x < cx - dp(36f) && showsMediaAction(IslandBus.MEDIA_PREVIOUS) -> callbacks?.onMedia(a, IslandBus.MEDIA_PREVIOUS)
-                        x > cx + dp(36f) && showsMediaAction(IslandBus.MEDIA_NEXT) -> callbacks?.onMedia(a, IslandBus.MEDIA_NEXT)
+                        x > cx + dp(36f) && x < musicOutputHit.left && showsMediaAction(IslandBus.MEDIA_NEXT) -> callbacks?.onMedia(a, IslandBus.MEDIA_NEXT)
                         x in (cx - dp(36f))..(cx + dp(36f)) && showsMediaAction(IslandBus.MEDIA_TOGGLE) -> {
                             // Flip instantly so the button feels responsive; the real state follows.
                             activity = a.copy(
@@ -3319,7 +3478,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
      */
     fun touchBounds(out: RectF) {
         val a = activity
-        if (isConcealed || a == null && !(features.idlePill && features.homeCard)) { out.setEmpty(); return }
+        if (isConcealed || a == null && !(features.idlePill && (features.homeCard || hasTucked))) { out.setEmpty(); return }
         val spec = specFor(if (a == null) Presentation.IDLE else presentation, a)
         val cx = IslandFit.center(layoutWidth() / fit.scale, spec.w, spec.cx, dp(4f))
         val top = targetTop(presentation)
@@ -3401,6 +3560,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val SHORT_SPLIT_WIDTH_DP = 140f
         private const val MEDIUM_WIDTH_DP = 360f
         private const val MEDIUM_HEIGHT_DP = 60f
+        /** A live update card without progress, buttons or a detail line. */
+        private const val LIVE_BASE_DP = 104f
+        private val REC_RED = Color.rgb(255, 59, 48)
         /** A medium pill's two text lines, measured from the bottom of the camera hole. */
         private const val MEDIUM_TEXT_BLOCK_DP = 44f
         private const val VOLUME_WIDTH_DP = 300f

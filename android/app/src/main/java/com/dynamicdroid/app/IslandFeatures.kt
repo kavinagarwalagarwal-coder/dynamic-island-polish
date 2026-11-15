@@ -66,6 +66,10 @@ data class IslandFeatureSet(
     val messages: Boolean = true,
     val timers: Boolean = true,
     val navigation: Boolean = true,
+    /** Live trips, orders, scores and flights from apps, and the hotspot (Android 16 Live Updates and more). */
+    val liveUpdates: Boolean = true,
+    /** Screen and voice recording in progress. */
+    val recording: Boolean = true,
     val charging: Boolean = true,
     /** The edge glow only while the island is open, not around the small pill. */
     val glowOpenOnly: Boolean = false,
@@ -115,6 +119,8 @@ data class IslandFeatureSet(
         IslandMode.TORCH -> torch
         IslandMode.SLEEP -> sleep
         IslandMode.HOME -> homeCard
+        IslandMode.LIVE -> liveUpdates
+        IslandMode.RECORDING -> recording
     }
 
     fun safe() = copy(compactHeightDp = compactHeightDp.coerceIn(MIN_COMPACT_DP, MAX_COMPACT_DP))
@@ -173,6 +179,8 @@ object IslandFeatures {
             messages = p.getBoolean("show_messages", d.messages),
             timers = p.getBoolean("show_timers", d.timers),
             navigation = p.getBoolean("show_navigation", d.navigation),
+            liveUpdates = p.getBoolean("show_live", d.liveUpdates),
+            recording = p.getBoolean("show_recording", d.recording),
             charging = p.getBoolean("show_charging", d.charging),
             glowOpenOnly = p.getBoolean("glow_open_only", d.glowOpenOnly),
             callsOverFullscreen = p.getBoolean("calls_over_fullscreen", d.callsOverFullscreen),

@@ -211,6 +211,11 @@ private fun MainActivity.PlaygroundPage(flow: Flow) {
             Chip(stringResource(R.string.mode_sleep)) { preview.setSecondary(null); showDemo(demoSleep(), Presentation.EXPANDED) }
             Chip(stringResource(R.string.mode_home)) { preview.setSecondary(null); showDemo(demoHome(), Presentation.EXPANDED) }
         }
+        ChipRow {
+            Chip(stringResource(R.string.demo_live)) { preview.setSecondary(null); showDemo(demoLive(), Presentation.EXPANDED) }
+            Chip(stringResource(R.string.demo_nav)) { preview.setSecondary(null); showDemo(demoNavigation(), Presentation.EXPANDED) }
+            Chip(stringResource(R.string.mode_recording)) { preview.setSecondary(null); showDemo(demoRecording(), Presentation.EXPANDED) }
+        }
     }
     Column(flow.next()) {
         OutlinedTextField(
@@ -529,6 +534,9 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_show_messages, "show_messages", f.messages, R.string.feature_show_messages_note)
         toggle(R.string.feature_show_timers, "show_timers", f.timers)
         toggle(R.string.feature_show_navigation, "show_navigation", f.navigation)
+        toggle(R.string.feature_live, "show_live", f.liveUpdates, R.string.feature_live_note)
+        toggle(R.string.feature_recording, "show_recording", f.recording, R.string.feature_recording_note)
+        Note(stringResource(R.string.feature_tuck_note), size = 14)
         toggle(R.string.feature_show_charging, "show_charging", f.charging)
         toggle(R.string.feature_volume, "volume", f.volume, R.string.feature_volume_note)
         toggle(R.string.feature_headphones, "headphones", f.headphones, R.string.feature_headphones_note) { if (it) requestBluetoothIfNeeded() }

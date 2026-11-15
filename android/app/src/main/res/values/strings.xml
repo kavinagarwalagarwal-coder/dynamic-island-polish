@@ -486,4 +486,23 @@
     <string name="guide_update_note">You have version %1$s. New versions install over this one and keep your settings and permissions.</string>
     <string name="guide_update_get">Get the latest version</string>
     <string name="setup_manage_heading">ALL PERMISSIONS</string>
+    <string name="live_hotspot_short">On</string>
+    <string name="mode_live">Live updates</string>
+    <string name="mode_recording">Recording</string>
+    <string name="feature_live">Live trips, orders and scores</string>
+    <string name="feature_live_note">Rides, deliveries, live scores, flights and the hotspot get their own island, like Live Activities on an iPhone. Uses Android 16 Live Updates where apps provide them.</string>
+    <string name="feature_recording">Recording</string>
+    <string name="feature_recording_note">Screen and voice recording show a red dot and the time so far.</string>
+    <string name="feature_tuck_note">Swipe up on the small island to put it away; swipe down on the resting pill to bring it back.</string>
+    <string name="demo_live">Ride</string>
+    <string name="demo_live_title">Driver arriving</string>
+    <string name="demo_live_text">White hatchback · KA 01 AB 1234</string>
+    <string name="demo_live_short">4 min</string>
+    <string name="demo_live_call">Call</string>
+    <string name="demo_live_message">Message</string>
+    <string name="demo_nav">Directions</string>
+    <string name="demo_nav_title">200 m</string>
+    <string name="demo_nav_text">Turn right onto MG Road</string>
+    <string name="demo_nav_detail">12 min · 4.3 km · arrive 11:04</string>
+    <string name="demo_rec_title">Screen recording</string>
 </resources>

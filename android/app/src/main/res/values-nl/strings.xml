@@ -475,4 +475,23 @@
     <string name="guide_update_note">Je hebt versie %1$s. Nieuwe versies installeren eroverheen en houden je instellingen en rechten.</string>
     <string name="guide_update_get">Nieuwste versie ophalen</string>
     <string name="setup_manage_heading">ALLE RECHTEN</string>
+    <string name="live_hotspot_short">Aan</string>
+    <string name="mode_live">Live-updates</string>
+    <string name="mode_recording">Opname</string>
+    <string name="feature_live">Live ritten, bestellingen en scores</string>
+    <string name="feature_live_note">Ritten, bezorgingen, scores, vluchten en de hotspot krijgen hun eigen eiland, zoals Live-activiteiten op een iPhone. Gebruikt de Live Updates van Android 16 waar apps die bieden.</string>
+    <string name="feature_recording">Opname</string>
+    <string name="feature_recording_note">Scherm- en spraakopnamen tonen een rode stip en de tijd tot nu toe.</string>
+    <string name="feature_tuck_note">Veeg het kleine eiland omhoog om het weg te leggen; veeg de rustende pil omlaag om het terug te halen.</string>
+    <string name="demo_live">Rit</string>
+    <string name="demo_live_title">Chauffeur komt eraan</string>
+    <string name="demo_live_text">Witte hatchback · KA 01 AB 1234</string>
+    <string name="demo_live_short">4 min</string>
+    <string name="demo_live_call">Bellen</string>
+    <string name="demo_live_message">Bericht</string>
+    <string name="demo_nav">Route</string>
+    <string name="demo_nav_title">200 m</string>
+    <string name="demo_nav_text">Sla rechtsaf de MG Road op</string>
+    <string name="demo_nav_detail">12 min · 4,3 km · aankomst 11:04</string>
+    <string name="demo_rec_title">Schermopname</string>
 </resources>

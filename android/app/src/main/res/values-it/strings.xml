@@ -475,4 +475,23 @@
     <string name="guide_update_note">Hai la versione %1$s. Le nuove si installano sopra e mantengono impostazioni e permessi.</string>
     <string name="guide_update_get">Scarica l\'ultima versione</string>
     <string name="setup_manage_heading">TUTTI I PERMESSI</string>
+    <string name="live_hotspot_short">Attivo</string>
+    <string name="mode_live">Attività in tempo reale</string>
+    <string name="mode_recording">Registrazione</string>
+    <string name="feature_live">Viaggi, ordini e risultati in diretta</string>
+    <string name="feature_live_note">Corse, consegne, risultati, voli e l\'hotspot hanno la loro isola, come le Attività in tempo reale dell\'iPhone. Usa i Live Updates di Android 16 quando le app li forniscono.</string>
+    <string name="feature_recording">Registrazione</string>
+    <string name="feature_recording_note">La registrazione dello schermo e vocale mostra un punto rosso e il tempo trascorso.</string>
+    <string name="feature_tuck_note">Scorri in su la piccola isola per metterla via; scorri in giù la pillola a riposo per riaverla.</string>
+    <string name="demo_live">Corsa</string>
+    <string name="demo_live_title">Autista in arrivo</string>
+    <string name="demo_live_text">Utilitaria bianca · KA 01 AB 1234</string>
+    <string name="demo_live_short">4 min</string>
+    <string name="demo_live_call">Chiama</string>
+    <string name="demo_live_message">Messaggio</string>
+    <string name="demo_nav">Percorso</string>
+    <string name="demo_nav_title">200 m</string>
+    <string name="demo_nav_text">Svolta a destra in MG Road</string>
+    <string name="demo_nav_detail">12 min · 4,3 km · arrivo 11:04</string>
+    <string name="demo_rec_title">Registrazione schermo</string>
 </resources>

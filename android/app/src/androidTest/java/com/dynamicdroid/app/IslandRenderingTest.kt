@@ -410,7 +410,7 @@ class IslandRenderingTest {
 
     /**
      * Nothing the island shows may sit under the camera hole. With a pretend 26dp camera at the top
-     * centre, every kind of island (with long titles, to push text towards the camera) is drawn and
+     * centre, every kind of island, 27 in all (with long titles, to push text towards the camera) is drawn and
      * the pixels inside the hole must stay black: text keeps clear of it, numbers hop past it and
      * the medium pills put their lines below it.
      */
@@ -452,6 +452,12 @@ class IslandRenderingTest {
                 add("ringer silent", activity.demoRinger(RingerState.SILENT), Presentation.EXPANDED)
                 add("ringer dnd", activity.demoRinger(RingerState.DND_ON), Presentation.EXPANDED)
                 add("volume", activity.demoVolume(.6f), Presentation.EXPANDED)
+                add("live compact", activity.demoLive(), Presentation.COMPACT)
+                add("live expanded", longer(activity.demoLive()), Presentation.EXPANDED)
+                add("navigation compact", activity.demoNavigation(), Presentation.COMPACT)
+                add("navigation expanded", longer(activity.demoNavigation()), Presentation.EXPANDED)
+                add("recording compact", activity.demoRecording(), Presentation.COMPACT)
+                add("recording expanded", longer(activity.demoRecording()), Presentation.EXPANDED)
             }
             for ((name, show) in cases) {
                 scenario.onActivity { show() }

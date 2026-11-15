@@ -475,4 +475,23 @@
     <string name="guide_update_note">バージョン %1$s を使用中。新しいバージョンは上書きでインストールされ、設定と権限はそのままです。</string>
     <string name="guide_update_get">最新版を入手</string>
     <string name="setup_manage_heading">すべての権限</string>
+    <string name="live_hotspot_short">オン</string>
+    <string name="mode_live">ライブアップデート</string>
+    <string name="mode_recording">録音・録画</string>
+    <string name="feature_live">ライブの移動・注文・スコア</string>
+    <string name="feature_live_note">配車、デリバリー、試合のスコア、フライト、テザリングに専用のアイランド。iPhone のライブアクティビティのように表示します。アプリが対応していれば Android 16 のライブアップデートを使います。</string>
+    <string name="feature_recording">録音・録画</string>
+    <string name="feature_recording_note">画面録画や録音中は赤い点と経過時間を表示します。</string>
+    <string name="feature_tuck_note">小さなアイランドを上にスワイプでしまい、待機中のピルを下にスワイプで戻します。</string>
+    <string name="demo_live">配車</string>
+    <string name="demo_live_title">ドライバー到着</string>
+    <string name="demo_live_text">白のハッチバック · KA 01 AB 1234</string>
+    <string name="demo_live_short">4分</string>
+    <string name="demo_live_call">電話</string>
+    <string name="demo_live_message">メッセージ</string>
+    <string name="demo_nav">経路</string>
+    <string name="demo_nav_title">200 m</string>
+    <string name="demo_nav_text">MG Road を右折</string>
+    <string name="demo_nav_detail">12分 · 4.3 km · 11:04 到着</string>
+    <string name="demo_rec_title">画面録画</string>
 </resources>

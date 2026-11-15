@@ -423,6 +423,33 @@ class MainActivity : AppCompatActivity() {
         actions = listOf(IslandAction("Decline", selfIntent()), IslandAction("Answer", selfIntent())),
     )
 
+    /** A ride on its way: the Android side of an iPhone Live Activity. */
+    internal fun demoLive() = LiveActivity(
+        key = "demo-live", packageName = "com.ubercab", mode = IslandMode.LIVE,
+        title = getString(R.string.demo_live_title), subtitle = getString(R.string.demo_live_text),
+        appLabel = "Uber", appIcon = null, artwork = null, accent = AppStyle.GREEN,
+        progress = .62f, shortText = getString(R.string.demo_live_short),
+        actions = listOf(IslandAction(getString(R.string.demo_live_call), selfIntent()), IslandAction(getString(R.string.demo_live_message), selfIntent())),
+    )
+
+    internal fun demoNavigation() = LiveActivity(
+        key = "demo-nav", packageName = "com.google.android.apps.maps", mode = IslandMode.NAVIGATION,
+        title = getString(R.string.demo_nav_title), subtitle = getString(R.string.demo_nav_text),
+        appLabel = "Maps", appIcon = AppStyle.icon(this, "com.google.android.apps.maps"), artwork = null,
+        accent = AppStyle.BLUE, detail = getString(R.string.demo_nav_detail),
+    )
+
+    internal fun demoRecording() = System.currentTimeMillis().let { now ->
+        LiveActivity(
+            key = "demo-rec", packageName = "com.android.systemui", mode = IslandMode.RECORDING,
+            title = getString(R.string.demo_rec_title), subtitle = "", appLabel = getString(R.string.mode_recording),
+            appIcon = null, artwork = null, accent = Color.RED, glyph = Glyph.SCREEN,
+            actions = listOf(IslandAction(getString(R.string.stopwatch_stop), selfIntent())),
+            chronometerBase = now - 83_000L,
+            clockBaseElapsed = android.os.SystemClock.elapsedRealtime() - 83_000L,
+        )
+    }
+
     internal fun demoTimer(minutes: Int = 9) = LiveActivity(
         key = "demo-timer", packageName = "com.google.android.deskclock", mode = IslandMode.TIMER,
         title = if (minutes == 9) "Pasta" else getString(R.string.demo_minutes, minutes), subtitle = "Timer", appLabel = "Clock",
@@ -819,6 +846,8 @@ class MainActivity : AppCompatActivity() {
         IslandMode.TORCH -> R.string.mode_torch
         IslandMode.SLEEP -> R.string.mode_sleep
         IslandMode.HOME -> R.string.mode_home
+        IslandMode.LIVE -> R.string.mode_live
+        IslandMode.RECORDING -> R.string.mode_recording
     })
 
     private fun accentName(index: Int) = getString(when (index) {

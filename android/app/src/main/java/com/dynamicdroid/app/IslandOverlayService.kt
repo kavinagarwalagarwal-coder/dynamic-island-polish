@@ -83,6 +83,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
      * that moment was dropped and leaving the player did not bring the island back.
      */
     private var seenForeground: String? = null
+    /** Activities put away with a swipe up (see onDismiss); the resting pill shows instead. */
+    private val tucked = mutableSetOf<String>()
 
     private fun foregroundQualifies(pkg: String) = pkg !in keyboardPackages && (pkg in homePackages ||
         activities.all().any { it.packageName == pkg } || packageManager.getLaunchIntentForPackage(pkg) != null)
@@ -480,8 +482,10 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         val quiet = IslandCustomization.quietNow(this)
         val (o, secondary) = activities.pair {
             features.shows(it.mode) && IslandCustomization.allowed(this, it.packageName) &&
-                (it.mode == IslandMode.TIMER || it.packageName != foregroundPkg)
+                (it.mode == IslandMode.TIMER || it.packageName != foregroundPkg) && it.key !in tucked
         }
+        tucked.retainAll(activities.all().map { it.key }.toSet())
+        view.hasTucked = tucked.isNotEmpty()
         ongoing = o
         view.setSecondary(if (t == null && placementTest == null && !quiet &&
             !IslandCustomization.isHiddenForForeground(this, foregroundPkg)) secondary?.let { appTint(this, it) } else null)
@@ -512,7 +516,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // A settled idle or hidden window is touch-through; restore touches the moment something shows.
         params?.let { lp ->
             val touchable = IslandTouchPolicy.takesTouches(a != null, features.idlePill, features.homeCard,
-                concealed = concealed, flying = absorb || view.isAbsorbing, passing = passingTouches)
+                concealed = concealed, flying = absorb || view.isAbsorbing, passing = passingTouches, tucked = tucked.isNotEmpty())
             val isOff = lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE != 0
             if (touchable == isOff) {
                 lp.flags = if (touchable) lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE.inv()
@@ -644,6 +648,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // Use the unfiltered shelf: the owner was deliberately hidden while its app was open.
         val source = activities.pair().first?.takeIf { it.mode == IslandMode.MUSIC || it.mode == IslandMode.CALL }
         foregroundPkg = pkg
+        // Opening an app brings back whatever of its was put away.
+        if (tucked.isNotEmpty()) tucked.removeAll { key -> activities.all().any { it.key == key && it.packageName == pkg } }
         // While the playing app is open, hear about window changes at once rather than after
         // accessibility's usual half-second wait, so the fly-in starts as the app closes.
         IslandAccessibilityService.instance?.fastWindowEvents(source?.packageName == pkg && IslandFeatures.read(this).appMorph)
@@ -750,7 +756,38 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         render()
     }
 
-    override fun onDismiss(activity: LiveActivity) = onCollapseRequest()
+    /**
+     * Swiping up: an open card closes; the small island puts its activity away (Apple's swipe to
+     * minimise) and the resting pill shows until it is swiped down, its app is opened, or it ends.
+     */
+    override fun onDismiss(activity: LiveActivity) {
+        if (transient == null && presentation == Presentation.COMPACT && !activity.isTransient &&
+            activities.all().any { it.key == activity.key }) {
+            tucked += activity.key
+            render()
+            return
+        }
+        onCollapseRequest()
+    }
+
+    override fun onUntuck() {
+        if (tucked.isEmpty()) return
+        tucked.clear()
+        presentation = Presentation.COMPACT
+        render()
+    }
+
+    /** The music card's output button: Android's switcher for where the sound plays. */
+    override fun onMediaOutput(activity: LiveActivity) {
+        val pkg = activity.packageName
+        val tries = listOf(
+            Intent(LiveSignals.MEDIA_OUTPUT_PANEL).putExtra(LiveSignals.MEDIA_OUTPUT_PACKAGE, pkg),
+            Intent(android.provider.Settings.ACTION_BLUETOOTH_SETTINGS),
+        )
+        for (i in tries) try {
+            startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)); onCollapseRequest(); return
+        } catch (_: RuntimeException) {}
+    }
 
     // ---------------------------------------------------------------- home card, stopwatch, flashlight, screenshots
 
@@ -1046,7 +1083,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         // another island had come and gone the pill stopped answering taps.)
         val f = IslandFeatures.read(this)
         val takes = IslandTouchPolicy.takesTouches(a != null, f.idlePill, f.homeCard,
-            concealed = view.isConcealed, flying = view.isAbsorbing, passing = passingTouches)
+            concealed = view.isConcealed, flying = view.isAbsorbing, passing = passingTouches, tucked = tucked.isNotEmpty())
         if (!takes && lp.flags and WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE == 0) {
             lp.flags = lp.flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
             changed = true

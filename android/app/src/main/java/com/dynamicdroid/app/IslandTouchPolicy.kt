@@ -12,8 +12,9 @@ object IslandTouchPolicy {
      * @param concealed the island is hidden (full-screen app, paused, screenshot)
      * @param flying an app is flying into the island
      * @param passing touches pass through for a moment (a pop-up being swiped away under it)
+     * @param tucked something was put away, and swiping down on the resting pill brings it back
      */
     fun takesTouches(showing: Boolean, idlePill: Boolean, homeCard: Boolean,
-                     concealed: Boolean, flying: Boolean, passing: Boolean): Boolean =
-        (showing || (idlePill && homeCard)) && !concealed && !flying && !passing
+                     concealed: Boolean, flying: Boolean, passing: Boolean, tucked: Boolean = false): Boolean =
+        (showing || (idlePill && (homeCard || tucked))) && !concealed && !flying && !passing
 }

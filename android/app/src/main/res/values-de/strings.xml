@@ -475,4 +475,23 @@
     <string name="guide_update_note">Du hast Version %1$s. Neue Versionen installieren sich darüber und behalten Einstellungen und Berechtigungen.</string>
     <string name="guide_update_get">Neueste Version holen</string>
     <string name="setup_manage_heading">ALLE BERECHTIGUNGEN</string>
+    <string name="live_hotspot_short">An</string>
+    <string name="mode_live">Live-Updates</string>
+    <string name="mode_recording">Aufnahme</string>
+    <string name="feature_live">Live-Fahrten, -Bestellungen und -Spielstände</string>
+    <string name="feature_live_note">Fahrten, Lieferungen, Spielstände, Flüge und der Hotspot bekommen eine eigene Insel, wie Live-Aktivitäten am iPhone. Nutzt die Live Updates von Android 16, wo Apps sie anbieten.</string>
+    <string name="feature_recording">Aufnahme</string>
+    <string name="feature_recording_note">Bildschirm- und Sprachaufnahmen zeigen einen roten Punkt und die bisherige Zeit.</string>
+    <string name="feature_tuck_note">Wische die kleine Insel nach oben, um sie wegzulegen; wische die ruhende Pille nach unten, um sie zurückzuholen.</string>
+    <string name="demo_live">Fahrt</string>
+    <string name="demo_live_title">Fahrer kommt</string>
+    <string name="demo_live_text">Weißer Kleinwagen · KA 01 AB 1234</string>
+    <string name="demo_live_short">4 Min.</string>
+    <string name="demo_live_call">Anrufen</string>
+    <string name="demo_live_message">Nachricht</string>
+    <string name="demo_nav">Route</string>
+    <string name="demo_nav_title">200 m</string>
+    <string name="demo_nav_text">Rechts abbiegen auf MG Road</string>
+    <string name="demo_nav_detail">12 Min. · 4,3 km · Ankunft 11:04</string>
+    <string name="demo_rec_title">Bildschirmaufnahme</string>
 </resources>

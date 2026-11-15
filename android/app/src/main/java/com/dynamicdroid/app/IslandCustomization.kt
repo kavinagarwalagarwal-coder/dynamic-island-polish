@@ -51,6 +51,9 @@ object IslandCustomization {
         IslandMode.NAVIGATION -> 60; IslandMode.MESSAGE -> 30; IslandMode.CHARGING -> 20
         IslandMode.ALARM -> 95; IslandMode.DOWNLOAD -> 40; IslandMode.VOLUME -> 10; IslandMode.DEVICE -> 25; IslandMode.RINGER -> 15
         IslandMode.EVENT -> 22; IslandMode.TORCH -> 50; IslandMode.SLEEP -> 12; IslandMode.HOME -> 5
+        // A recording is something to know about at all times, like a call; a live trip or order
+        // ranks with navigation.
+        IslandMode.RECORDING -> 90; IslandMode.LIVE -> 58
     }
 
     fun customAccent(context: Context, pkg: String): Int? =
