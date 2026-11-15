@@ -31,7 +31,7 @@ object LiveSignals {
         // Live scores
         "com.cricbuzz.android", "com.july.cricinfo", "com.espn.score_center", "com.fotmob.android",
         "com.onefootball.android", "com.theathletic", "com.sofascore.results",
-        "com.google.android.apps.sports",
+        "com.google.android.apps.sports", "com.pl.cwc_2015", "in.cricketexchange.app.cricketexchange",
         // Flights and trains
         "com.flightradar24free", "com.flightaware.android.liveFlightTracker", "com.tripit", "com.makemytrip",
         "com.ixigo.train.ixitrain",
@@ -42,6 +42,49 @@ object LiveSignals {
                      ongoing: Boolean, hasShortText: Boolean): Boolean =
         template == PROGRESS_STYLE || flags and FLAG_PROMOTED_ONGOING != 0 || requestPromoted ||
             (ongoing && (packageName in liveApps || hasShortText))
+
+    /** The Google app: its live sports scores, and only those, become live updates. */
+    const val GOOGLE_APP = "com.google.android.googlequicksearchbox"
+
+    /** Apps that post live scores: Cricbuzz, ESPNcricinfo, ICC, CREX, ESPN, Google, JioHotstar... */
+    val scoreApps = setOf(
+        "com.cricbuzz.android", "com.july.cricinfo", "com.pl.cwc_2015", "in.cricketexchange.app.cricketexchange",
+        "com.espn.score_center", "com.fotmob.android", "com.onefootball.android", "com.sofascore.results",
+        "com.theathletic", "com.google.android.apps.sports", GOOGLE_APP, "in.startv.hotstar",
+    )
+
+    // "IND 245/3 (42.1 ov)", "AUS: 198/7 (20)", "245/3 (42.1)": runs/wickets with overs, or a team code.
+    private val cricketOvers = Regex("(?:\\b([A-Z]{2,5})\\s*:?\\s+)?\\b(\\d{1,3}[/-]\\d{1,2})\\s*\\(\\s*(\\d{1,2}(?:\\.[0-5])?)\\s*(?:ov|ovs|overs?)?\\s*\\)",
+        RegexOption.IGNORE_CASE)
+    private val cricketRunsOvers = Regex("(?:\\b([A-Z]{2,5})\\s*:?\\s+)?\\b(\\d{1,3})\\s*\\(\\s*\\d{1,2}(?:\\.[0-5])?\\s*(?:ov|ovs|overs?)\\s*\\)",
+        RegexOption.IGNORE_CASE)
+    private val cricketTeam = Regex("\\b([A-Z]{2,5})\\s*:?\\s+(\\d{1,3}[/-]\\d{1,2})\\b")
+    private val chase = Regex("\\b(need|needs|require|requires|target|trail|lead)s?\\b.*\\b\\d+\\b.*\\b(runs?|balls?|overs?)\\b",
+        RegexOption.IGNORE_CASE)
+
+    /** The pill's chip for a cricket score: "IND 245/3", or the runs alone. */
+    fun cricketScore(lines: List<String>): String? {
+        for (s in lines) (cricketOvers.find(s) ?: cricketRunsOvers.find(s))?.let { m ->
+            val team = m.groupValues[1].takeIf { it.isNotEmpty() && it == it.uppercase() }
+            return listOfNotNull(team, m.groupValues[2]).joinToString(" ")
+        }
+        for (s in lines) cricketTeam.find(s)?.let { return "${it.groupValues[1]} ${it.groupValues[2]}" }
+        return null
+    }
+
+    /** Text that reads as a live cricket score (or a chase: "need 30 runs in 18 balls"). */
+    fun looksLikeScore(lines: List<String>, scoreApp: Boolean = true): Boolean =
+        cricketScore(lines) != null || scoreApp && lines.any { chase.containsMatchIn(it) }
+
+    /**
+     * A live score notification: from a score app (or the Google app), or any app's ongoing one
+     * whose text reads as a cricket score. Must be the kind that updates in place (ongoing, or
+     * alerting only once), so wicket and boundary alerts stay ordinary notifications.
+     */
+    fun isLiveScore(packageName: String, ongoing: Boolean, alertOnce: Boolean, lines: List<String>): Boolean {
+        if (!ongoing && !(alertOnce && packageName in scoreApps)) return false
+        return looksLikeScore(lines, packageName in scoreApps)
+    }
 
     private val recorders = setOf(
         "com.google.android.apps.recorder", "com.sec.android.app.voicenote", "com.android.soundrecorder",
@@ -85,6 +128,7 @@ object LiveSignals {
      */
     fun shortText(explicit: CharSequence?, title: String, text: String): String? {
         explicit?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { return it.take(10) }
+        cricketScore(listOf(title, text))?.let { return it }
         for (s in listOf(title, text)) {
             eta.find(s)?.let { return "${it.groupValues[1]} min" }
         }

@@ -32,6 +32,8 @@ class IslandNotificationListener : NotificationListenerService() {
     private val systemPackages = setOf("com.android.systemui", "android")
     /** Notifications currently shown as recordings, so the "saved" update can end them. */
     private val recordings = HashSet<String>()
+    /** Notifications shown as live scores, so the result ("India won") keeps updating the card. */
+    private val scores = HashSet<String>()
     private val lastMessageText = HashMap<String, String>()
     private val lastProgress = HashMap<String, Float>()
 
@@ -158,7 +160,20 @@ class IslandNotificationListener : NotificationListenerService() {
         // Recordings first: a recorder's Pause/Stop stopwatch would otherwise pass for a timer.
         val recording = features.recording && LiveSignals.isRecording(sbn.packageName, channel, title, text, sbn.isOngoing, chronometer)
         val hotspot = features.liveUpdates && LiveSignals.isHotspot(sbn.packageName, channel, sbn.isOngoing)
-        val live = features.liveUpdates && n.category != Notification.CATEGORY_CALL && LiveSignals.isLiveUpdate(
+        // Live scores: the notification's text, or for a scoreboard drawn as a custom layout, its words.
+        val alertOnce = n.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0
+        var scoreLines = listOfNotNull(title, text, extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
+            extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(), shortCritical?.toString()).filter { it.isNotBlank() }
+        val scoreCandidate = features.liveUpdates && (sbn.isOngoing || alertOnce) &&
+            (sbn.packageName in LiveSignals.scoreApps || sbn.key in scores)
+        if (scoreCandidate && !LiveSignals.looksLikeScore(scoreLines) && (n.contentView != null || n.bigContentView != null)) {
+            val custom = runCatching { NotificationText.read(this, n) }.getOrDefault(emptyList())
+            if (custom.isNotEmpty()) scoreLines = custom
+        }
+        val liveScore = features.liveUpdates && n.category != Notification.CATEGORY_CALL &&
+            (LiveSignals.isLiveScore(sbn.packageName, sbn.isOngoing, alertOnce, scoreLines) ||
+                sbn.key in scores && (sbn.isOngoing || alertOnce))
+        val live = features.liveUpdates && n.category != Notification.CATEGORY_CALL && sbn.packageName != LiveSignals.GOOGLE_APP && LiveSignals.isLiveUpdate(
             extras.getString(Notification.EXTRA_TEMPLATE), n.flags, extras.getBoolean(LiveSignals.EXTRA_REQUEST_PROMOTED),
             sbn.packageName, sbn.isOngoing, !shortCritical.isNullOrBlank())
         // A recording whose notification stops recording ("Recording saved") ends here.
@@ -173,6 +188,7 @@ class IslandNotificationListener : NotificationListenerService() {
             n.category == Notification.CATEGORY_NAVIGATION && sbn.isOngoing -> IslandMode.NAVIGATION
             recording -> IslandMode.RECORDING
             hotspot -> IslandMode.LIVE
+            liveScore -> IslandMode.LIVE
             recognizedTimer -> IslandMode.TIMER
             live && !(features.downloads && n.category == Notification.CATEGORY_PROGRESS) -> IslandMode.LIVE
             features.downloads && progress != null && progress < 1f &&
@@ -228,8 +244,10 @@ class IslandNotificationListener : NotificationListenerService() {
             key = sbn.key,
             packageName = sbn.packageName,
             mode = mode,
-            title = title,
-            subtitle = text,
+            // A scoreboard drawn as a custom layout: its words become the card's text.
+            title = if (liveScore && title == appLabel && scoreLines.firstOrNull() != title)
+                scoreLines.first().take(80) else title,
+            subtitle = if (liveScore && text.isBlank()) scoreLines.drop(1).joinToString("  ").take(120) else text,
             appLabel = AppStyle.label(this, sbn.packageName),
             appIcon = AppStyle.icon(this, sbn.packageName),
             artwork = largeIcon(n),
@@ -251,16 +269,19 @@ class IslandNotificationListener : NotificationListenerService() {
                 else -> null
             },
             detail = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString().orEmpty(),
-            shortText = if (mode == IslandMode.LIVE && !hotspot) LiveSignals.shortText(shortCritical, title, text) else null,
+            shortText = if (mode == IslandMode.LIVE && !hotspot) (if (liveScore) LiveSignals.cricketScore(scoreLines) else null)
+                ?: LiveSignals.shortText(shortCritical, title, text) else null,
         )
         if (mode == IslandMode.TIMER) timers[sbn.key] = activity
         if (mode == IslandMode.RECORDING) recordings += sbn.key
+        if (liveScore && mode == IslandMode.LIVE) scores += sbn.key
         IslandBus.post(activity)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         timers.remove(sbn.key)
         recordings.remove(sbn.key)
+        scores.remove(sbn.key)
         lastProgress.remove(sbn.key)
         lastMessageText.remove(sbn.key)
         IslandBus.remove(sbn.key)
