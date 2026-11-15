@@ -1053,6 +1053,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         cameraCenter(), secondary != null, bubbleDiameter(), dp(8f), dp(4f))
 
     /** Full-width cards follow the phone's own screen corners, inset by the card margin. */
+    /**
+     * Apple's concentric corners: something tucked into the card's corner rounds by the card's
+     * radius minus its margin, so both curves share one centre. Kept within a tile's shape.
+     */
+    private fun concentric(margin: Float, size: Float): Float {
+        val outer = min(radiusS.value, rect.height() / 2f)
+        return (outer - margin).coerceIn(dp(8f), size * 0.3f)
+    }
+
     private fun cardRadius(fallback: Float): Float {
         // Apple: 44 points, concentric with the screen corner across the 11-point margin.
         val margin = dp(if (apple) 11f else 8f)
@@ -1853,7 +1862,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             cardDots.drawRing(canvas, fillPaint, acx, acy, dp(23.5f), dp(2.6f), dp(1.05f), 3, userAccent ?: a.accent, a.isPlaying, alpha)
             cardDots.drawRecord(canvas, fillPaint, acx, acy, dp(21.5f), a.isPlaying, alpha)
             }
-        } else drawArtwork(canvas, a, l, t, art, dp(14f), alpha)
+        } else drawArtwork(canvas, a, l, t, art, concentric(pad, art), alpha)
         musicArtHit.set(l - dp(6f), t - dp(6f), l + art + dp(6f), t + art + dp(6f))
         val tx = l + art + dp(14f)
         val waveW = dp(24f)
@@ -1925,7 +1934,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val top = rect.top + dp(20f)
         val arrow = dp(56f)
         val img = a.artwork ?: a.appIcon
-        if (img != null) drawImage(canvas, img, l, top, arrow, dp(14f), alpha)
+        if (img != null) drawImage(canvas, img, l, top, arrow, concentric(l - rect.left, arrow), alpha)
         else IslandGlyphs.draw(canvas, Glyph.PLANE, l + arrow / 2, top + arrow / 2, arrow * .6f, withAlpha(Color.WHITE, alpha))
         val tx = l + arrow + dp(16f)
         fadeText(canvas, a, 0, a.title, tx, top + dp(26f), rr - tx, bigPaint, Color.WHITE, alpha)
@@ -2624,7 +2633,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val s = dp(40f)
         val top = rect.top + dp(16f)
         val img = a.appIcon ?: a.artwork
-        if (img != null) drawImage(canvas, img, l, top, s, dp(11f), alpha) else drawLetterTile(canvas, a, l, top, s, dp(11f), alpha)
+        val corner = concentric(l - rect.left, s)
+        if (img != null) drawImage(canvas, img, l, top, s, corner, alpha) else drawLetterTile(canvas, a, l, top, s, corner, alpha)
         val tx = l + s + dp(12f)
         val percentLeft = rolling(canvas, "download-x", "${IslandSignals.percent(a.progress ?: 0f)}%", rr, top + dp(16f),
             titlePaint, cFg, alpha, alignRight = true)
@@ -3424,6 +3434,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                         callbacks?.onMedia(a, if (dx < 0f) IslandBus.MEDIA_NEXT else IslandBus.MEDIA_PREVIOUS)
                     }
                     dragging && swipe && dy < 0f -> swipeUp()
+                    // Apple's inward swipe: sideways across the island puts it away (the
+                    // activity keeps running and comes back with a swipe down), or folds an open card.
+                    dragging && a != null && !a.isTransient && secondary == null &&
+                        (presentation == Presentation.COMPACT || presentation == Presentation.EXPANDED) &&
+                        abs(dx) > dp(44f) && abs(dx) > abs(dy) * 1.6f -> swipeUp()
                     dragging && swipe && dy > 0f && a == null && hasTucked -> {
                         haptic(HapticGesture.SWIPE, HapticFeedbackConstants.CLOCK_TICK)
                         callbacks?.onUntuck()
