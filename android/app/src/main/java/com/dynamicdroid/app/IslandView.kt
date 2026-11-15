@@ -1212,7 +1212,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val other = secondary
         if (other != null && secondaryA.value > 0.01f &&
             (other.mode == IslandMode.MUSIC && other.isPlaying ||
-                other.mode == IslandMode.TIMER && other.pausedTimerMs == null && (other.clockMs() ?: 0L) > 0L)) return 33L
+                other.mode == IslandMode.TIMER && other.pausedTimerMs == null && (other.clockMs() ?: 0L) > 0L)) return BUBBLE_FRAME_MS
         // Scheduling runs before onDraw updates rollAt. Include a pending text change so the
         // last 0:01 → 0:00 roll (and paused updates) gets frames all the way to completion.
         if (isLiveTimer(a) && (a.chronometerText() != rollText ||
@@ -1220,16 +1220,23 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (a.mode == IslandMode.RINGER && SystemClock.uptimeMillis() - ringerAnimAt < RINGER_ANIM_MS + 50L) return 16L
         return when {
             // The small island's waveform reads fine at 30 fps; the open card's progress bar gets 60.
-            a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else 33L
+            // Battery: the small waveform is a few short bars and reads as smooth at 20 fps.
+            a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else COMPACT_WAVE_FRAME_MS
             // A tap's ripple (or a burst between songs) finishes even while paused.
             usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling || fieldFading) -> 16L
-            a.mode == IslandMode.CALL -> 33L
+            a.mode == IslandMode.CALL -> 50L
             a.mode == IslandMode.ALARM -> 33L
             a.clockBaseElapsed != null && a.pausedTimerMs == null -> {
                 val ms = a.clockMs() ?: return null
                 if (a.chronometerCountDown && ms == 0L) return null
-                // Keep the progress ring continuous; digits still change only at second boundaries.
-                33L
+                // The open card's ring moves smoothly; the small pill's ring and the recording dot
+                // move so slowly that a few frames a second look the same and cost far less.
+                // Digits still roll on time: a pending change asks for frames above.
+                when {
+                    presentation == Presentation.EXPANDED -> 33L
+                    a.mode == IslandMode.RECORDING -> 66L
+                    else -> COMPACT_CLOCK_FRAME_MS
+                }
             }
             else -> null
         }
@@ -3672,6 +3679,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private val DND_PURPLE = Color.rgb(150, 132, 255)
         private const val NUMBER_ROLL_MS = 260L
         private const val TEXT_FADE_MS = 300L
+        /** Frame spacing for slow, small motion, chosen for battery (see continuousDelay). */
+        private const val COMPACT_WAVE_FRAME_MS = 50L
+        private const val COMPACT_CLOCK_FRAME_MS = 100L
+        private const val BUBBLE_FRAME_MS = 66L
         private const val TEXT_FADE_BLUR_DP = 4f
         private const val FIT_SLOTS = 48
         private const val SHORT_COMPACT_WIDTH_DP = 168f

@@ -77,7 +77,7 @@ class IslandAccessibilityService : AccessibilityService() {
                 }
             }
             // Swiping to the next Short / Reel, or a viewer opening inside the same screen.
-            AccessibilityEvent.TYPE_VIEW_SCROLLED -> scheduleMediaCheck(250L)
+            AccessibilityEvent.TYPE_VIEW_SCROLLED -> scheduleMediaCheck(400L)
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED ->
                 if (SystemClock.uptimeMillis() - lastMediaCheck > CONTENT_CHECK_EVERY_MS) scheduleMediaCheck(300L)
         }
@@ -419,7 +419,7 @@ class IslandAccessibilityService : AccessibilityService() {
         private const val SYSTEM_UI = "com.android.systemui"
         private const val POPUP_SEARCH_MS = 3500L
         private const val POPUP_RETRY_MS = 650L
-        private const val CONTENT_CHECK_EVERY_MS = 1500L
+        private const val CONTENT_CHECK_EVERY_MS = 3000L
         private const val MEDIA_NODE_LIMIT = 400
         private const val STILL_THERE_MS = 2_000L
         /** Like a held key on a keyboard: a short pause, then steady steps. */
