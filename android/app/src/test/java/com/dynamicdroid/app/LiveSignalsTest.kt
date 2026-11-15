@@ -38,7 +38,7 @@ class LiveSignalsTest {
         assertEquals("ETA 4", LiveSignals.shortText("ETA 4", "", ""))
         assertEquals("5 min", LiveSignals.shortText(null, "Arriving in 5 mins", ""))
         assertEquals("12 min", LiveSignals.shortText(null, "Order on the way", "Reaching in 12 minutes"))
-        assertEquals("245/3", LiveSignals.shortText(null, "IND 245/3 (38.2)", "AUS yet to bat"))
+        assertEquals("IND 245/3", LiveSignals.shortText(null, "IND 245/3 (38.2)", "AUS yet to bat"))
         assertEquals("2-1", LiveSignals.shortText(null, "Arsenal 2 - 1 Chelsea", ""))
         assertEquals("10:52", LiveSignals.shortText(null, "Your flight", "Departs 10:52"))
         assertNull(LiveSignals.shortText(null, "Looking for a driver", "Hang tight"))
