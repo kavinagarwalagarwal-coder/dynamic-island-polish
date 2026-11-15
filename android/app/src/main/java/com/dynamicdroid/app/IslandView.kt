@@ -38,6 +38,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.sign
 import kotlin.math.sin
+import kotlin.math.sqrt
 
 enum class Presentation { IDLE, COMPACT, EXPANDED }
 
@@ -723,14 +724,16 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val r = restingDiameter() / 2f
         val cx = cameraCenter()
         val cy = restingTop() + r
-        val outer = r * 2.6f
+        // Just past the hole's edge: content now keeps clear of it, so the fade only softens the
+        // rim instead of darkening the room beside the camera (it used to reach 2.6 radii).
+        val outer = r + cameraGap() + dp(6f)
         if (!(outer > 1f)) return
         if (cx + outer < rect.left || cx - outer > rect.right || cy + outer < rect.top || cy - outer > rect.bottom) return
         var shader = fadeShader
         if (shader == null || fadeShaderR != outer) {
             shader = RadialGradient(0f, 0f, outer,
                 intArrayOf(Color.BLACK, Color.BLACK, Color.argb(150, 0, 0, 0), Color.TRANSPARENT),
-                floatArrayOf(0f, 0.46f, 0.7f, 1f), Shader.TileMode.CLAMP)
+                floatArrayOf(0f, r / outer, (r + cameraGap()) / outer, 1f), Shader.TileMode.CLAMP)
             fadeShader = shader; fadeShaderR = outer
         }
         matrix.reset(); matrix.setTranslate(cx, cy); shader.setLocalMatrix(matrix)
@@ -738,6 +741,47 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fadePaint.alpha = bodyAlpha
         canvas.drawCircle(cx, cy, outer, fadePaint)
         fadePaint.shader = null
+    }
+
+    /** Space kept clear around the camera hole, beyond its edge. */
+    private fun cameraGap() = dp(4f)
+
+    /**
+     * Half the width to keep clear of the camera for a line of content spanning [top]..[bottom],
+     * or 0 when the line passes above or below the hole. Uses the hole's round shape, so a line
+     * that only grazes its edge loses only a little room.
+     */
+    private fun cameraHalfWidth(top: Float, bottom: Float): Float {
+        if (!onCamera() || seeThrough()) return 0f
+        val r = restingDiameter() / 2f
+        val cy = restingTop() + r
+        val reach = r + cameraGap()
+        val d = when { cy < top -> top - cy; cy > bottom -> cy - bottom; else -> 0f }
+        return if (d >= reach) 0f else sqrt(reach * reach - d * d)
+    }
+
+    /** Below the camera hole (and its gap), or null when the island isn't on a camera. */
+    private fun belowCamera(): Float? = if (!onCamera() || seeThrough()) null
+        else restingTop() + restingDiameter() + cameraGap()
+
+    /** While true, every line of text keeps clear of the camera hole (set while content draws). */
+    private var guardCamera = false
+
+    /**
+     * Medium pills (a device connecting, a system event, the flashlight) put their two lines of
+     * text below the camera, so they grow a little taller on a phone with a camera hole.
+     */
+    private fun mediumRowHeight(): Float {
+        val below = belowCamera() ?: return dp(MEDIUM_HEIGHT_DP)
+        return max(dp(MEDIUM_HEIGHT_DP), below - baseTop + dp(MEDIUM_TEXT_BLOCK_DP))
+    }
+
+    /** Baselines for a medium pill's title and detail: below the camera when there is one. */
+    private fun mediumBaselines(rowTop: Float, rowH: Float): Pair<Float, Float> {
+        val below = belowCamera()
+        if (below == null) { val cy = rowTop + rowH / 2f; return (cy - dp(2f)) to (cy + dp(16f)) }
+        val top = max(rowTop + dp(8f), below - (baseTop - rowTop))
+        return (top + dp(15f)) to (top + dp(33f))
     }
 
     /** How far right content left of the camera may reach, and where content right of it may start. */
@@ -1015,18 +1059,25 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 val h = dp(VOLUME_HEIGHT_DP) + if (a.ringer != null) dp(RINGER_ROW_DP) else 0f
                 Spec(openWidth(dp(VOLUME_WIDTH_DP)), h, min(h / 2f, dp(VOLUME_HEIGHT_DP) / 2f), openCenter())
             }
-            IslandMode.DEVICE, IslandMode.EVENT ->
-                Spec(openWidth(dp(MEDIUM_WIDTH_DP)), dp(MEDIUM_HEIGHT_DP), dp(MEDIUM_HEIGHT_DP) / 2f, openCenter())
+            IslandMode.DEVICE, IslandMode.EVENT -> {
+                val h = mediumRowHeight()
+                Spec(openWidth(dp(MEDIUM_WIDTH_DP)), h, min(h / 2f, cardRadius(dp(MEDIUM_HEIGHT_DP) / 2f)), openCenter())
+            }
             IslandMode.TORCH -> {
-                val h = dp(if (a.progress != null) 92f else MEDIUM_HEIGHT_DP)
-                Spec(openWidth(dp(MEDIUM_WIDTH_DP)), h, if (a.progress != null) cardRadius(dp(40f)) else h / 2f, openCenter())
+                val h = mediumRowHeight() + if (a.progress != null) dp(32f) else 0f
+                Spec(openWidth(dp(MEDIUM_WIDTH_DP)), h, if (a.progress != null) cardRadius(dp(40f)) else min(h / 2f, cardRadius(h / 2f)), openCenter())
             }
             IslandMode.SLEEP -> Spec(w, dp(150f), cardRadius(dp(44f)), screenCenter())
             IslandMode.HOME -> Spec(w, dp(162f), cardRadius(dp(44f)), screenCenter())
             IslandMode.RINGER -> {
                 // Just wide enough for the glyph and its word, like a small switch label.
                 val h = dp(RINGER_HEIGHT_DP)
-                val want = h + dp(14f) + titlePaint.measureText(a.title) + dp(22f)
+                val word = titlePaint.measureText(a.title)
+                // On a camera, the glyph sits left of the hole and the word right of it, so the pill
+                // is as wide on both sides as the word side needs.
+                val keep = if (onCamera()) restingDiameter() / 2f + cameraGap() else 0f
+                val want = if (keep > 0f) 2f * (keep + dp(8f) + word + dp(20f))
+                    else h + dp(14f) + word + dp(22f)
                 if (features.fullWidthOpen) Spec(w, h, h / 2f, screenCenter())
                 else Spec(want.coerceIn(dp(136f), w), h, h / 2f, cameraCenter())
             }
@@ -1154,8 +1205,33 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         super.onDetachedFromWindow()
     }
 
+    /** Set by [simulateCameraForTest]: window insets then leave the pretend camera alone. */
+    private var simulatedCamera = false
+
+    /**
+     * Tests only: pretend the screen has a camera hole of [diameter] at ([centerX], [centerY]) in
+     * this view's pixels, so layouts that keep clear of the camera can be checked on emulators
+     * without one.
+     */
+    @androidx.annotation.VisibleForTesting
+    internal fun simulateCameraForTest(centerX: Float, centerY: Float, diameter: Float) {
+        simulatedCamera = true
+        anchorToCutout = true; accessibilityHost = true; unsafeCutout = false
+        cameraX = centerX; cutoutCenterY = centerY; cutoutDiameter = diameter
+        cameraTop = max(dp(4f), centerY - dp(18f))
+        updateAnchor()
+        show(activity, presentation)
+    }
+
+    /** Tests only: the camera hole in this view's pixels (centre x, centre y, radius), if on one. */
+    @androidx.annotation.VisibleForTesting
+    internal fun cameraHoleForTest(): FloatArray? = if (!onCamera()) null else {
+        val r = restingDiameter() / 2f
+        floatArrayOf(cameraCenter() * fit.scale, (restingTop() + r) * fit.scale, r * fit.scale)
+    }
+
     override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
-        if (anchorToCutout) {
+        if (anchorToCutout && !simulatedCamera) {
             getLocationOnScreen(windowLocation)
             windowOriginY = windowLocation[1].toFloat()
             val fallbackId = resources.getIdentifier("status_bar_height", "dimen", "android")
@@ -1321,6 +1397,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             canvas.save()
             canvas.translate(0f, -lift)
             canvas.scale(sc, sc, rect.centerX(), rect.top)
+            guardCamera = true
             if (alpha > 2) when (a.mode) {
                 // Secondary elements (progress, buttons) trail the header by a beat.
                 IslandMode.MUSIC -> drawMusicExpanded(canvas, a, alpha, stagger(ea, 0.3f))
@@ -1339,6 +1416,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 IslandMode.ALARM -> drawAlarmExpanded(canvas, a, alpha)
                 else -> drawGenericExpanded(canvas, a, alpha)
             }
+            guardCamera = false
             canvas.restore()
         } else {
             barY = -1000f
@@ -1350,8 +1428,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 canvas.save()
                 canvas.scale(1f - (1f - ca) * 0.08f, 1f, rect.centerX(), rect.centerY())
                 burnInShift(canvas)
+                guardCamera = true
                 if (a.mode == IslandMode.MESSAGE) drawMessageMedium(canvas, a, (alpha * intro).toInt())
                 else drawCompact(canvas, a, (alpha * intro).toInt())
+                guardCamera = false
                 canvas.restore()
             }
         }
@@ -1953,7 +2033,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     /** Headphones arriving, or any Bluetooth audio device dropping away. */
     private fun drawDeviceExpanded(canvas: Canvas, a: LiveActivity, alpha: Int) {
         val cy = rect.centerY()
-        val icon = rect.height() - dp(20f)
+        val icon = min(rect.height(), dp(MEDIUM_HEIGHT_DP)) - dp(20f)
         val l = rect.left + dp(10f)
         val tint = if (a.lost) cRed else (userAccent ?: AppStyle.GREEN)
         fillPaint.color = withAlpha(tint, alpha * 45 / 255)
@@ -1962,13 +2042,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         else drawHeadphones(canvas, l + icon / 2, cy, icon * .5f, withAlpha(tint, alpha))
         val tx = l + icon + dp(10f)
         var right = rect.right - dp(18f)
+        val (titleY, detailY) = mediumBaselines(rect.top, rect.height())
         val battery = a.progress
         if (battery != null && !a.lost) {
             val label = "${IslandSignals.percent(battery)}%"
-            right = rolling(canvas, "battery", label, right, cy + dp(5f), titlePaint, tint, alpha, alignRight = true) - dp(10f)
+            right = rolling(canvas, "battery", label, right, (titleY + detailY) / 2f + dp(3f), titlePaint, tint, alpha, alignRight = true) - dp(10f)
         }
-        text(canvas, a.title, tx, cy - dp(2f), right - tx, titlePaint, Color.WHITE, alpha)
-        text(canvas, a.subtitle, tx, cy + dp(16f), right - tx, smallPaint, if (a.lost) cRed else GREY, alpha)
+        text(canvas, a.title, tx, titleY, right - tx, titlePaint, Color.WHITE, alpha)
+        text(canvas, a.subtitle, tx, detailY, right - tx, smallPaint, if (a.lost) cRed else GREY, alpha)
     }
 
     // ---------------------------------------------------------------- events, flashlight, sleep, home
@@ -1976,7 +2057,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     /** A short system notice: a coloured glyph, what happened and a detail line. */
     private fun drawEventExpanded(canvas: Canvas, a: LiveActivity, alpha: Int) {
         val cy = rect.centerY()
-        val icon = rect.height() - dp(20f)
+        val icon = min(rect.height(), dp(MEDIUM_HEIGHT_DP)) - dp(20f)
         val l = rect.left + dp(10f)
         fillPaint.color = withAlpha(a.accent, alpha * 45 / 255)
         canvas.drawCircle(l + icon / 2, cy, icon / 2, fillPaint)
@@ -1984,11 +2065,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val tx = l + icon + dp(10f)
         var right = rect.right - dp(18f)
         a.progress?.let { level ->
-            right = rolling(canvas, "event", "${IslandSignals.percent(level)}%", right, cy + dp(5f), titlePaint, a.accent, alpha,
+            right = rolling(canvas, "event", "${IslandSignals.percent(level)}%", right, (mediumBaselines(rect.top, rect.height()).let { (it.first + it.second) / 2f }) + dp(3f), titlePaint, a.accent, alpha,
                 alignRight = true) - dp(10f)
         }
-        text(canvas, a.title, tx, cy - dp(2f), right - tx, titlePaint, Color.WHITE, alpha)
-        text(canvas, a.subtitle, tx, cy + dp(16f), right - tx, smallPaint, GREY, alpha)
+        val (titleY, detailY) = mediumBaselines(rect.top, rect.height())
+        text(canvas, a.title, tx, titleY, right - tx, titlePaint, Color.WHITE, alpha)
+        text(canvas, a.subtitle, tx, detailY, right - tx, smallPaint, GREY, alpha)
     }
 
     private val torchBar = RectF()
@@ -1999,9 +2081,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     /** The flashlight: a lit glyph that turns it off, and (where supported) a brightness bar. */
     private fun drawTorchExpanded(canvas: Canvas, a: LiveActivity, alpha: Int) {
         val hasLevels = a.progress != null
-        val rowH = dp(MEDIUM_HEIGHT_DP)
+        val rowH = mediumRowHeight()
         val cy = rect.top + rowH / 2f
-        val icon = rowH - dp(20f)
+        val icon = min(rowH, dp(MEDIUM_HEIGHT_DP)) - dp(20f)
         val l = rect.left + dp(10f)
         // A soft beam behind the glyph, brighter with the level.
         val level = torchLive ?: a.progress ?: 1f
@@ -2011,8 +2093,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         torchOffHit.set(l - dp(6f), cy - icon / 2 - dp(6f), l + icon + dp(6f), cy + icon / 2 + dp(6f))
         val tx = l + icon + dp(10f)
         val right = rect.right - dp(18f)
-        text(canvas, a.title, tx, cy - dp(2f), right - tx, titlePaint, Color.WHITE, alpha)
-        text(canvas, a.subtitle, tx, cy + dp(16f), right - tx, smallPaint, GREY, alpha)
+        val (titleY, detailY) = mediumBaselines(rect.top, rowH)
+        text(canvas, a.title, tx, titleY, right - tx, titlePaint, Color.WHITE, alpha)
+        text(canvas, a.subtitle, tx, detailY, right - tx, smallPaint, GREY, alpha)
         if (!hasLevels) { torchBar.setEmpty(); return }
         val barTop = rect.top + rowH + dp(2f)
         val bh = dp(14f)
@@ -2273,7 +2356,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             }
         }
         val right = rect.right - dp(18f)
-        val tx = gx + icon / 2f + dp(12f)
+        val half = cameraHalfWidth(cy + dp(5.5f) + titlePaint.ascent(), cy + dp(5.5f) + titlePaint.descent())
+        val tx = max(gx + icon / 2f + dp(12f), if (half > 0f) cameraCenter() + half + dp(4f) else 0f)
         // The word slides in a touch behind the glyph.
         val lag = easeOut(((t - 0.05f) * 2.5f).coerceIn(0f, 1f))
         // Centred in the space beside the glyph, so short words don't float off to one side.
@@ -2837,9 +2921,25 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         alignRight: Boolean = false, center: Boolean = false,
     ) {
         if (maxW <= 0f || s.isBlank()) return
-        val out = fitted(s, p, maxW)
+        var x0 = x; var room = maxW
+        if (guardCamera && !center) {
+            // A line at the camera's height stops before the hole on its side, or starts after it.
+            val half = cameraHalfWidth(y + p.ascent(), y + p.descent())
+            if (half > 0f) {
+                val cx = cameraCenter()
+                if (!alignRight) {
+                    if (x0 < cx - half) room = min(room, cx - half - x0)
+                    else if (x0 < cx + half) { room -= cx + half - x0; x0 = cx + half }
+                } else {
+                    if (x0 > cx + half) room = min(room, x0 - (cx + half))
+                    else if (x0 > cx - half) { room -= x0 - (cx - half); x0 = cx - half }
+                }
+                if (room <= dp(6f)) return
+            }
+        }
+        val out = fitted(s, p, room)
         p.color = withAlpha(color, alpha * Color.alpha(color) / 255)
-        val dx = if (alignRight && !center) x - p.measureText(out) else x
+        val dx = if (alignRight && !center) x0 - p.measureText(out) else x0
         canvas.drawText(out, dx, y, p)
     }
 
@@ -2900,7 +3000,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             r.text = value
         }
         val width = p.measureText(value)
-        val left = if (alignRight) x - width else x
+        var left = if (alignRight) x - width else x
+        if (guardCamera) {
+            // A number that would sit under the camera hops past it in reading direction.
+            val half = cameraHalfWidth(baseline + p.ascent(), baseline + p.descent())
+            val cx = cameraCenter()
+            if (half > 0f && left < cx + half && left + width > cx - half)
+                left = if (alignRight) cx - half - width else cx + half
+        }
         val t = if (r.at == 0L) 1f else ((now - r.at).toFloat() / NUMBER_ROLL_MS).coerceIn(0f, 1f)
         val e = 1f - (1f - t) * (1f - t) * (1f - t)
         if (t >= 1f || r.prev.isEmpty()) {
@@ -3294,6 +3401,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val SHORT_SPLIT_WIDTH_DP = 140f
         private const val MEDIUM_WIDTH_DP = 360f
         private const val MEDIUM_HEIGHT_DP = 60f
+        /** A medium pill's two text lines, measured from the bottom of the camera hole. */
+        private const val MEDIUM_TEXT_BLOCK_DP = 44f
         private const val VOLUME_WIDTH_DP = 300f
         private const val VOLUME_HEIGHT_DP = 54f
         private val ALARM = Color.rgb(255, 184, 28)

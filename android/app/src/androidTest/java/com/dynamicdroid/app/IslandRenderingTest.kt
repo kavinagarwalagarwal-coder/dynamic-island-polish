@@ -406,4 +406,83 @@ class IslandRenderingTest {
         assertTrue("Fly-in frames too costly: avg=${"%.2f".format(avgMs)}ms $diag", avgMs < 6.0)
     }
 
+
+    /**
+     * Nothing the island shows may sit under the camera hole. With a pretend 26dp camera at the top
+     * centre, every kind of island (with long titles, to push text towards the camera) is drawn and
+     * the pixels inside the hole must stay black: text keeps clear of it, numbers hop past it and
+     * the medium pills put their lines below it.
+     */
+    @Test fun nothingIsDrawnUnderTheCameraHole() {
+        val long = "Quite a long title that would run under the camera"
+        val detail = "and a long detail line that also runs across the middle"
+        val offenders = ArrayList<String>()
+        launchPlayground().use { scenario ->
+            val cases = ArrayList<Pair<String, () -> Unit>>()
+            var view: IslandView? = null
+            scenario.onActivity { activity ->
+                val v = findIsland(activity.window.decorView)!!
+                view = v
+                v.applyFeatures(IslandFeatures.read(activity).copy(cameraFade = false, idlePill = true,
+                    edgeGlow = false, dotMusic = false, artworkBackdrop = false))
+                v.applyFit(IslandFit(alignCamera = true)); v.setSecondary(null)
+                val d = v.resources.displayMetrics.density
+                v.simulateCameraForTest(v.width / 2f, 26f * d, 26f * d)
+                fun add(name: String, a: LiveActivity, p: Presentation) { cases += name to { v.show(a, p) } }
+                val longer = { a: LiveActivity -> a.copy(title = long, subtitle = detail) }
+                add("music compact", activity.demoMusic(true), Presentation.COMPACT)
+                add("music expanded", longer(activity.demoMusic(true)), Presentation.EXPANDED)
+                add("message compact", longer(activity.demoMessage()), Presentation.COMPACT)
+                add("message expanded", longer(activity.demoMessage()).copy(appLabel = "A messaging app with a long name"), Presentation.EXPANDED)
+                add("call compact", activity.demoCall(), Presentation.COMPACT)
+                add("call expanded", longer(activity.demoCall()), Presentation.EXPANDED)
+                add("calling expanded", longer(activity.demoCalling()), Presentation.EXPANDED)
+                add("timer compact", activity.demoTimer(75), Presentation.COMPACT)
+                add("timer expanded", longer(activity.demoTimer(9)), Presentation.EXPANDED)
+                add("device expanded", longer(activity.demoDevice(false)), Presentation.EXPANDED)
+                add("device lost expanded", longer(activity.demoDevice(true)), Presentation.EXPANDED)
+                add("event expanded", longer(activity.demoEvent()), Presentation.EXPANDED)
+                add("torch expanded", longer(activity.demoTorch()), Presentation.EXPANDED)
+                add("sleep expanded", activity.demoSleep(), Presentation.EXPANDED)
+                add("home expanded", activity.demoHome(), Presentation.EXPANDED)
+                add("download compact", activity.demoDownload(), Presentation.COMPACT)
+                add("download expanded", longer(activity.demoDownload()), Presentation.EXPANDED)
+                add("alarm expanded", longer(activity.demoAlarm()), Presentation.EXPANDED)
+                add("ringer silent", activity.demoRinger(RingerState.SILENT), Presentation.EXPANDED)
+                add("ringer dnd", activity.demoRinger(RingerState.DND_ON), Presentation.EXPANDED)
+                add("volume", activity.demoVolume(.6f), Presentation.EXPANDED)
+            }
+            for ((name, show) in cases) {
+                scenario.onActivity { show() }
+                SystemClock.sleep(1300)
+                var hole: FloatArray? = null; val at = IntArray(2); var covered = false
+                scenario.onActivity {
+                    val v = view!!
+                    hole = v.cameraHoleForTest()
+                    v.getLocationOnScreen(at)
+                    val rect = field<RectF>(v, "rect")
+                    covered = hole?.let { h -> rect.contains(h[0], h[1]) } == true
+                }
+                val h = hole ?: error("No pretend camera for $name")
+                if (!covered) { offenders += "$name: island does not cover the camera"; continue }
+                val shot = instrumentation.uiAutomation.takeScreenshot() ?: error("No emulator screenshot")
+                var lit = 0; var total = 0
+                val r = h[2] * .9f
+                val cx = at[0] + h[0]; val cy = at[1] + h[1]
+                for (y in (cy - r).toInt()..(cy + r).toInt()) for (x in (cx - r).toInt()..(cx + r).toInt()) {
+                    if (x !in 0 until shot.width || y !in 0 until shot.height) continue
+                    if ((x - cx) * (x - cx) + (y - cy) * (y - cy) > r * r) continue
+                    total++
+                    val c = shot.getPixel(x, y)
+                    if (maxOf(android.graphics.Color.red(c), android.graphics.Color.green(c), android.graphics.Color.blue(c)) > 70) lit++
+                }
+                if (lit > total / 50) {
+                    offenders += "$name: $lit of $total pixels lit under the camera"
+                    saveBitmap("camera-${name.replace(' ', '-')}", shot)
+                } else shot.recycle()
+            }
+        }
+        assertTrue("Content under the camera hole:\n" + offenders.joinToString("\n"), offenders.isEmpty())
+    }
+
 }
