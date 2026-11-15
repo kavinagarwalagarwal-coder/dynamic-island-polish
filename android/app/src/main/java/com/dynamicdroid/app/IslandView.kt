@@ -576,11 +576,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (introHoldUntil == 0L && !sheenActive() && !isAbsorbing) restoreShapeSprings()
         presenceS.stiffness = 240f
         val spec = specFor(p, next)
-        next?.let { activity ->
-            val speed = IslandCustomization.motionSpeed(context, activity.packageName)
-            shapeSprings.forEach { it.stiffness = IslandMotion.SHAPE_K / (speed * speed) }
-            leadAxes(spec, speed)
-        }
+        val speed = next?.let { IslandCustomization.motionSpeed(context, it.packageName) } ?: 1f
+        if (next != null) shapeSprings.forEach { it.stiffness = IslandMotion.SHAPE_K / (speed * speed) }
+        // Folding back to the resting pill gets the same height-first choreography as any close.
+        leadAxes(spec, speed)
 
         if (isAbsorbing && (next?.key != old?.key || p != Presentation.COMPACT)) {
             absorbS.snap(0f); morphCard = null; softMorphCard = null; morphStart = 0L
@@ -976,9 +975,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 widthS.tune(d, b); centerS.tune(d, 0f)
             }
         } else {
-            val lag = 1f / (IslandMotion.AXIS_LAG * IslandMotion.AXIS_LAG)
-            if (growing) { heightS.stiffness *= lag; radiusS.stiffness *= lag }
-            else { widthS.stiffness *= lag; centerS.stiffness *= lag }
+            // Set from the base each time, so repeated changes never compound.
+            val base = IslandMotion.SHAPE_K / (speed * speed)
+            val lagged = base / (IslandMotion.AXIS_LAG * IslandMotion.AXIS_LAG)
+            heightS.stiffness = if (growing) lagged else base; radiusS.stiffness = heightS.stiffness
+            widthS.stiffness = if (growing) base else lagged; centerS.stiffness = widthS.stiffness
         }
     }
 
@@ -1568,7 +1569,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             center + dropGeometry.radiusX, cy + dropGeometry.radiusY)
         val surfaceAlpha = (255 * intro * presenceS.value.coerceIn(0f, 1f)).toInt()
         fillPaint.color = withAlpha(Color.BLACK, surfaceAlpha)
-        drawDropNeck(canvas, surfaceAlpha)
+        // Android 12+: a real liquid join. Otherwise the drawn neck stands in for it.
+        if (!(Build.VERSION.SDK_INT >= 31 && canvas.isHardwareAccelerated && drawGoo(canvas, surfaceAlpha)))
+            drawDropNeck(canvas, surfaceAlpha)
+        fillPaint.color = withAlpha(Color.BLACK, surfaceAlpha)
         canvas.drawOval(secondaryRect, fillPaint)
         val alpha = (surfaceAlpha * dropGeometry.content).toInt()
         if (features.colouredBubbles && alpha > 2) drawBubbleRing(canvas, a, alpha)
@@ -1612,6 +1616,57 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             canvas.drawOval(arcRect, ringPaint)
         }
     }
+
+    private var gooNode: android.graphics.RenderNode? = null
+    private val gooPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
+    private val gooClip = Path()
+
+    /**
+     * The liquid split, done the way metaballs are: the pill and the droplet are blurred
+     * together and cut back to a hard edge, so where they are close the black flows between them
+     * like surface tension, thins out and snaps as the droplet pulls away, and pours back when it
+     * returns. The pill itself is clipped out, so only the bridge (and the droplet) is added and
+     * nothing covers the pill's content. The blur grows only while the droplet is leaving or
+     * arriving; at rest the two stay cleanly apart and no effect runs at all.
+     */
+    @android.annotation.TargetApi(31)
+    private fun drawGoo(canvas: Canvas, alpha: Int): Boolean {
+        val gap = secondaryRect.left - rect.right
+        if (reduceMotion || dropGeometry.neck < .01f || gap > dp(40f) || rect.height() > dp(64f)) return false
+        val node = gooNode ?: android.graphics.RenderNode("goo").also { gooNode = it }
+        val pad = dp(16f)
+        val l = (rect.right - rect.height() * 2f - pad).toInt()
+        val t = (min(rect.top, secondaryRect.top) - pad).toInt()
+        val r = (secondaryRect.right + pad).toInt() + 1
+        val b = (max(rect.bottom, secondaryRect.bottom) + pad).toInt() + 1
+        node.setPosition(l, t, r, b)
+        val sigma = dp(GOO_REST_BLUR_DP) + dp(GOO_BLUR_DP - GOO_REST_BLUR_DP) * dropGeometry.neck
+        node.setRenderEffect(android.graphics.RenderEffect.createChainEffect(
+            android.graphics.RenderEffect.createColorFilterEffect(gooThreshold),
+            android.graphics.RenderEffect.createBlurEffect(sigma, sigma, Shader.TileMode.DECAL)))
+        node.alpha = alpha / 255f
+        val c = node.beginRecording()
+        c.translate(-l.toFloat(), -t.toFloat())
+        val corner = min(radiusS.value, rect.height() / 2f)
+        c.drawRoundRect(rect, corner, corner, gooPaint)
+        c.drawOval(secondaryRect, gooPaint)
+        node.endRecording()
+        canvas.save()
+        gooClip.reset()
+        gooClip.addRoundRect(rect, corner, corner, Path.Direction.CW)
+        canvas.clipOutPath(gooClip)
+        canvas.drawRenderNode(node)
+        canvas.restore()
+        return true
+    }
+
+    /** Cuts the blurred shapes back to a crisp edge at half opacity, so flat edges stay put. */
+    private val gooThreshold = ColorMatrixColorFilter(ColorMatrix(floatArrayOf(
+        0f, 0f, 0f, 0f, 0f,
+        0f, 0f, 0f, 0f, 0f,
+        0f, 0f, 0f, 0f, 0f,
+        0f, 0f, 0f, 24f, -12f * 255f,
+    )))
 
     /** Two cubic edges pinch down before the droplet detaches. Draw behind both surfaces. */
     private fun drawDropNeck(canvas: Canvas, alpha: Int) {
@@ -3679,6 +3734,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private val DND_PURPLE = Color.rgb(150, 132, 255)
         private const val NUMBER_ROLL_MS = 260L
         private const val TEXT_FADE_MS = 300L
+        /** Liquid split: blur while the droplet leaves or returns, and the floor it relaxes to. */
+        private const val GOO_BLUR_DP = 7f
+        private const val GOO_REST_BLUR_DP = 2.5f
         /** Frame spacing for slow, small motion, chosen for battery (see continuousDelay). */
         private const val COMPACT_WAVE_FRAME_MS = 50L
         private const val COMPACT_CLOCK_FRAME_MS = 100L
