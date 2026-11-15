@@ -30,6 +30,8 @@ class IslandNotificationListener : NotificationListenerService() {
     private var controller: MediaController? = null
     private val timers = HashMap<String, LiveActivity>()
     private val systemPackages = setOf("com.android.systemui", "android")
+    /** Notifications currently shown as recordings, so the "saved" update can end them. */
+    private val recordings = HashSet<String>()
     private val lastMessageText = HashMap<String, String>()
     private val lastProgress = HashMap<String, Float>()
 
@@ -87,9 +89,14 @@ class IslandNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName || !IslandCustomization.allowed(this, sbn.packageName)) return
-        // System UI's own notifications (screen recording, casting, battery...) already have their
-        // own status-bar chips; the recording one would read as a stopwatch and never stop.
-        if (sbn.packageName in systemPackages) return
+        // System UI's own notifications (casting, battery...) already have their own status-bar
+        // chips; only its screen recorder gets an island (as a recording, never as a stopwatch).
+        if (sbn.packageName in systemPackages && !(sbn.isOngoing && LiveSignals.isRecording(sbn.packageName,
+                if (Build.VERSION.SDK_INT >= 26) sbn.notification.channelId else null,
+                sbn.notification.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty(), "", true, true))) {
+            if (sbn.key in recordings) { recordings.remove(sbn.key); IslandBus.remove(sbn.key) }
+            return
+        }
         val n = sbn.notification
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val extras = n.extras
@@ -154,6 +161,12 @@ class IslandNotificationListener : NotificationListenerService() {
         val live = features.liveUpdates && n.category != Notification.CATEGORY_CALL && LiveSignals.isLiveUpdate(
             extras.getString(Notification.EXTRA_TEMPLATE), n.flags, extras.getBoolean(LiveSignals.EXTRA_REQUEST_PROMOTED),
             sbn.packageName, sbn.isOngoing, !shortCritical.isNullOrBlank())
+        // A recording whose notification stops recording ("Recording saved") ends here.
+        if (sbn.key in recordings && !recording) {
+            recordings.remove(sbn.key)
+            IslandBus.remove(sbn.key)
+            return
+        }
         val mode = when {
             n.category == Notification.CATEGORY_CALL -> IslandMode.CALL
             features.alarms && IslandSignals.isRingingAlarm(n.category, clockApp, actionLabels) -> IslandMode.ALARM
@@ -241,11 +254,13 @@ class IslandNotificationListener : NotificationListenerService() {
             shortText = if (mode == IslandMode.LIVE && !hotspot) LiveSignals.shortText(shortCritical, title, text) else null,
         )
         if (mode == IslandMode.TIMER) timers[sbn.key] = activity
+        if (mode == IslandMode.RECORDING) recordings += sbn.key
         IslandBus.post(activity)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         timers.remove(sbn.key)
+        recordings.remove(sbn.key)
         lastProgress.remove(sbn.key)
         lastMessageText.remove(sbn.key)
         IslandBus.remove(sbn.key)
