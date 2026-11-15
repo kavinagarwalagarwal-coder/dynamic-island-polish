@@ -65,7 +65,12 @@ object LiveSignals {
         RegexOption.IGNORE_CASE)
 
     /** The pill's chip for a cricket score: "IND 245/3", or the runs alone. */
-    fun cricketScore(lines: List<String>): String? {
+    fun cricketScore(lines: List<String>): String? = cricketScoreIn(lines)
+        // Scoreboards (Google's pinned score among them) put the team, the runs and the overs
+        // in separate boxes: read them run together as one line as well.
+        ?: lines.takeIf { it.size > 1 }?.let { cricketScoreIn(listOf(it.joinToString(" "))) }
+
+    private fun cricketScoreIn(lines: List<String>): String? {
         for (s in lines) (cricketOvers.find(s) ?: cricketRunsOvers.find(s))?.let { m ->
             val team = m.groupValues[1].takeIf { it.isNotEmpty() && it == it.uppercase() }
             return listOfNotNull(team, m.groupValues[2]).joinToString(" ")
@@ -76,7 +81,11 @@ object LiveSignals {
 
     /** Text that reads as a live cricket score (or a chase: "need 30 runs in 18 balls"). */
     fun looksLikeScore(lines: List<String>, scoreApp: Boolean = true): Boolean =
-        cricketScore(lines) != null || scoreApp && lines.any { chase.containsMatchIn(it) || namedTeam.containsMatchIn(it) }
+        cricketScore(lines) != null || scoreApp && (lines.any { chase.containsMatchIn(it) || namedTeam.containsMatchIn(it) } ||
+            lines.any { runsAlone.matches(it.trim()) })
+
+    // A scoreboard box holding just "245/3" or "245-3", from a score app.
+    private val runsAlone = Regex("\\d{1,3}[/-]\\d{1,2}(?:\\s*\\(\\d{1,2}(?:\\.[0-5])?\\s*(?:ov|ovs|overs?)?\\))?")
 
     /**
      * A live score notification: from a score app (or the Google app), or any app's ongoing one

@@ -52,4 +52,12 @@ class LiveSignalsTest {
         assertFalse(LiveSignals.isLiveScore("com.example.app", false, false, listOf("India 245/3"), quiet = true))
         assertFalse(LiveSignals.isLiveScore("com.example.app", true, false, listOf("Due 12/3")))
     }
+
+    @Test fun scoreboardsSplitIntoBoxesStillRead() {
+        // Google's pinned score: team, runs and overs in separate text boxes.
+        val google = listOf("Australia", "AUS", "245/3", "(42.1 ov)", "England", "ENG", "Yet to bat")
+        assertEquals("AUS 245/3", LiveSignals.cricketScore(google))
+        assertTrue(LiveSignals.isLiveScore(LiveSignals.GOOGLE_APP, true, false, google))
+        assertTrue(LiveSignals.isLiveScore("com.cricbuzz.android", true, false, listOf("Live", "198-7")))
+    }
 }
