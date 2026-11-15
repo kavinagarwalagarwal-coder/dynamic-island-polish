@@ -11,6 +11,12 @@ class Spring(
     var dampingRatio: Float,
     private val threshold: Float,
 ) {
+    companion object {
+        /** A spring described the way Apple does: perceptual duration (seconds) and bounce. */
+        fun apple(initial: Float, duration: Float, bounce: Float, threshold: Float) =
+            Spring(initial, 0f, 1f, threshold).also { it.tune(duration, bounce) }
+    }
+
     var value = initial
         private set
     var target = initial
@@ -20,6 +26,17 @@ class Spring(
 
     val isAtRest: Boolean
         get() = abs(target - value) < threshold && abs(velocity) < threshold * 10f
+
+    /**
+     * Apple's spring model (WWDC23 "Animate with springs"): a perceptual duration and a bounce
+     * (0 = no overshoot, 0.3 = lively) instead of stiffness and damping. Velocity is kept, so a
+     * retuned spring carries on from wherever it is mid-flight.
+     */
+    fun tune(duration: Float, bounce: Float) {
+        val omega = (2.0 * Math.PI / duration.coerceAtLeast(0.05f)).toFloat()
+        stiffness = omega * omega
+        dampingRatio = (1f - bounce).coerceIn(0.05f, 1f)
+    }
 
     fun snap(v: Float) {
         value = v
