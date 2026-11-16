@@ -74,18 +74,21 @@ class PixelScenes(private val density: Float) {
      * the right. At mute the sky turns to night and the car parks, grey and dozing.
      * The scenery is painted once into a bitmap; each frame only draws it and the car.
      */
-    fun roadTrip(canvas: Canvas, scene: android.graphics.RectF, carX: Float, level: Float, now: Long, accent: Int, alpha: Int) {
+    fun roadTrip(canvas: Canvas, scene: android.graphics.RectF, settledW: Float, settledH: Float, carX: Float, level: Float,
+                 now: Long, accent: Int, alpha: Int) {
         val cell = scene.height() / 32f
-        val key = (scene.width().toInt().toLong() shl 20) or scene.height().toInt().toLong()
+        // Painted once at the card's settled size (not every frame while it opens), then scaled.
+        val key = (settledW.toInt().toLong() shl 20) or settledH.toInt().toLong()
         if (scenery == null || key != sceneryKey) {
             sceneryKey = key
-            scenery = paintScenery(scene.width(), scene.height(), cell, false)
-            night = paintScenery(scene.width(), scene.height(), cell, true)
+            val c = settledH / 32f
+            scenery = paintScenery(settledW, settledH, c, false)
+            night = paintScenery(settledW, settledH, c, true)
         }
         bitmapPaint.alpha = alpha
-        canvas.drawBitmap(scenery!!, scene.left, scene.top, bitmapPaint)
+        canvas.drawBitmap(scenery!!, null, scene, bitmapPaint)
         val dark = (1f - level / .08f).coerceIn(0f, 1f)
-        if (dark > 0f) { bitmapPaint.alpha = (alpha * dark).toInt(); canvas.drawBitmap(night!!, scene.left, scene.top, bitmapPaint) }
+        if (dark > 0f) { bitmapPaint.alpha = (alpha * dark).toInt(); canvas.drawBitmap(night!!, null, scene, bitmapPaint) }
         // Wheels roll by the distance travelled; the car faces where it's heading.
         if (!lastCarX.isNaN()) {
             val dx = carX - lastCarX

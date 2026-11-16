@@ -2187,7 +2187,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 sceneClip.rewind()
                 sceneClip.addRoundRect(sceneRect, corner, corner, Path.Direction.CW)
                 canvas.save(); canvas.clipPath(sceneClip)
-                pixels.roadTrip(canvas, sceneRect, carX, level, SystemClock.uptimeMillis(),
+                pixels.roadTrip(canvas, sceneRect, max(dp(60f), widthS.target - dp(20f)),
+                    volumeHeight() - compactHeight() - dp(12f), carX, level, SystemClock.uptimeMillis(),
                     PixelScenes.accentFor(userAccent ?: a.accent), alpha)
                 val signY = sceneRect.top + sceneRect.height() * pixels.roadTop - cell * 5f
                 pixels.endSign(canvas, sceneRect.left + cell * 2f, signY, cell, false, alpha)
