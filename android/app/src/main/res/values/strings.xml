@@ -516,4 +516,7 @@
     <string name="look_hyper" translatable="false">HyperOS</string>
     <string name="glass_blur_on">Live glass behind the open island: available on this phone.</string>
     <string name="glass_blur_off">Live glass behind the open island: this phone isn\'t allowing window blur right now (battery saver, developer options, or turned off by the maker). The card stays black.</string>
+    <string name="feature_clean_status">Clean status bar</string>
+    <string name="feature_clean_status_note">Hides Android\'s extra icons (alarm, Bluetooth, ringer, Do Not Disturb, location, NFC…) so only the time, signal, Wi-Fi and battery sit beside the island, like iPhone. Your own settings come back when you turn this off.</string>
+    <string name="clean_status_needs_grant">This needs the same one-time computer permission as hiding the phone\'s pop-ups.</string>
 </resources>

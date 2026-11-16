@@ -504,4 +504,7 @@
     <string name="feature_glass_note">Knoppen en balken in het open eiland worden glas als je ze aanraakt, zoals in HyperOS 4.</string>
     <string name="glass_blur_on">Live glas achter het open eiland: beschikbaar op deze telefoon.</string>
     <string name="glass_blur_off">Live glas achter het open eiland: deze telefoon staat vensterwaas nu niet toe (batterijbesparing, ontwikkelaarsopties of uitgeschakeld door de fabrikant). De kaart blijft zwart.</string>
+    <string name="feature_clean_status">Opgeruimde statusbalk</string>
+    <string name="feature_clean_status_note">Verbergt de extra pictogrammen van Android (wekker, Bluetooth, beltoon, Niet storen, locatie, NFC…) zodat alleen tijd, signaal, wifi en batterij naast het eiland staan, zoals op de iPhone. Je eigen instellingen komen terug als je dit uitzet.</string>
+    <string name="clean_status_needs_grant">Hiervoor is dezelfde eenmalige toestemming via een computer nodig als voor het verbergen van pop-ups.</string>
 </resources>

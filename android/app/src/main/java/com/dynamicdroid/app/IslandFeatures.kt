@@ -58,6 +58,8 @@ data class IslandFeatureSet(
     val burnInCare: Boolean = false,
     /** Liquid glass buttons and bars in the open island (HyperOS 4 style). */
     val glassControls: Boolean = true,
+    /** Hide Android's extra status-bar icons so only time, signal, Wi-Fi and battery flank the island. */
+    val cleanStatusBar: Boolean = true,
     val lockScreen: Boolean = false,
     val hapticTap: Boolean = true,
     val hapticHold: Boolean = true,
@@ -173,6 +175,7 @@ object IslandFeatures {
             edgeGlow = p.getBoolean("edge_glow", d.edgeGlow),
             burnInCare = p.getBoolean("burn_in", d.burnInCare),
             glassControls = p.getBoolean("glass_controls", d.glassControls),
+            cleanStatusBar = p.getBoolean("clean_status_bar", d.cleanStatusBar),
             lockScreen = p.getBoolean("lock_screen", d.lockScreen),
             hapticTap = p.getBoolean("haptic_tap", d.hapticTap),
             hapticHold = p.getBoolean("haptic_hold", d.hapticHold),

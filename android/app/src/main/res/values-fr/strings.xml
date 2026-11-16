@@ -504,4 +504,7 @@
     <string name="feature_glass_note">Les boutons et barres de l\'île ouverte deviennent du verre quand vous les touchez, comme sur HyperOS 4.</string>
     <string name="glass_blur_on">Verre en direct derrière l\'île ouverte : disponible sur ce téléphone.</string>
     <string name="glass_blur_off">Verre en direct derrière l\'île ouverte : ce téléphone n\'autorise pas le flou des fenêtres pour l\'instant (économiseur de batterie, options pour les développeurs ou désactivé par le fabricant). La carte reste noire.</string>
+    <string name="feature_clean_status">Barre d\'état épurée</string>
+    <string name="feature_clean_status_note">Masque les icônes en plus d\'Android (alarme, Bluetooth, sonnerie, Ne pas déranger, localisation, NFC…) pour qu\'il ne reste que l\'heure, le réseau, le Wi-Fi et la batterie autour de l\'île, comme sur iPhone. Vos réglages reviennent quand vous le désactivez.</string>
+    <string name="clean_status_needs_grant">Il faut la même autorisation unique depuis un ordinateur que pour masquer les fenêtres pop-up.</string>
 </resources>

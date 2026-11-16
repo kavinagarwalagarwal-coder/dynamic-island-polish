@@ -566,6 +566,11 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_swipe_tracks, "swipe_tracks", f.swipeTracks, R.string.feature_swipe_tracks_note)
         toggle(R.string.feature_app_morph, "app_morph", f.appMorph, R.string.feature_app_morph_note)
         toggle(R.string.feature_glass, "glass_controls", f.glassControls, R.string.feature_glass_note)
+        toggle(R.string.feature_clean_status, "clean_status_bar", f.cleanStatusBar, R.string.feature_clean_status_note)
+        if (f.cleanStatusBar && !StatusBarControl.canControl(this@FeaturesPage)) {
+            Note(stringResource(R.string.clean_status_needs_grant), size = 13)
+            ActionButton(stringResource(R.string.popups_grant_button)) { explainPopupGrant() }
+        }
         // Whether this phone lets Android blur behind windows (the live frosted card needs it).
         val blur = remember {
             android.os.Build.VERSION.SDK_INT >= 31 && runCatching {

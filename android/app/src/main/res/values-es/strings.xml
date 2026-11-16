@@ -504,4 +504,7 @@
     <string name="feature_glass_note">Los botones y barras de la isla abierta se vuelven cristal al tocarlos, como en HyperOS 4.</string>
     <string name="glass_blur_on">Cristal en vivo tras la isla abierta: disponible en este teléfono.</string>
     <string name="glass_blur_off">Cristal en vivo tras la isla abierta: este teléfono no permite ahora el desenfoque de ventanas (ahorro de batería, opciones de desarrollador o desactivado por el fabricante). La tarjeta se queda negra.</string>
+    <string name="feature_clean_status">Barra de estado limpia</string>
+    <string name="feature_clean_status_note">Oculta los iconos extra de Android (alarma, Bluetooth, timbre, No molestar, ubicación, NFC…) para que junto a la isla solo queden la hora, la señal, el Wi-Fi y la batería, como en iPhone. Tu configuración vuelve al desactivarlo.</string>
+    <string name="clean_status_needs_grant">Necesita el mismo permiso único desde un ordenador que ocultar las ventanas emergentes.</string>
 </resources>

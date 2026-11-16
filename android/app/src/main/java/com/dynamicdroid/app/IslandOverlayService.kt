@@ -106,7 +106,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private val refreshQuietRules = object : Runnable {
         override fun run() {
             render()
-            HeadsUpControl.sync(this@IslandOverlayService, island != null)
+            HeadsUpControl.sync(this@IslandOverlayService, island != null); StatusBarControl.sync(this@IslandOverlayService, island != null)
             if (IslandCustomization.quietEnabled(this@IslandOverlayService)) handler.postDelayed(this, 60_000L)
         }
     }
@@ -326,9 +326,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         events = SystemEvents(this, ::onActivity, ::onRemoved).also { it.start() }
         reply = ReplyPanel(this, ::onReplySent) { armTransientTimeout(transient) }
         IslandAccessibilityService.onVolumeKey = ::handleVolumeKey
-        IslandBus.listenerChanged = { HeadsUpControl.sync(this, island != null) }
+        IslandBus.listenerChanged = { HeadsUpControl.sync(this, island != null); StatusBarControl.sync(this, island != null) }
         IslandAccessibilityService.beforePopupSwipe = { passTouchesFor(it) }
-        HeadsUpControl.sync(this, island != null)
+        HeadsUpControl.sync(this, island != null); StatusBarControl.sync(this, island != null)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -355,7 +355,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         if (intent?.action == ACTION_CUSTOMIZATION) {
             island?.applyFeatures(IslandFeatures.read(this))
-            HeadsUpControl.sync(this, island != null)
+            HeadsUpControl.sync(this, island != null); StatusBarControl.sync(this, island != null)
             devices?.stop(); devices?.start()
             events?.refresh()
             handler.removeCallbacks(refreshQuietRules)
@@ -443,7 +443,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private fun reattach() {
         detachWindow()
         if (attachWindow()) render()
-        HeadsUpControl.sync(this, island != null)
+        HeadsUpControl.sync(this, island != null); StatusBarControl.sync(this, island != null)
     }
 
     // ---------------------------------------------------------------- state
@@ -1282,6 +1282,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         IslandAccessibilityService.beforePopupSwipe = null
         // The island is going away: the phone's own pop-ups must come back.
         HeadsUpControl.restore(this)
+        StatusBarControl.restore(this)
         devices?.stop()
         events?.stop()
         watcher?.stop()

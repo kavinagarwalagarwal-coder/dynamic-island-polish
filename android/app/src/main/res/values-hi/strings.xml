@@ -504,4 +504,7 @@
     <string name="feature_glass_note">खुले आइलैंड के बटन और बार छूने पर कांच जैसे बन जाते हैं, HyperOS 4 की तरह।</string>
     <string name="glass_blur_on">खुले आइलैंड के पीछे लाइव ग्लास: इस फ़ोन पर उपलब्ध है।</string>
     <string name="glass_blur_off">खुले आइलैंड के पीछे लाइव ग्लास: यह फ़ोन अभी विंडो ब्लर की अनुमति नहीं देता (बैटरी सेवर, डेवलपर विकल्प, या निर्माता ने बंद किया है)। कार्ड काला ही रहेगा।</string>
+    <string name="feature_clean_status">साफ़ स्टेटस बार</string>
+    <string name="feature_clean_status_note">Android के अतिरिक्त आइकन (अलार्म, ब्लूटूथ, रिंगर, परेशान न करें, लोकेशन, NFC…) छिपाता है ताकि आइलैंड के पास सिर्फ़ समय, सिग्नल, वाई-फ़ाई और बैटरी रहें, iPhone की तरह। बंद करने पर आपकी सेटिंग वापस आ जाती है।</string>
+    <string name="clean_status_needs_grant">इसके लिए वही एक बार की कंप्यूटर अनुमति चाहिए जो पॉप-अप छिपाने के लिए चाहिए।</string>
 </resources>

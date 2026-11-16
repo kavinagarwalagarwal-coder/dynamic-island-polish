@@ -504,4 +504,7 @@
     <string name="feature_glass_note">Açık adadaki düğmeler ve çubuklar dokunduğunuzda cama dönüşür, HyperOS 4\'teki gibi.</string>
     <string name="glass_blur_on">Açık adanın arkasında canlı cam: bu telefonda kullanılabilir.</string>
     <string name="glass_blur_off">Açık adanın arkasında canlı cam: bu telefon şu anda pencere bulanıklığına izin vermiyor (pil tasarrufu, geliştirici seçenekleri veya üretici tarafından kapatılmış). Kart siyah kalır.</string>
+    <string name="feature_clean_status">Sade durum çubuğu</string>
+    <string name="feature_clean_status_note">Android\'in ek simgelerini (alarm, Bluetooth, zil, Rahatsız Etmeyin, konum, NFC…) gizler; adanın yanında yalnızca saat, sinyal, Wi-Fi ve pil kalır, iPhone\'daki gibi. Kapattığınızda ayarlarınız geri gelir.</string>
+    <string name="clean_status_needs_grant">Açılır bildirimleri gizlemekle aynı tek seferlik bilgisayar izni gerekir.</string>
 </resources>

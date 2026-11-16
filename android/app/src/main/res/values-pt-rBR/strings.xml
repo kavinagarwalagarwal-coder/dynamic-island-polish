@@ -504,4 +504,7 @@
     <string name="feature_glass_note">Botões e barras da ilha aberta viram vidro quando você toca, como no HyperOS 4.</string>
     <string name="glass_blur_on">Vidro ao vivo atrás da ilha aberta: disponível neste telefone.</string>
     <string name="glass_blur_off">Vidro ao vivo atrás da ilha aberta: este telefone não permite desfoque de janelas agora (economia de bateria, opções do desenvolvedor ou desativado pelo fabricante). O cartão fica preto.</string>
+    <string name="feature_clean_status">Barra de status limpa</string>
+    <string name="feature_clean_status_note">Esconde os ícones extras do Android (alarme, Bluetooth, toque, Não perturbe, local, NFC…) para que ao lado da ilha fiquem só hora, sinal, Wi-Fi e bateria, como no iPhone. Suas configurações voltam quando você desativa.</string>
+    <string name="clean_status_needs_grant">Precisa da mesma permissão única pelo computador usada para esconder os pop-ups.</string>
 </resources>

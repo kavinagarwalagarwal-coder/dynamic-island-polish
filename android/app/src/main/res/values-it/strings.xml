@@ -504,4 +504,7 @@
     <string name="feature_glass_note">Pulsanti e barre dell\'isola aperta diventano vetro quando li tocchi, come in HyperOS 4.</string>
     <string name="glass_blur_on">Vetro dal vivo dietro l\'isola aperta: disponibile su questo telefono.</string>
     <string name="glass_blur_off">Vetro dal vivo dietro l\'isola aperta: questo telefono ora non consente la sfocatura delle finestre (risparmio energetico, opzioni sviluppatore o disattivata dal produttore). La scheda resta nera.</string>
+    <string name="feature_clean_status">Barra di stato pulita</string>
+    <string name="feature_clean_status_note">Nasconde le icone extra di Android (sveglia, Bluetooth, suoneria, Non disturbare, posizione, NFC…) così accanto all\'isola restano solo ora, segnale, Wi-Fi e batteria, come su iPhone. Le tue impostazioni tornano quando lo disattivi.</string>
+    <string name="clean_status_needs_grant">Serve la stessa autorizzazione una tantum da computer usata per nascondere i pop-up.</string>
 </resources>

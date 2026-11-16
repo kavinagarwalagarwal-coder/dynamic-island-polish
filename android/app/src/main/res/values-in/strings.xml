@@ -504,4 +504,7 @@
     <string name="feature_glass_note">Tombol dan bilah di pulau yang terbuka berubah menjadi kaca saat disentuh, seperti HyperOS 4.</string>
     <string name="glass_blur_on">Kaca langsung di balik pulau yang terbuka: tersedia di ponsel ini.</string>
     <string name="glass_blur_off">Kaca langsung di balik pulau yang terbuka: ponsel ini saat ini tidak mengizinkan blur jendela (penghemat baterai, opsi developer, atau dinonaktifkan produsen). Kartu tetap hitam.</string>
+    <string name="feature_clean_status">Bilah status bersih</string>
+    <string name="feature_clean_status_note">Menyembunyikan ikon tambahan Android (alarm, Bluetooth, dering, Jangan Ganggu, lokasi, NFC…) sehingga hanya jam, sinyal, Wi-Fi, dan baterai yang ada di sisi pulau, seperti iPhone. Setelan Anda kembali saat dimatikan.</string>
+    <string name="clean_status_needs_grant">Memerlukan izin satu kali dari komputer yang sama seperti menyembunyikan pop-up.</string>
 </resources>
