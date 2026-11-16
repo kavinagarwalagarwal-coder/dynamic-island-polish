@@ -502,4 +502,6 @@
     <string name="live_chip_button">Sembunyikan chip Android untuk aplikasi terakhir</string>
     <string name="feature_glass">Kontrol kaca cair</string>
     <string name="feature_glass_note">Tombol dan bilah di pulau yang terbuka berubah menjadi kaca saat disentuh, seperti HyperOS 4.</string>
+    <string name="glass_blur_on">Kaca langsung di balik pulau yang terbuka: tersedia di ponsel ini.</string>
+    <string name="glass_blur_off">Kaca langsung di balik pulau yang terbuka: ponsel ini saat ini tidak mengizinkan blur jendela (penghemat baterai, opsi developer, atau dinonaktifkan produsen). Kartu tetap hitam.</string>
 </resources>

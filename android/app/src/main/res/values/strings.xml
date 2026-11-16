@@ -514,4 +514,6 @@
     <string name="feature_glass">Liquid glass controls</string>
     <string name="feature_glass_note">Buttons and bars in the open island turn to glass when you touch them, like HyperOS 4.</string>
     <string name="look_hyper" translatable="false">HyperOS</string>
+    <string name="glass_blur_on">Live glass behind the open island: available on this phone.</string>
+    <string name="glass_blur_off">Live glass behind the open island: this phone isn\'t allowing window blur right now (battery saver, developer options, or turned off by the maker). The card stays black.</string>
 </resources>

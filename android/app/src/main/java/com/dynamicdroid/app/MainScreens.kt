@@ -566,6 +566,13 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_swipe_tracks, "swipe_tracks", f.swipeTracks, R.string.feature_swipe_tracks_note)
         toggle(R.string.feature_app_morph, "app_morph", f.appMorph, R.string.feature_app_morph_note)
         toggle(R.string.feature_glass, "glass_controls", f.glassControls, R.string.feature_glass_note)
+        // Whether this phone lets Android blur behind windows (the live frosted card needs it).
+        val blur = remember {
+            android.os.Build.VERSION.SDK_INT >= 31 && runCatching {
+                getSystemService(android.view.WindowManager::class.java)?.isCrossWindowBlurEnabled == true
+            }.getOrDefault(false)
+        }
+        Note(stringResource(if (blur) R.string.glass_blur_on else R.string.glass_blur_off), size = 13)
     }
     Column(flow.next()) {
         Heading(stringResource(R.string.features_events))

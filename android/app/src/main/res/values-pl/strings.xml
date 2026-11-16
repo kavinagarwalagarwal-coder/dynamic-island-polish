@@ -502,4 +502,6 @@
     <string name="live_chip_button">Ukryj chip Androida dla ostatniej aplikacji</string>
     <string name="feature_glass">Sterowanie z płynnego szkła</string>
     <string name="feature_glass_note">Przyciski i paski w otwartej wyspie zmieniają się w szkło po dotknięciu, jak w HyperOS 4.</string>
+    <string name="glass_blur_on">Szkło na żywo za otwartą wyspą: dostępne na tym telefonie.</string>
+    <string name="glass_blur_off">Szkło na żywo za otwartą wyspą: ten telefon nie pozwala teraz na rozmycie okien (oszczędzanie baterii, opcje programisty lub wyłączone przez producenta). Karta pozostaje czarna.</string>
 </resources>

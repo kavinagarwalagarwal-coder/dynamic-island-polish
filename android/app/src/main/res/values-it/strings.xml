@@ -502,4 +502,6 @@
     <string name="live_chip_button">Nascondi il chip di Android per l\'ultima app</string>
     <string name="feature_glass">Controlli in vetro liquido</string>
     <string name="feature_glass_note">Pulsanti e barre dell\'isola aperta diventano vetro quando li tocchi, come in HyperOS 4.</string>
+    <string name="glass_blur_on">Vetro dal vivo dietro l\'isola aperta: disponibile su questo telefono.</string>
+    <string name="glass_blur_off">Vetro dal vivo dietro l\'isola aperta: questo telefono ora non consente la sfocatura delle finestre (risparmio energetico, opzioni sviluppatore o disattivata dal produttore). La scheda resta nera.</string>
 </resources>

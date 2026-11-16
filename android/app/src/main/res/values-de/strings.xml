@@ -502,4 +502,6 @@
     <string name="live_chip_button">Android-Chip für die letzte App ausblenden</string>
     <string name="feature_glass">Flüssigglas-Bedienelemente</string>
     <string name="feature_glass_note">Tasten und Leisten in der geöffneten Insel werden bei Berührung zu Glas, wie bei HyperOS 4.</string>
+    <string name="glass_blur_on">Live-Glas hinter der geöffneten Insel: auf diesem Telefon verfügbar.</string>
+    <string name="glass_blur_off">Live-Glas hinter der geöffneten Insel: Dieses Telefon erlaubt gerade keine Fensterunschärfe (Energiesparmodus, Entwickleroptionen oder vom Hersteller deaktiviert). Die Karte bleibt schwarz.</string>
 </resources>

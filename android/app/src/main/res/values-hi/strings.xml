@@ -502,4 +502,6 @@
     <string name="live_chip_button">पिछले ऐप के लिए Android की चिप छिपाएँ</string>
     <string name="feature_glass">लिक्विड ग्लास कंट्रोल</string>
     <string name="feature_glass_note">खुले आइलैंड के बटन और बार छूने पर कांच जैसे बन जाते हैं, HyperOS 4 की तरह।</string>
+    <string name="glass_blur_on">खुले आइलैंड के पीछे लाइव ग्लास: इस फ़ोन पर उपलब्ध है।</string>
+    <string name="glass_blur_off">खुले आइलैंड के पीछे लाइव ग्लास: यह फ़ोन अभी विंडो ब्लर की अनुमति नहीं देता (बैटरी सेवर, डेवलपर विकल्प, या निर्माता ने बंद किया है)। कार्ड काला ही रहेगा।</string>
 </resources>

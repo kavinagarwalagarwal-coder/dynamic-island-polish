@@ -502,4 +502,6 @@
     <string name="live_chip_button">Masquer la puce Android pour la dernière app</string>
     <string name="feature_glass">Commandes en verre liquide</string>
     <string name="feature_glass_note">Les boutons et barres de l\'île ouverte deviennent du verre quand vous les touchez, comme sur HyperOS 4.</string>
+    <string name="glass_blur_on">Verre en direct derrière l\'île ouverte : disponible sur ce téléphone.</string>
+    <string name="glass_blur_off">Verre en direct derrière l\'île ouverte : ce téléphone n\'autorise pas le flou des fenêtres pour l\'instant (économiseur de batterie, options pour les développeurs ou désactivé par le fabricant). La carte reste noire.</string>
 </resources>

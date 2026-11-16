@@ -502,4 +502,6 @@
     <string name="live_chip_button">Android-chip verbergen voor de laatste app</string>
     <string name="feature_glass">Bediening van vloeibaar glas</string>
     <string name="feature_glass_note">Knoppen en balken in het open eiland worden glas als je ze aanraakt, zoals in HyperOS 4.</string>
+    <string name="glass_blur_on">Live glas achter het open eiland: beschikbaar op deze telefoon.</string>
+    <string name="glass_blur_off">Live glas achter het open eiland: deze telefoon staat vensterwaas nu niet toe (batterijbesparing, ontwikkelaarsopties of uitgeschakeld door de fabrikant). De kaart blijft zwart.</string>
 </resources>

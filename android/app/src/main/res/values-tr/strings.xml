@@ -502,4 +502,6 @@
     <string name="live_chip_button">Son uygulama için Android çipini gizle</string>
     <string name="feature_glass">Sıvı cam kontroller</string>
     <string name="feature_glass_note">Açık adadaki düğmeler ve çubuklar dokunduğunuzda cama dönüşür, HyperOS 4\'teki gibi.</string>
+    <string name="glass_blur_on">Açık adanın arkasında canlı cam: bu telefonda kullanılabilir.</string>
+    <string name="glass_blur_off">Açık adanın arkasında canlı cam: bu telefon şu anda pencere bulanıklığına izin vermiyor (pil tasarrufu, geliştirici seçenekleri veya üretici tarafından kapatılmış). Kart siyah kalır.</string>
 </resources>

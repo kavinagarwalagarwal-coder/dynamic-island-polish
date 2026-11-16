@@ -502,4 +502,6 @@
     <string name="live_chip_button">Ocultar o chip do Android para o último app</string>
     <string name="feature_glass">Controles de vidro líquido</string>
     <string name="feature_glass_note">Botões e barras da ilha aberta viram vidro quando você toca, como no HyperOS 4.</string>
+    <string name="glass_blur_on">Vidro ao vivo atrás da ilha aberta: disponível neste telefone.</string>
+    <string name="glass_blur_off">Vidro ao vivo atrás da ilha aberta: este telefone não permite desfoque de janelas agora (economia de bateria, opções do desenvolvedor ou desativado pelo fabricante). O cartão fica preto.</string>
 </resources>
