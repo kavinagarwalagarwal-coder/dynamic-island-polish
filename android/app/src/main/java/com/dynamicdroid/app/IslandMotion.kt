@@ -30,6 +30,11 @@ object IslandMotion {
     const val APPLE_OPEN_BOUNCE = 0.2f
     const val APPLE_CLOSE_BOUNCE = 0.08f
     const val AXIS_LAG = 1.14f
+    // HyperOS's Super Island is livelier than Apple's: a quicker open with a clear bounce
+    // ("physics-based liquid animations"), and a close that still lands with a small rebound.
+    const val HYPER_DURATION = 0.46f
+    const val HYPER_OPEN_BOUNCE = 0.3f
+    const val HYPER_CLOSE_BOUNCE = 0.14f
     const val CONTENT_IN_K = 140f
     const val CONTENT_OUT_K = 380f
     const val IDLE_SIDE_MARGIN_DP = 2f

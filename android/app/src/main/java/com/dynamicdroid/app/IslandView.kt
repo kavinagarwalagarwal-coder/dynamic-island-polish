@@ -129,7 +129,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     // ---------------------------------------------------------------- look (Apple / Nothing)
 
-    private val apple get() = features.look == IslandLook.APPLE
+    private val apple get() = features.look != IslandLook.NOTHING
+    /** HyperOS 4's Super Island: Soft Light Glass edges, touch light, music lighting. */
+    private val hyper get() = features.look == IslandLook.HYPER
     private val GREY: Int get() = if (apple) APPLE_GREY else NOTHING_GREY
     private val cMuted: Int get() = if (apple) APPLE_GREY else NothingStyle.muted
     private val cFg: Int get() = if (apple) Color.WHITE else NothingStyle.foreground
@@ -397,6 +399,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // Stiffer press so the squish lands on the finger's first frame.
     private val pressS = Spring(1f, 760f, 0.76f, 0.0008f)
     private val stretchS = Spring(0f, 360f, 0.78f, 0.5f)
+    /** Sideways drag: the island leans and stretches toward your finger, then springs back (Super Island). */
+    private val slideS = Spring(0f, 340f, 0.62f, 0.5f)
+    /** HyperOS touch light: brightens under your finger and follows the drag. */
+    private val touchLightS = Spring.apple(0f, .3f, 0f, .002f)
+    private var lightX = 0f
+    private var lightY = 0f
     private val absorbS = Spring(0f, 78f, 0.94f, 0.003f)
     private val appMorph = AppMorphGeometry()
     private var morphCard: Bitmap? = null
@@ -433,7 +441,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var glassY = -1f
     /** Which bar the bead rides: 1 song, 2 volume. */
     private var glassBar = 0
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA, glassPressS, dragGlassS)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA, glassPressS, dragGlassS, slideS, touchLightS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -970,14 +978,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val growing = spec.h > heightS.value + dp(2f)
         val shrinking = spec.h < heightS.value - dp(2f)
         if (!growing && !shrinking) return
-        if (features.motion == MotionStyle.APPLE) {
-            val d = IslandMotion.APPLE_DURATION * speed
+        if (features.motion == MotionStyle.APPLE || features.motion == MotionStyle.HYPER) {
+            val hyperMotion = features.motion == MotionStyle.HYPER
+            val d = (if (hyperMotion) IslandMotion.HYPER_DURATION else IslandMotion.APPLE_DURATION) * speed
             if (growing) {
-                val b = IslandMotion.APPLE_OPEN_BOUNCE
+                val b = if (hyperMotion) IslandMotion.HYPER_OPEN_BOUNCE else IslandMotion.APPLE_OPEN_BOUNCE
                 widthS.tune(d, b); centerS.tune(d, b / 2f); topS.tune(d, b / 2f)
                 heightS.tune(d * IslandMotion.AXIS_LAG, b * .8f); radiusS.tune(d * IslandMotion.AXIS_LAG, 0f)
             } else {
-                val b = IslandMotion.APPLE_CLOSE_BOUNCE
+                val b = if (hyperMotion) IslandMotion.HYPER_CLOSE_BOUNCE else IslandMotion.APPLE_CLOSE_BOUNCE
                 heightS.tune(d / IslandMotion.AXIS_LAG, b); radiusS.tune(d / IslandMotion.AXIS_LAG, 0f); topS.tune(d, 0f)
                 widthS.tune(d, b); centerS.tune(d, 0f)
             }
@@ -1000,6 +1009,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 IslandMotion.FLUID_RADIUS_DAMPING, IslandMotion.FLUID_CENTER_DAMPING)
             MotionStyle.BOUNCY -> listOf(0.55f, 0.6f, 0.7f, 0.72f)
             MotionStyle.SMOOTH -> listOf(1f, 1f, 1f, 1f)
+            MotionStyle.HYPER -> listOf(0.66f, 0.7f, 0.82f, 0.78f)
         }
         widthS.dampingRatio = wd
         heightS.dampingRatio = hd
@@ -1009,7 +1019,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     /** How much the shape squashes and its edges flow with its speed, per motion style. */
-    private fun squash() = when (features.motion) { MotionStyle.APPLE -> 0f; MotionStyle.LIQUID -> 1f; MotionStyle.BOUNCY -> 1.7f; MotionStyle.SMOOTH -> 0f }
+    private fun squash() = when (features.motion) {
+        MotionStyle.APPLE -> 0f; MotionStyle.LIQUID -> 1f; MotionStyle.BOUNCY -> 1.7f; MotionStyle.SMOOTH -> 0f
+        // A gentle jelly: it keeps its volume as it moves, without Liquid's wobble.
+        MotionStyle.HYPER -> .7f
+    }
 
     /** Pixel size the overlay window needs for the current target state. */
     fun windowSizeFor(next: LiveActivity?, p: Presentation): Pair<Int, Int> {
@@ -1400,7 +1414,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         h = max(dp(1f), h * (1f - 0.11f * flowX + 0.03f * flowY))
         w *= 1f - 0.05f * flowY + 0.015f * flowX
         val top = topS.value
-        rect.set(cx - w / 2f, top, cx + w / 2f, top + h)
+        // Dragged sideways it leans toward the finger and stretches a little, like a held drop.
+        val lean = slideS.value
+        w += abs(lean) * .45f
+        h = max(dp(1f), h - abs(lean) * .06f)
+        val cxl = cx + lean * .55f
+        rect.set(cxl - w / 2f, top, cxl + w / 2f, top + h)
         var r = min(radiusS.value * press, h / 2f)
         val absorb = absorbS.value.coerceIn(0f, 1f)
         if (isAbsorbing) {
@@ -1439,6 +1458,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         // shrinks, so a morph reads as liquid rather than a rubber rectangle.
         buildBody(body, rect, r, -flowX * dp(2.4f), -flowY * dp(3f))
         canvas.drawPath(body, shapePaint)
+        if (hyper && !isAbsorbing) drawSoftLight(canvas, r, bodyAlpha)
         if (a == null) { canvas.restore(); if (dimmed) canvas.restore(); if (layered) canvas.restore(); return }
         drawOutline(canvas, a, r, bodyAlpha)
 
@@ -2569,16 +2589,71 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         canvas.drawRect(rect, fillPaint)
     }
 
+    // Soft Light Glass edge: a hairline that is brighter along the top, like light on thick glass.
+    private val softRim = LinearGradient(0f, 0f, 0f, 1f, intArrayOf(0x4DFFFFFF, 0x14FFFFFF, 0x0AFFFFFF), floatArrayOf(0f, .45f, 1f), Shader.TileMode.CLAMP)
+    private val touchSpot = RadialGradient(0f, 0f, 1f, intArrayOf(0x2EFFFFFF, 0x10FFFFFF, 0x00FFFFFF), floatArrayOf(0f, .45f, 1f), Shader.TileMode.CLAMP)
+    private val touchRim = RadialGradient(0f, 0f, 1f, intArrayOf(0xCCFFFFFF.toInt(), 0x00FFFFFF), null, Shader.TileMode.CLAMP)
+    private val softPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val softRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+
+    /**
+     * HyperOS 4's Soft Light Glass on the island: a hairline edge that catches light (stronger
+     * while the island is moving, so light runs along it as it morphs), and "interactive lighting"
+     * that glows under your finger and follows the drag. The body stays pure black so the camera
+     * stays hidden; the open card alone gets the soft inner glow.
+     */
+    private fun drawSoftLight(canvas: Canvas, r: Float, alpha: Int) {
+        if (alpha < 8) return
+        val open = expandedA.value.coerceIn(0f, 1f)
+        val moving = if (reduceMotion) 0f else ((abs(widthS.speed) + abs(heightS.speed)) / dp(1400f)).coerceIn(0f, 1f)
+        val touch = touchLightS.value.coerceIn(0f, 1f)
+        val strength = (.35f + .65f * open) * (1f + 1.4f * moving)
+        val sw = dp(.9f)
+        matrix.setScale(1f, rect.height()); matrix.postTranslate(0f, rect.top)
+        softRim.setLocalMatrix(matrix)
+        softRimPaint.shader = softRim
+        softRimPaint.strokeWidth = sw
+        softRimPaint.alpha = (alpha * strength).toInt().coerceIn(0, 255)
+        canvas.drawPath(body, softRimPaint)
+        if (touch > .01f) {
+            // The edge nearest the finger lights up.
+            val reach = dp(90f)
+            matrix.setScale(reach, reach); matrix.postTranslate(lightX, lightY)
+            touchRim.setLocalMatrix(matrix)
+            softRimPaint.shader = touchRim
+            softRimPaint.strokeWidth = dp(1.4f)
+            softRimPaint.alpha = (alpha * touch).toInt().coerceIn(0, 255)
+            canvas.drawPath(body, softRimPaint)
+            // Inside the open card, a soft pool of light under the finger.
+            if (open > .05f) {
+                val pool = dp(120f)
+                matrix.setScale(pool, pool); matrix.postTranslate(lightX, lightY)
+                touchSpot.setLocalMatrix(matrix)
+                softPaint.shader = touchSpot
+                softPaint.alpha = (alpha * touch * open).toInt().coerceIn(0, 255)
+                canvas.save(); canvas.clipPath(body)
+                canvas.drawRect(rect, softPaint)
+                canvas.restore()
+            }
+        }
+        softRimPaint.shader = null
+        softPaint.shader = null
+    }
+
     /**
      * Soft halo: a few rings stepping outward and fading, so it costs no blur and looks the same on
      * every Android version. It brightens for a few seconds when something new arrives.
      */
     private fun drawGlow(canvas: Canvas, a: LiveActivity, r: Float, alpha: Int) {
-        if (!features.edgeGlow || isAbsorbing || alpha < 8) return
+        // HyperOS lights the island while music plays, in the song's colour, breathing gently.
+        val mediaLight = hyper && a.mode == IslandMode.MUSIC && a.isPlaying
+        if ((!features.edgeGlow && !mediaLight) || isAbsorbing || alpha < 8) return
         val base = ColorUtils.blendARGB(userAccent ?: a.accent.takeIf { ColorUtils.calculateLuminance(it) > .08 } ?: Color.WHITE,
             Color.WHITE, 0.3f)
         val now = SystemClock.uptimeMillis()
-        val flare = if (now < eventOutlineUntil) 1f + 0.7f * ((eventOutlineUntil - now) / OUTLINE_EVENT_MS.toFloat()) else 1f
+        val breathe = if (mediaLight && !features.edgeGlow && !reduceMotion)
+            .55f + .3f * sin((now % 2400L) / 2400f * 2f * PI.toFloat()) else 1f
+        val flare = (if (now < eventOutlineUntil) 1f + 0.7f * ((eventOutlineUntil - now) / OUTLINE_EVENT_MS.toFloat()) else 1f) * breathe
         // Many hairline rings with a smooth falloff read as one soft halo, not separate lines.
         val step = dp(GLOW_REACH_DP) / GLOW_STEPS
         haloPaint.strokeWidth = step * 1.25f
@@ -3525,6 +3600,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 torchDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.TORCH && !torchBar.isEmpty &&
                     e.y > torchBar.top - dp(14f)
                 if (torchDragging) { torchLive = torchFraction(e.x); invalidate() }
+                if (hyper && !reduceMotion) { lightX = e.x; lightY = e.y; touchLightS.target = 1f }
                 if (features.glassControls && presentation == Presentation.EXPANDED && !reduceMotion) {
                     glassX = e.x; glassY = e.y
                     glassPressS.target = 1f
@@ -3557,8 +3633,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     invalidate()
                 } else if (dragging) {
                     stretchS.snap(if (reduceMotion) 0f else rubber(dy))
+                    if (!reduceMotion && abs(dx) > abs(dy)) slideS.snap(rubber(dx) * .9f)
                     kick()
                 }
+                if (hyper) { lightX = e.x; lightY = e.y }
                 return true
             }
             MotionEvent.ACTION_UP -> {
@@ -3633,6 +3711,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         bubblePress.target = 1f
         glassPressS.target = 0f
         dragGlassS.target = 0f
+        slideS.target = 0f
+        touchLightS.target = 0f
         stretchS.target = 0f
         settled = false
         kick()

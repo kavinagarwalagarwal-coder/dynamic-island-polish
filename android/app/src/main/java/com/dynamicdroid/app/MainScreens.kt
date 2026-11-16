@@ -600,7 +600,8 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         Heading(stringResource(R.string.features_look))
         // Apple (Dynamic Island) or Nothing (the original monochrome, dot-matrix look).
         Label(stringResource(R.string.look_title))
-        Choices(listOf(IslandLook.APPLE to stringResource(R.string.look_apple), IslandLook.NOTHING to stringResource(R.string.look_nothing)),
+        Choices(listOf(IslandLook.HYPER to stringResource(R.string.look_hyper), IslandLook.APPLE to stringResource(R.string.look_apple),
+            IslandLook.NOTHING to stringResource(R.string.look_nothing)),
             f.look, horizontal = true) {
             IslandFeatures.setLook(this@FeaturesPage, it); applyFeaturesUpdate()
             showDemo(demoMusic(true), if (preview.presentation == Presentation.EXPANDED) Presentation.COMPACT else Presentation.EXPANDED)
@@ -619,7 +620,7 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_landscape, "landscape_see_through", f.landscapeSeeThrough, R.string.feature_landscape_note)
         Label(stringResource(R.string.feature_motion))
         Choices(listOf(MotionStyle.APPLE to stringResource(R.string.motion_apple), MotionStyle.LIQUID to stringResource(R.string.motion_liquid), MotionStyle.BOUNCY to stringResource(R.string.motion_bouncy),
-            MotionStyle.SMOOTH to stringResource(R.string.motion_smooth)), f.motion, horizontal = true) {
+            MotionStyle.SMOOTH to stringResource(R.string.motion_smooth), MotionStyle.HYPER to stringResource(R.string.look_hyper)), f.motion, horizontal = true) {
             IslandFeatures.setMotion(this@FeaturesPage, it); applyFeaturesUpdate()
             // Show the new motion straight away in the preview.
             showDemo(demoMusic(true), if (preview.presentation == Presentation.EXPANDED) Presentation.COMPACT else Presentation.EXPANDED)

@@ -9,13 +9,15 @@ enum class OutlineMode { OFF, EVENTS, ALWAYS }
  * How the island's shape moves: Apple's (default: one soft overshoot, no squash), liquid
  * (flows and squashes like a drop), bouncy like jelly, or smooth with no overshoot.
  */
-enum class MotionStyle { APPLE, LIQUID, BOUNCY, SMOOTH }
+enum class MotionStyle { APPLE, LIQUID, BOUNCY, SMOOTH, HYPER }
 
 /**
  * The island's overall look. APPLE follows Apple's Dynamic Island (SF-like semibold type, app
- * colours, plain black body); NOTHING is the original monochrome, monospace, dot-matrix look.
+ * colours, plain black body); NOTHING is the original monochrome, monospace, dot-matrix look;
+ * HYPER is Xiaomi HyperOS 4's Super Island on Apple's layout: Soft Light Glass edges that catch
+ * light, light that follows your finger, music lighting, bouncier physics and liquid glass controls.
  */
-enum class IslandLook { APPLE, NOTHING }
+enum class IslandLook { APPLE, NOTHING, HYPER }
 enum class HapticGesture { TAP, HOLD, SWIPE, UP }
 
 /**
@@ -81,8 +83,8 @@ data class IslandFeatureSet(
     val landscapeSeeThrough: Boolean = true,
     /** Content fades to black around the camera hole, so nothing sits behind it. */
     val cameraFade: Boolean = true,
-    val motion: MotionStyle = MotionStyle.APPLE,
-    val look: IslandLook = IslandLook.APPLE,
+    val motion: MotionStyle = MotionStyle.HYPER,
+    val look: IslandLook = IslandLook.HYPER,
     // Short notices for system events, each on its own switch.
     val eventUnplugged: Boolean = true,
     val eventLowBattery: Boolean = true,
@@ -222,14 +224,19 @@ object IslandFeatures {
      * Apple's spring. Nothing: dot-matrix music, blurred art behind it, liquid motion.
      */
     fun setLook(context: Context, look: IslandLook) {
-        val apple = look == IslandLook.APPLE
+        val apple = look != IslandLook.NOTHING
         p(context).edit()
             .putString("look", look.name)
             .putBoolean("dot_music", !apple)
             .putBoolean("artwork_backdrop", !apple)
             .putBoolean("idle_pill", apple)
             .putBoolean("edge_glow", false)
-            .putString("motion", (if (apple) MotionStyle.APPLE else MotionStyle.LIQUID).name)
+            .putBoolean("glass_controls", look == IslandLook.HYPER || p(context).getBoolean("glass_controls", true))
+            .putString("motion", when (look) {
+                IslandLook.APPLE -> MotionStyle.APPLE
+                IslandLook.HYPER -> MotionStyle.HYPER
+                IslandLook.NOTHING -> MotionStyle.LIQUID
+            }.name)
             .apply()
     }
 
