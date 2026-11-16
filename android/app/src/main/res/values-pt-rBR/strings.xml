@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND precisa de 30 corridas em 47 bolas</string>
     <string name="live_last_seen">Última notificação de placar:</string>
     <string name="live_none">Nenhuma ainda. Ative o placar ao vivo ou fixado no seu app de críquete.</string>
+    <string name="feature_pixel_scenes">Cenas em pixels</string>
+    <string name="feature_pixel_scenes_note">O volume é um carro andando por uma rua de pixels, um download é um foguete rumo a um planeta e o carregamento, uma bateria de pixels com uma faísca.</string>
 </resources>

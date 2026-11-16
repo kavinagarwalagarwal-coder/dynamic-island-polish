@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND braucht 30 Runs aus 47 Bällen</string>
     <string name="live_last_seen">Letzte Ergebnis-Benachrichtigung:</string>
     <string name="live_none">Noch keine. Schalte in deiner Cricket-App den Live- oder angehefteten Spielstand ein.</string>
+    <string name="feature_pixel_scenes">Pixel-Szenen</string>
+    <string name="feature_pixel_scenes_note">Lautstärke ist ein Auto, das eine Pixelstraße entlangfährt, ein Download eine Rakete auf dem Weg zu einem Planeten, Laden ein Pixel-Akku mit wandernden Funken.</string>
 </resources>

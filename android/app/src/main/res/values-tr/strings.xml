@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND\'nin 47 topta 30 sayıya ihtiyacı var</string>
     <string name="live_last_seen">Son skor bildirimi:</string>
     <string name="live_none">Henüz yok. Kriket uygulamanızda canlı veya sabitlenmiş skoru açın.</string>
+    <string name="feature_pixel_scenes">Piksel sahneler</string>
+    <string name="feature_pixel_scenes_note">Ses, piksel bir sokakta giden bir araba; indirme, bir gezegene uçan bir roket; şarj ise içinde kıvılcım dolaşan piksel bir pil olur.</string>
 </resources>

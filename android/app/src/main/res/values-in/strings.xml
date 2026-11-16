@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND butuh 30 run dari 47 bola</string>
     <string name="live_last_seen">Notifikasi skor terakhir:</string>
     <string name="live_none">Belum ada. Aktifkan skor langsung atau skor yang disematkan di aplikasi kriket Anda.</string>
+    <string name="feature_pixel_scenes">Adegan piksel</string>
+    <string name="feature_pixel_scenes_note">Volume jadi mobil yang melaju di jalan piksel, unduhan jadi roket menuju planet, dan pengisian daya jadi baterai piksel dengan percikan.</string>
 </resources>

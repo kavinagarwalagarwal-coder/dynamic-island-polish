@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND ha bisogno di 30 punti in 47 palle</string>
     <string name="live_last_seen">Ultima notifica del punteggio:</string>
     <string name="live_none">Ancora nessuna. Attiva il punteggio live o fissato nella tua app di cricket.</string>
+    <string name="feature_pixel_scenes">Scene in pixel</string>
+    <string name="feature_pixel_scenes_note">Il volume è un\'auto che percorre una strada in pixel, un download un razzo verso un pianeta, la ricarica una batteria in pixel con una scintilla.</string>
 </resources>

@@ -54,6 +54,8 @@ data class IslandFeatureSet(
     /** A soft halo around the pill's edge so it stands out. */
     val edgeGlow: Boolean = false,
     val burnInCare: Boolean = false,
+    /** Playful pixel scenes for levels: a car driving for volume, a rocket for downloads, a pixel battery. */
+    val pixelScenes: Boolean = true,
     val lockScreen: Boolean = false,
     val hapticTap: Boolean = true,
     val hapticHold: Boolean = true,
@@ -168,6 +170,7 @@ object IslandFeatures {
                 .getOrDefault(d.outline),
             edgeGlow = p.getBoolean("edge_glow", d.edgeGlow),
             burnInCare = p.getBoolean("burn_in", d.burnInCare),
+            pixelScenes = p.getBoolean("pixel_scenes", d.pixelScenes),
             lockScreen = p.getBoolean("lock_screen", d.lockScreen),
             hapticTap = p.getBoolean("haptic_tap", d.hapticTap),
             hapticHold = p.getBoolean("haptic_hold", d.hapticHold),

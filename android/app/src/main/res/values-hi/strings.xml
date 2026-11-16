@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND को 47 गेंदों में 30 रन चाहिए</string>
     <string name="live_last_seen">पिछला स्कोर नोटिफ़िकेशन:</string>
     <string name="live_none">अभी तक कोई नहीं। अपने क्रिकेट ऐप में लाइव या पिन किया गया स्कोर चालू करें।</string>
+    <string name="feature_pixel_scenes">पिक्सेल दृश्य</string>
+    <string name="feature_pixel_scenes_note">वॉल्यूम एक पिक्सेल सड़क पर चलती कार है, डाउनलोड ग्रह की ओर जाता रॉकेट, और चार्जिंग एक पिक्सेल बैटरी जिसमें चिंगारी दौड़ती है।</string>
 </resources>

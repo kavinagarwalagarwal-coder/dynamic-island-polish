@@ -1106,8 +1106,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             IslandMode.ALARM -> Spec(w, dp(88f), cardRadius(dp(44f)), screenCenter())
             IslandMode.DOWNLOAD -> Spec(w, dp(100f), cardRadius(dp(40f)), screenCenter())
             IslandMode.VOLUME -> {
-                val h = dp(VOLUME_HEIGHT_DP) + if (a.ringer != null) dp(RINGER_ROW_DP) else 0f
-                Spec(openWidth(dp(VOLUME_WIDTH_DP)), h, min(h / 2f, dp(VOLUME_HEIGHT_DP) / 2f), openCenter())
+                val h = volumeHeight() + if (a.ringer != null) dp(RINGER_ROW_DP) else 0f
+                Spec(openWidth(dp(VOLUME_WIDTH_DP)), h, min(h / 2f, volumeHeight() / 2f), openCenter())
             }
             IslandMode.DEVICE, IslandMode.EVENT -> {
                 val h = mediumRowHeight()
@@ -1225,6 +1225,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             // A tap's ripple (or a burst between songs) finishes even while paused.
             usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling || fieldFading) -> 16L
             a.mode == IslandMode.CALL -> 50L
+            // Pixel scenes tick at a retro 15 fps while their card is open.
+            features.pixelScenes && !reduceMotion && presentation == Presentation.EXPANDED &&
+                (a.mode == IslandMode.VOLUME || a.mode == IslandMode.DOWNLOAD || a.mode == IslandMode.CHARGING) -> 66L
             a.mode == IslandMode.ALARM -> 33L
             a.clockBaseElapsed != null && a.pausedTimerMs == null -> {
                 val ms = a.clockMs() ?: return null
@@ -2128,13 +2131,19 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         // Battery pill
         val bw = dp(34f)
         val bh = dp(16f)
-        val bl = rr - bw
-        fillPaint.color = withAlpha(Color.WHITE, alpha * 60 / 255)
-        canvas.drawRoundRect(bl, cy - bh / 2, rr, cy + bh / 2, dp(5f), dp(5f), fillPaint)
+        var bl = rr - bw
         val level = a.title.filter { it.isDigit() }.toIntOrNull()?.coerceIn(0, 100) ?: 50
         val levelColor = if (!apple) cMuted else if (level <= 20) APPLE_RED else AppStyle.GREEN
-        fillPaint.color = withAlpha(levelColor, alpha)
-        canvas.drawRoundRect(bl + dp(2f), cy - bh / 2 + dp(2f), bl + dp(2f) + (bw - dp(4f)) * level / 100f, cy + bh / 2 - dp(2f), dp(3.5f), dp(3.5f), fillPaint)
+        if (features.pixelScenes && !reduceMotion) {
+            // A pixel battery filling column by column, with a spark running through the charge.
+            bl = pixels.battery(canvas, rr, cy, dp(16f), level, SystemClock.uptimeMillis(),
+                if (level <= 20) APPLE_RED else AppStyle.GREEN, alpha)
+        } else {
+            fillPaint.color = withAlpha(Color.WHITE, alpha * 60 / 255)
+            canvas.drawRoundRect(bl, cy - bh / 2, rr, cy + bh / 2, dp(5f), dp(5f), fillPaint)
+            fillPaint.color = withAlpha(levelColor, alpha)
+            canvas.drawRoundRect(bl + dp(2f), cy - bh / 2 + dp(2f), bl + dp(2f) + (bw - dp(4f)) * level / 100f, cy + bh / 2 - dp(2f), dp(3.5f), dp(3.5f), fillPaint)
+        }
         rolling(canvas, "charging", a.title, bl - dp(10f), cy + dp(6f), titlePaint, levelColor, alpha, alignRight = true)
     }
 
@@ -2163,9 +2172,19 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         volumeRight = rect.right - dp(18f)
         val pulse = barPulse.value.coerceIn(0f, 1f)
         val thick = dp(4f) + (if (volumeDragging) dp(3f) else dp(2f) * pulse)
-        drawBar(canvas, volumeLeft, volumeRight, rect.top + dp(VOLUME_HEIGHT_DP) - dp(14f), level, userAccent ?: waveColor, alpha, thick)
+        if (features.pixelScenes && !reduceMotion) {
+            // A car drives down a pixel street: where it is is the volume.
+            val sceneH = dp(24f)
+            pixels.drive(canvas, volumeLeft, volumeRight, rect.top + volumeHeight() - dp(6f) - sceneH / 2f, sceneH, level,
+                (levelS.speed / 3f).coerceIn(-1f, 1f), SystemClock.uptimeMillis(), PixelScenes.accentFor(userAccent ?: a.accent), alpha)
+        } else drawBar(canvas, volumeLeft, volumeRight, rect.top + volumeHeight() - dp(14f), level, userAccent ?: waveColor, alpha, thick)
         if (a.ringer != null) drawRingerControls(canvas, a, alpha)
     }
+
+    /** The volume card grows a little to fit the street when pixel scenes are on. */
+    private fun volumeHeight() = dp(VOLUME_HEIGHT_DP) + if (features.pixelScenes) dp(VOLUME_SCENE_EXTRA_DP) else 0f
+
+    private val pixels by lazy { PixelScenes(density) }
 
     private fun ringerIndex(state: RingerState?) = when (state) {
         RingerState.RING -> 0f; RingerState.VIBRATE -> 1f; RingerState.SILENT -> 2f; else -> null
@@ -2183,7 +2202,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
      */
     private fun drawRingerControls(canvas: Canvas, a: LiveActivity, alpha: Int) {
         val current = a.ringer ?: return
-        val top = rect.top + dp(VOLUME_HEIGHT_DP) + dp(2f)
+        val top = rect.top + volumeHeight() + dp(2f)
         val h = dp(40f)
         val gap = dp(8f)
         val l = rect.left + dp(14f)
@@ -2648,7 +2667,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val textRight = percentLeft - dp(12f)
         fadeText(canvas, a, 0, a.title, tx, top + dp(16f), textRight - tx, titlePaint, Color.WHITE, alpha)
         fadeText(canvas, a, 1, a.subtitle.ifBlank { a.appLabel }, tx, top + dp(35f), rr - tx, bodyPaint, GREY, alpha)
-        drawBar(canvas, l, rr, rect.bottom - dp(20f), levelS.value, userAccent ?: waveColor, late)
+        if (features.pixelScenes && !reduceMotion)
+            pixels.launch(canvas, l, rr, rect.bottom - dp(19f), dp(18f), levelS.value, SystemClock.uptimeMillis(),
+                PixelScenes.accentFor(userAccent ?: a.accent), late)
+        else drawBar(canvas, l, rr, rect.bottom - dp(20f), levelS.value, userAccent ?: waveColor, late)
     }
 
     /** Ringing alarm: Snooze and Dismiss come from the clock app's own notification buttons. */
@@ -3373,7 +3395,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 if (a != null && usesDots(a) && !reduceMotion && !touchingSecondary) { cardDots.ripple(0.9f, e.x, e.y); kick() }
                 // Only the slider row drags; the ringer buttons below it are taps.
                 volumeDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.VOLUME &&
-                    e.y < rect.top + dp(VOLUME_HEIGHT_DP) + dp(2f)
+                    e.y < rect.top + volumeHeight() + dp(2f)
                 if (volumeDragging) setVolumeFromTouch(e.x)
                 torchDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.TORCH && !torchBar.isEmpty &&
                     e.y > torchBar.top - dp(14f)
@@ -3696,6 +3718,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val MEDIUM_TEXT_BLOCK_DP = 44f
         private const val VOLUME_WIDTH_DP = 300f
         private const val VOLUME_HEIGHT_DP = 54f
+        private const val VOLUME_SCENE_EXTRA_DP = 14f
         private val ALARM = Color.rgb(255, 184, 28)
     }
 }

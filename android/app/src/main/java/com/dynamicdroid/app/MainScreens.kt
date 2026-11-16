@@ -552,6 +552,7 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_home_card, "home_card", f.homeCard, R.string.feature_home_card_note)
         toggle(R.string.feature_swipe_tracks, "swipe_tracks", f.swipeTracks, R.string.feature_swipe_tracks_note)
         toggle(R.string.feature_app_morph, "app_morph", f.appMorph, R.string.feature_app_morph_note)
+        toggle(R.string.feature_pixel_scenes, "pixel_scenes", f.pixelScenes, R.string.feature_pixel_scenes_note)
     }
     Column(flow.next()) {
         Heading(stringResource(R.string.features_events))

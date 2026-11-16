@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND нужно 30 ранов с 47 мячей</string>
     <string name="live_last_seen">Последнее уведомление о счёте:</string>
     <string name="live_none">Пока нет. Включите живой или закреплённый счёт в приложении о крикете.</string>
+    <string name="feature_pixel_scenes">Пиксельные сцены</string>
+    <string name="feature_pixel_scenes_note">Громкость — машина, едущая по пиксельной улице, загрузка — ракета, летящая к планете, зарядка — пиксельная батарейка с бегущей искрой.</string>
 </resources>

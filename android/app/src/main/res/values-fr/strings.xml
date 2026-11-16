@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND a besoin de 30 points en 47 balles</string>
     <string name="live_last_seen">Dernière notification de score :</string>
     <string name="live_none">Aucune pour l\'instant. Active le score en direct ou épinglé dans ton app de cricket.</string>
+    <string name="feature_pixel_scenes">Scènes en pixels</string>
+    <string name="feature_pixel_scenes_note">Le volume est une voiture qui roule dans une rue en pixels, un téléchargement une fusée vers une planète, la charge une batterie en pixels traversée d\'une étincelle.</string>
 </resources>

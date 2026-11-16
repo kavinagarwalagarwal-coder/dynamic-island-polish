@@ -509,4 +509,6 @@
     <string name="demo_score_text">IND need 30 runs from 47 balls</string>
     <string name="live_last_seen">Last score notification:</string>
     <string name="live_none">None yet. Turn on the live or pinned score in your cricket app.</string>
+    <string name="feature_pixel_scenes">Pixel scenes</string>
+    <string name="feature_pixel_scenes_note">Volume is a car driving down a pixel street, a download is a rocket flying to a planet, and charging is a pixel battery with a spark running through it.</string>
 </resources>

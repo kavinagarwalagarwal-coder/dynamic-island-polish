@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND heeft 30 runs nodig uit 47 ballen</string>
     <string name="live_last_seen">Laatste scoremelding:</string>
     <string name="live_none">Nog geen. Zet de live of vastgezette score aan in je cricketapp.</string>
+    <string name="feature_pixel_scenes">Pixelscènes</string>
+    <string name="feature_pixel_scenes_note">Volume is een auto die door een pixelstraat rijdt, een download een raket op weg naar een planeet, opladen een pixelbatterij met een vonk.</string>
 </resources>
