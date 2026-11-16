@@ -17,6 +17,15 @@ object LiveDiagnostics {
         if (prefs.getString("last", null) != value) prefs.edit().putString("last", value).apply()
     }
 
+    /** The last app whose notification Android itself promoted to a status-bar chip. */
+    fun recordPromoted(context: Context, packageName: String) {
+        val prefs = context.getSharedPreferences("live_signal", Context.MODE_PRIVATE)
+        if (prefs.getString("promoted", null) != packageName) prefs.edit().putString("promoted", packageName).apply()
+    }
+
+    fun promoted(context: Context): String? =
+        context.getSharedPreferences("live_signal", Context.MODE_PRIVATE).getString("promoted", null)
+
     fun read(context: Context): String = context.getSharedPreferences("live_signal", Context.MODE_PRIVATE)
         .getString("last", null) ?: context.getString(R.string.live_none)
 }

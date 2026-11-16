@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND は残り47球で30ラン必要</string>
     <string name="live_last_seen">最後のスコア通知:</string>
     <string name="live_none">まだありません。クリケットアプリでライブスコアまたはピン留めスコアをオンにしてください。</string>
+    <string name="live_chip_note">Android 16 はライブアップデートを時計の横にチップとしても表示し、アイランドと重複します。アイランドだけにするには、そのアプリのライブアップデート（ライブ情報を表示）をオフにしてください。アイランドには引き続き表示されます。</string>
+    <string name="live_chip_button">最後のアプリの Android チップを非表示</string>
 </resources>

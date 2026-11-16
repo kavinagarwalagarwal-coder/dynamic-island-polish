@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND heeft 30 runs nodig uit 47 ballen</string>
     <string name="live_last_seen">Laatste scoremelding:</string>
     <string name="live_none">Nog geen. Zet de live of vastgezette score aan in je cricketapp.</string>
+    <string name="live_chip_note">Android 16 toont live-updates ook als chip naast de klok, dubbel met het eiland. Wil je alleen het eiland, zet dan live-updates (Live-info tonen) uit voor die app. Het eiland blijft ze tonen.</string>
+    <string name="live_chip_button">Android-chip verbergen voor de laatste app</string>
 </resources>

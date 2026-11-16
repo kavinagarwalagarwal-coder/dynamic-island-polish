@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND\'nin 47 topta 30 sayıya ihtiyacı var</string>
     <string name="live_last_seen">Son skor bildirimi:</string>
     <string name="live_none">Henüz yok. Kriket uygulamanızda canlı veya sabitlenmiş skoru açın.</string>
+    <string name="live_chip_note">Android 16 canlı güncellemeleri saatin yanında bir çip olarak da gösterir ve adayı ikiler. Yalnızca adanın kalması için o uygulamada canlı güncellemeleri (Canlı bilgileri göster) kapatın. Ada göstermeye devam eder.</string>
+    <string name="live_chip_button">Son uygulama için Android çipini gizle</string>
 </resources>

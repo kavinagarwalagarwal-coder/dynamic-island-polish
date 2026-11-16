@@ -509,4 +509,6 @@
     <string name="demo_score_text">IND need 30 runs from 47 balls</string>
     <string name="live_last_seen">Last score notification:</string>
     <string name="live_none">None yet. Turn on the live or pinned score in your cricket app.</string>
+    <string name="live_chip_note">Android 16 also shows live updates as a chip by the clock, doubling the island. To keep only the island, turn off live updates (Show live info) for that app. The island keeps showing it.</string>
+    <string name="live_chip_button">Hide Android\'s chip for the last app</string>
 </resources>

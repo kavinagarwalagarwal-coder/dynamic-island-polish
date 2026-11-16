@@ -537,6 +537,18 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_show_navigation, "show_navigation", f.navigation)
         toggle(R.string.feature_live, "show_live", f.liveUpdates, R.string.feature_live_note)
         Note(stringResource(R.string.live_last_seen) + " " + remember { LiveDiagnostics.read(this@FeaturesPage) }, size = 13)
+        if (android.os.Build.VERSION.SDK_INT >= 36) {
+            // Android 16 shows its own chip by the clock for live updates, doubling the island.
+            // Apps can't remove it, but the user can turn it off per app in one switch.
+            val promoted = remember { LiveDiagnostics.promoted(this@FeaturesPage) }
+            Note(stringResource(R.string.live_chip_note), size = 13)
+            ActionButton(stringResource(R.string.live_chip_button)) {
+                val intent = if (promoted != null) Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, promoted)
+                else Intent(android.provider.Settings.ACTION_SETTINGS)
+                runCatching { startActivity(intent) }.onFailure { runCatching { startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) } }
+            }
+        }
         toggle(R.string.feature_recording, "show_recording", f.recording, R.string.feature_recording_note)
         Note(stringResource(R.string.feature_tuck_note), size = 14)
         toggle(R.string.feature_show_charging, "show_charging", f.charging)

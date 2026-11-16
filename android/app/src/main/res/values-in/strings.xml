@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND butuh 30 run dari 47 bola</string>
     <string name="live_last_seen">Notifikasi skor terakhir:</string>
     <string name="live_none">Belum ada. Aktifkan skor langsung atau skor yang disematkan di aplikasi kriket Anda.</string>
+    <string name="live_chip_note">Android 16 juga menampilkan pembaruan langsung sebagai chip di dekat jam, menggandakan pulau. Agar hanya pulau yang tampil, matikan pembaruan langsung (Tampilkan info langsung) untuk aplikasi itu. Pulau tetap menampilkannya.</string>
+    <string name="live_chip_button">Sembunyikan chip Android untuk aplikasi terakhir</string>
 </resources>

@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND braucht 30 Runs aus 47 Bällen</string>
     <string name="live_last_seen">Letzte Ergebnis-Benachrichtigung:</string>
     <string name="live_none">Noch keine. Schalte in deiner Cricket-App den Live- oder angehefteten Spielstand ein.</string>
+    <string name="live_chip_note">Android 16 zeigt Live-Updates zusätzlich als Chip neben der Uhr, doppelt zur Insel. Damit nur die Insel bleibt, schalte für diese App Live-Updates (Live-Infos anzeigen) aus. Die Insel zeigt sie weiter.</string>
+    <string name="live_chip_button">Android-Chip für die letzte App ausblenden</string>
 </resources>

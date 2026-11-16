@@ -498,4 +498,6 @@
     <string name="demo_score_text">IND precisa de 30 corridas em 47 bolas</string>
     <string name="live_last_seen">Última notificação de placar:</string>
     <string name="live_none">Nenhuma ainda. Ative o placar ao vivo ou fixado no seu app de críquete.</string>
+    <string name="live_chip_note">O Android 16 também mostra atualizações ao vivo como um chip ao lado do relógio, duplicando a ilha. Para deixar só a ilha, desative as atualizações ao vivo (Mostrar info ao vivo) desse app. A ilha continua mostrando.</string>
+    <string name="live_chip_button">Ocultar o chip do Android para o último app</string>
 </resources>
