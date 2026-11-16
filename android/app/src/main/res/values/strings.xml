@@ -511,4 +511,6 @@
     <string name="live_none">None yet. Turn on the live or pinned score in your cricket app.</string>
     <string name="live_chip_note">Android 16 also shows live updates as a chip by the clock, doubling the island. To keep only the island, turn off live updates (Show live info) for that app. The island keeps showing it.</string>
     <string name="live_chip_button">Hide Android\'s chip for the last app</string>
+    <string name="feature_glass">Liquid glass controls</string>
+    <string name="feature_glass_note">Buttons and bars in the open island turn to glass when you touch them, like HyperOS 4.</string>
 </resources>

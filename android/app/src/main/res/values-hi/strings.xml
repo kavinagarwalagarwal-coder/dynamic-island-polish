@@ -500,4 +500,6 @@
     <string name="live_none">अभी तक कोई नहीं। अपने क्रिकेट ऐप में लाइव या पिन किया गया स्कोर चालू करें।</string>
     <string name="live_chip_note">Android 16 लाइव अपडेट को घड़ी के पास एक चिप के रूप में भी दिखाता है, जिससे आइलैंड दोहरा हो जाता है। सिर्फ़ आइलैंड रखने के लिए उस ऐप के लाइव अपडेट (लाइव जानकारी दिखाएँ) बंद करें। आइलैंड उन्हें दिखाता रहेगा।</string>
     <string name="live_chip_button">पिछले ऐप के लिए Android की चिप छिपाएँ</string>
+    <string name="feature_glass">लिक्विड ग्लास कंट्रोल</string>
+    <string name="feature_glass_note">खुले आइलैंड के बटन और बार छूने पर कांच जैसे बन जाते हैं, HyperOS 4 की तरह।</string>
 </resources>

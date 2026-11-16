@@ -500,4 +500,6 @@
     <string name="live_none">Belum ada. Aktifkan skor langsung atau skor yang disematkan di aplikasi kriket Anda.</string>
     <string name="live_chip_note">Android 16 juga menampilkan pembaruan langsung sebagai chip di dekat jam, menggandakan pulau. Agar hanya pulau yang tampil, matikan pembaruan langsung (Tampilkan info langsung) untuk aplikasi itu. Pulau tetap menampilkannya.</string>
     <string name="live_chip_button">Sembunyikan chip Android untuk aplikasi terakhir</string>
+    <string name="feature_glass">Kontrol kaca cair</string>
+    <string name="feature_glass_note">Tombol dan bilah di pulau yang terbuka berubah menjadi kaca saat disentuh, seperti HyperOS 4.</string>
 </resources>

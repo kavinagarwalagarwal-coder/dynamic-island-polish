@@ -500,4 +500,6 @@
     <string name="live_none">Ancora nessuna. Attiva il punteggio live o fissato nella tua app di cricket.</string>
     <string name="live_chip_note">Android 16 mostra gli aggiornamenti live anche come chip vicino all\'orologio, doppione dell\'isola. Per tenere solo l\'isola, disattiva gli aggiornamenti live (Mostra info live) per quell\'app. L\'isola continua a mostrarli.</string>
     <string name="live_chip_button">Nascondi il chip di Android per l\'ultima app</string>
+    <string name="feature_glass">Controlli in vetro liquido</string>
+    <string name="feature_glass_note">Pulsanti e barre dell\'isola aperta diventano vetro quando li tocchi, come in HyperOS 4.</string>
 </resources>

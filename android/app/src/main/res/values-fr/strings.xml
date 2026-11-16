@@ -500,4 +500,6 @@
     <string name="live_none">Aucune pour l\'instant. Active le score en direct ou épinglé dans ton app de cricket.</string>
     <string name="live_chip_note">Android 16 affiche aussi les mises à jour en direct sous forme de puce près de l\'horloge, en double de l\'île. Pour ne garder que l\'île, désactive les mises à jour en direct (Afficher les infos en direct) pour cette app. L\'île continue de les afficher.</string>
     <string name="live_chip_button">Masquer la puce Android pour la dernière app</string>
+    <string name="feature_glass">Commandes en verre liquide</string>
+    <string name="feature_glass_note">Les boutons et barres de l\'île ouverte deviennent du verre quand vous les touchez, comme sur HyperOS 4.</string>
 </resources>

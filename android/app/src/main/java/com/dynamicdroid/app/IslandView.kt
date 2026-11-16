@@ -426,7 +426,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
     private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA)
+    /** Liquid glass (HyperOS 4): a touched control swells into a glass lens, and a dragged bar grows a glass bead. */
+    private val glassPressS = Spring.apple(0f, .34f, .22f, .002f)
+    private val dragGlassS = Spring.apple(0f, .34f, .22f, .002f)
+    private var glassX = -1f
+    private var glassY = -1f
+    /** Which bar the bead rides: 1 song, 2 volume. */
+    private var glassBar = 0
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA, glassPressS, dragGlassS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -1949,12 +1956,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             if (seeking || abs(musicBarS.value - fraction) < .004f || reduceMotion) musicBarS.snap(fraction)
             else { musicBarS.target = fraction; kick() }
             drawBar(canvas, barLeft, barRight, barY, musicBarS.value, userAccent ?: if (apple) Color.WHITE else waveColor, late,
-                if (seeking) dp(7f) else dp(4f))
+                if (seeking) dp(7f) else dp(4f), if (glassBar == 1) dragGlassS.value else 0f)
         }
 
         // Controls
         val cy = rect.top + dp(146f)
         val cx = rect.centerX()
+        // A pressed control blooms a glass droplet behind it.
+        if (features.glassControls) for (x in floatArrayOf(cx - dp(72f), cx, cx + dp(72f))) {
+            val r = dp(26f)
+            val lift = glassLift(x - r, cy - r, x + r, cy + r)
+            if (lift > .02f) drawGlass(canvas, x - r * lift, cy - r * lift, x + r * lift, cy + r * lift, lift, late)
+        }
         if (showsMediaAction(IslandBus.MEDIA_PREVIOUS))
             drawSkip(canvas, cx - dp(72f), cy, false, late)
         if (showsMediaAction(IslandBus.MEDIA_TOGGLE))
@@ -2218,7 +2231,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         volumeRight = rect.right - dp(18f)
         val pulse = barPulse.value.coerceIn(0f, 1f)
         val thick = dp(4f) + (if (volumeDragging) dp(3f) else dp(2f) * pulse)
-        drawBar(canvas, volumeLeft, volumeRight, rect.top + dp(VOLUME_HEIGHT_DP) - dp(14f), level, userAccent ?: waveColor, alpha, thick)
+        drawBar(canvas, volumeLeft, volumeRight, rect.top + dp(VOLUME_HEIGHT_DP) - dp(14f), level, userAccent ?: waveColor, alpha, thick,
+            if (glassBar == 2) dragGlassS.value else 0f)
         if (a.ringer != null) drawRingerControls(canvas, a, alpha)
     }
 
@@ -3005,8 +3019,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         var first = 0
         if (reply != null) {
             // The reply pill is filled white so it reads as the main action.
-            fillPaint.color = withAlpha(cFg, alpha)
-            canvas.drawRoundRect(l, t, l + w, t + h, h / 2, h / 2, fillPaint)
+            if (features.glassControls) drawGlass(canvas, l, t, l + w, t + h, glassLift(l, t, l + w, t + h), alpha, solid = cFg)
+            else {
+                fillPaint.color = withAlpha(cFg, alpha)
+                canvas.drawRoundRect(l, t, l + w, t + h, h / 2, h / 2, fillPaint)
+            }
             smallPaint.textAlign = Paint.Align.CENTER
             text(canvas, reply.label, l + w / 2, t + h / 2 + dp(4.5f), w - dp(16f), smallPaint, NothingStyle.background, alpha, center = true)
             smallPaint.textAlign = Paint.Align.LEFT
@@ -3016,8 +3033,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         actions.forEachIndexed { index, action ->
             val i = index + first
             val x = l + i * (w + gap)
-            fillPaint.color = withAlpha(cFg, alpha * 60 / 255)
-            canvas.drawRoundRect(x, t, x + w, t + h, h / 2, h / 2, fillPaint)
+            if (features.glassControls) drawGlass(canvas, x, t, x + w, t + h, glassLift(x, t, x + w, t + h), alpha)
+            else {
+                fillPaint.color = withAlpha(cFg, alpha * 60 / 255)
+                canvas.drawRoundRect(x, t, x + w, t + h, h / 2, h / 2, fillPaint)
+            }
             smallPaint.textAlign = Paint.Align.CENTER
             text(canvas, action.label, x + w / 2, t + h / 2 + dp(4.5f), w - dp(16f), smallPaint, lighten(cFg), alpha, center = true)
             smallPaint.textAlign = Paint.Align.LEFT
@@ -3370,8 +3390,22 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     /** One quiet bar style for every level and progress on the island. */
-    private fun drawBar(canvas: Canvas, left: Float, right: Float, cy: Float, fraction: Float, color: Int, alpha: Int, thick: Float = dp(4f)) {
+    private fun drawBar(canvas: Canvas, left: Float, right: Float, cy: Float, fraction: Float, color: Int, alpha: Int, thick: Float = dp(4f),
+                        bead: Float = 0f) {
         if (right <= left) return
+        if (bead > .02f) {
+            // While dragged, a glass bead rides the end of the fill (drawn last, over the bar).
+            drawBarFill(canvas, left, right, cy, fraction, color, alpha, thick)
+            val x = left + (right - left) * fraction.coerceIn(0f, 1f)
+            val w = dp(30f) * bead
+            val h = dp(20f) * bead
+            drawGlass(canvas, x - w / 2, cy - h / 2, x + w / 2, cy + h / 2, 1f, alpha)
+            return
+        }
+        drawBarFill(canvas, left, right, cy, fraction, color, alpha, thick)
+    }
+
+    private fun drawBarFill(canvas: Canvas, left: Float, right: Float, cy: Float, fraction: Float, color: Int, alpha: Int, thick: Float) {
         fillPaint.color = withAlpha(cFg, alpha * 38 / 255)
         canvas.drawRoundRect(left, cy - thick / 2, right, cy + thick / 2, thick / 2, thick / 2, fillPaint)
         val f = fraction.coerceIn(0f, 1f)
@@ -3380,6 +3414,64 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val end = max(left + thick, left + (right - left) * f)
         fillPaint.color = withAlpha(color, alpha)
         canvas.drawRoundRect(left, cy - thick / 2, end, cy + thick / 2, thick / 2, thick / 2, fillPaint)
+    }
+
+    /** How far the control in this box is lifted into glass by the current (or fading) touch. */
+    private fun glassLift(l: Float, t: Float, r: Float, b: Float): Float {
+        val v = glassPressS.value
+        if (v < .01f || glassX < 0f) return 0f
+        val slack = dp(6f)
+        return if (glassX >= l - slack && glassX <= r + slack && glassY >= t - slack && glassY <= b + slack) v.coerceIn(0f, 1.2f) else 0f
+    }
+
+    // Unit gradients stretched per call with the shared matrix, so glass allocates nothing per frame.
+    private val glassBody = LinearGradient(0f, 0f, 0f, 1f, intArrayOf(0x3DFFFFFF, 0x12FFFFFF), null, Shader.TileMode.CLAMP)
+    private val glassRim = LinearGradient(0f, 0f, 1f, 1f, intArrayOf(0xE6FFFFFF.toInt(), 0x1AFFFFFF, 0x99FFFFFF.toInt()), null, Shader.TileMode.CLAMP)
+    private val glassShine = LinearGradient(0f, 0f, 0f, 1f, 0xA6FFFFFF.toInt(), 0x00FFFFFF, Shader.TileMode.CLAMP)
+    private val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val glassRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+
+    /**
+     * A liquid-glass pill or droplet: a faint body, a lit rim (bright top-left and bottom-right)
+     * and a specular streak, swelling a little and brightening as [lift] rises. With [solid] it is
+     * a filled bead (the main action) that clears toward glass while pressed.
+     */
+    private fun drawGlass(canvas: Canvas, l: Float, t: Float, r: Float, b: Float, lift: Float, alpha: Int, solid: Int? = null) {
+        val k = lift.coerceIn(0f, 1.2f)
+        val cxg = (l + r) / 2f
+        val cyg = (t + b) / 2f
+        val w = (r - l) * (1f + .06f * k)
+        val h = (b - t) * (1f + .1f * k)
+        if (w < 1f || h < 1f) return
+        val L = cxg - w / 2f
+        val T = cyg - h / 2f
+        val rad = h / 2f
+        if (solid != null) {
+            fillPaint.color = withAlpha(solid, (alpha * (1f - .45f * k.coerceAtMost(1f))).toInt())
+            canvas.drawRoundRect(L, T, L + w, T + h, rad, rad, fillPaint)
+        }
+        matrix.setScale(1f, h); matrix.postTranslate(L, T)
+        glassBody.setLocalMatrix(matrix)
+        glassPaint.shader = glassBody
+        glassPaint.alpha = (alpha * (.85f + .9f * k)).toInt().coerceIn(0, 255)
+        canvas.drawRoundRect(L, T, L + w, T + h, rad, rad, glassPaint)
+        val sw = dp(.8f + .7f * k)
+        matrix.setScale(w, h); matrix.postTranslate(L, T)
+        glassRim.setLocalMatrix(matrix)
+        glassRimPaint.shader = glassRim
+        glassRimPaint.strokeWidth = sw
+        glassRimPaint.alpha = (alpha * (.55f + .45f * k.coerceAtMost(1f))).toInt().coerceIn(0, 255)
+        canvas.drawRoundRect(L + sw / 2, T + sw / 2, L + w - sw / 2, T + h - sw / 2, rad - sw / 2, rad - sw / 2, glassRimPaint)
+        val hw = w * .6f
+        val hh = h * .26f
+        val ht = T + h * .1f
+        matrix.setScale(1f, hh); matrix.postTranslate(cxg - hw / 2f, ht)
+        glassShine.setLocalMatrix(matrix)
+        glassPaint.shader = glassShine
+        glassPaint.alpha = (alpha * (.35f + .55f * k.coerceAtMost(1f))).toInt().coerceIn(0, 255)
+        canvas.drawRoundRect(cxg - hw / 2f, ht, cxg + hw / 2f, ht + hh, hh / 2f, hh / 2f, glassPaint)
+        glassPaint.shader = null
+        glassRimPaint.shader = null
     }
 
     private fun withAlpha(color: Int, alpha: Int) = ColorUtils.setAlphaComponent(color, alpha.coerceIn(0, 255))
@@ -3433,6 +3525,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 torchDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.TORCH && !torchBar.isEmpty &&
                     e.y > torchBar.top - dp(14f)
                 if (torchDragging) { torchLive = torchFraction(e.x); invalidate() }
+                if (features.glassControls && presentation == Presentation.EXPANDED && !reduceMotion) {
+                    glassX = e.x; glassY = e.y
+                    glassPressS.target = 1f
+                    glassBar = if (seeking) 1 else if (volumeDragging) 2 else 0
+                    if (glassBar != 0) dragGlassS.target = 1f
+                }
                 if (touchingSecondary) bubblePress.target = if (reduceMotion) 1f else 0.94f
                 else pressS.target = if (reduceMotion) 1f else if (presentation == Presentation.EXPANDED) 0.985f else 0.96f
                 if (presentation == Presentation.COMPACT) postDelayed(longPress, LONG_PRESS_MS)
@@ -3533,6 +3631,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         removeCallbacks(longPress)
         pressS.target = 1f
         bubblePress.target = 1f
+        glassPressS.target = 0f
+        dragGlassS.target = 0f
         stretchS.target = 0f
         settled = false
         kick()

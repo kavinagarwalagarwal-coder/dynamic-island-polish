@@ -66,6 +66,30 @@ internal fun DrawScope.drawGlassBead(center: Offset, size: Size, lift: Float) {
 private fun mix(a: Float, b: Float, t: Float) = a + (b - a) * t
 
 /**
+ * A clear glass pill on a dark page (buttons, unselected chips): a faint body, a lit rim and a
+ * specular streak, all brightening as [lift] rises while it is touched.
+ */
+internal fun DrawScope.drawGlassPill(lift: Float, corner: Float) {
+    val l = lift.coerceIn(0f, 1f)
+    val r = CornerRadius(corner)
+    drawRoundRect(
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .10f + .10f * l), Color.White.copy(alpha = .03f + .05f * l))),
+        cornerRadius = r)
+    val stroke = mix(.8f, 1.3f, l).dp.toPx()
+    drawRoundRect(
+        Brush.linearGradient(listOf(Color.White.copy(alpha = .55f + .35f * l), Color.White.copy(alpha = .06f),
+            Color.White.copy(alpha = .30f + .30f * l)), start = Offset.Zero, end = Offset(size.width, size.height)),
+        topLeft = Offset(stroke / 2f, stroke / 2f), size = Size(size.width - stroke, size.height - stroke),
+        cornerRadius = CornerRadius(corner - stroke / 2f), style = Stroke(stroke))
+    val hw = size.width * .7f
+    val hh = size.height * .28f
+    val top = size.height * .08f
+    drawRoundRect(
+        Brush.verticalGradient(listOf(Color.White.copy(alpha = .10f + .22f * l), Color.Transparent), startY = top, endY = top + hh),
+        topLeft = Offset((size.width - hw) / 2f, top), size = Size(hw, hh), cornerRadius = CornerRadius(hh / 2f))
+}
+
+/**
  * The switch: the track fills with colour as the bead travels, the bead swells to glass while
  * the row is held and stretches with its speed. Purely visual: the row carries the semantics.
  */

@@ -500,4 +500,6 @@
     <string name="live_none">Ninguna todavía. Activa el marcador en directo o fijado en tu app de críquet.</string>
     <string name="live_chip_note">Android 16 también muestra las actualizaciones en directo como un chip junto al reloj, duplicando la isla. Para dejar solo la isla, desactiva las actualizaciones en directo (Mostrar info en directo) de esa app. La isla las sigue mostrando.</string>
     <string name="live_chip_button">Ocultar el chip de Android para la última app</string>
+    <string name="feature_glass">Controles de cristal líquido</string>
+    <string name="feature_glass_note">Los botones y barras de la isla abierta se vuelven cristal al tocarlos, como en HyperOS 4.</string>
 </resources>

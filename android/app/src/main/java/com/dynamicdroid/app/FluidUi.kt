@@ -152,10 +152,15 @@ fun SettingSwitch(title: String, checked: Boolean, note: String? = null, enabled
 @Composable
 fun ActionButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
+    val pressed by source.collectIsPressedAsState()
+    // Glass swells a touch under the finger (HyperOS 4), rather than sinking.
+    val lift = animateFloatAsState(if (pressed && enabled) 1f else 0f, if (pressed) Fluid.expand() else Fluid.collapse(), label = "glass")
     Box(
-        modifier.fillMaxWidth().padding(top = 10.dp).pressSpring(source, 0.975f)
+        modifier.fillMaxWidth().padding(top = 10.dp)
+            .graphicsLayer { val k = 1f + .025f * lift.value; scaleX = k; scaleY = k }
             .defaultMinSize(minHeight = 56.dp)
-            .background(Fluid.surface, Fluid.pill).border(BorderStroke(1.dp, Fluid.line), Fluid.pill)
+            .background(Fluid.surface, Fluid.pill)
+            .drawBehind { drawGlassPill(lift.value, 18.dp.toPx()) }
             .clickable(source, androidx.compose.material3.ripple(color = Fluid.foreground), enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center,
@@ -176,6 +181,8 @@ fun RowScope.Chip(text: String, selected: Boolean = false, description: String? 
     val fill = animateColorAsState(if (selected) Fluid.foreground else Fluid.surface, Fluid.liquid(), label = "chip")
     val ink by animateColorAsState(if (selected) Color.Black else Fluid.foreground, Fluid.liquid(), label = "chipInk")
     val pop = remember { Animatable(1f) }
+    val pressed by source.collectIsPressedAsState()
+    val lift = animateFloatAsState(if (pressed) 1f else 0f, if (pressed) Fluid.expand() else Fluid.collapse(), label = "chipGlass")
     LaunchedEffect(selected) {
         if (selected) { pop.snapTo(0.94f); pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 420f)) }
     }
@@ -185,13 +192,10 @@ fun RowScope.Chip(text: String, selected: Boolean = false, description: String? 
             .pressSpring(source)
             .defaultMinSize(minHeight = 52.dp)
             .drawBehind {
+                // The selected chip is a white bead; the others are clear glass. Both lift when touched.
                 val corner = androidx.compose.ui.geometry.CornerRadius(18.dp.toPx())
                 drawRoundRect(fill.value, cornerRadius = corner)
-                val stroke = 1.dp.toPx()
-                drawRoundRect(if (selected) fill.value else Fluid.line, topLeft = androidx.compose.ui.geometry.Offset(stroke / 2, stroke / 2),
-                    size = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke),
-                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(18.dp.toPx() - stroke / 2),
-                    style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
+                drawGlassPill(lift.value, 18.dp.toPx())
             }
             .clip(Fluid.pill)
             .selectable(selected, source, androidx.compose.material3.ripple(color = ink), role = Role.Tab, onClick = onClick)

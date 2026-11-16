@@ -500,4 +500,6 @@
     <string name="live_none">Jeszcze żadnego. Włącz wynik na żywo lub przypięty w aplikacji do krykieta.</string>
     <string name="live_chip_note">Android 16 pokazuje aktualizacje na żywo także jako chip obok zegara, dublując wyspę. Aby zostawić tylko wyspę, wyłącz aktualizacje na żywo (Pokazuj informacje na żywo) dla tej aplikacji. Wyspa nadal je pokaże.</string>
     <string name="live_chip_button">Ukryj chip Androida dla ostatniej aplikacji</string>
+    <string name="feature_glass">Sterowanie z płynnego szkła</string>
+    <string name="feature_glass_note">Przyciski i paski w otwartej wyspie zmieniają się w szkło po dotknięciu, jak w HyperOS 4.</string>
 </resources>

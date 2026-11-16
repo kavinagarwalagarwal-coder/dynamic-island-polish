@@ -500,4 +500,6 @@
     <string name="live_none">まだありません。クリケットアプリでライブスコアまたはピン留めスコアをオンにしてください。</string>
     <string name="live_chip_note">Android 16 はライブアップデートを時計の横にチップとしても表示し、アイランドと重複します。アイランドだけにするには、そのアプリのライブアップデート（ライブ情報を表示）をオフにしてください。アイランドには引き続き表示されます。</string>
     <string name="live_chip_button">最後のアプリの Android チップを非表示</string>
+    <string name="feature_glass">リキッドガラスのコントロール</string>
+    <string name="feature_glass_note">開いたアイランドのボタンやバーが、触れるとガラスのように変わります（HyperOS 4 風）。</string>
 </resources>
