@@ -152,3 +152,25 @@ fun LiquidSliderTrack(fraction: Float) {
         if (w > 0f) drawRoundRect(on, size = Size(max(w, size.height), size.height), cornerRadius = r)
     }
 }
+
+/**
+ * A choice's mark: an empty glass ring, and when chosen a white bead that wells up inside it
+ * with a little overshoot. Purely visual: the row carries the radio semantics.
+ */
+@Composable
+fun LiquidRadio(selected: Boolean) {
+    val fill = remember { Animatable(if (selected) 1f else 0f) }
+    LaunchedEffect(selected) { fill.animateTo(if (selected) 1f else 0f, if (selected) Fluid.expand() else Fluid.collapse()) }
+    val line = Fluid.line
+    Canvas(Modifier.size(24.dp)) {
+        val ring = 1.2.dp.toPx()
+        drawCircle(Color.White.copy(alpha = .06f), radius = size.minDimension / 2f)
+        drawCircle(Brush.linearGradient(listOf(Color.White.copy(alpha = .7f), line, Color.White.copy(alpha = .35f)),
+            start = Offset.Zero, end = Offset(size.width, size.height)), radius = size.minDimension / 2f - ring / 2f, style = Stroke(ring))
+        val f = fill.value
+        if (f > .01f) {
+            val d = size.minDimension * .62f * f
+            drawGlassBead(center, Size(d, d), 0f)
+        }
+    }
+}

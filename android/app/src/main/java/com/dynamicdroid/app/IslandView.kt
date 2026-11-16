@@ -1996,6 +1996,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             drawSkip(canvas, cx + dp(72f), cy, true, late)
         // Where the sound plays (Android's output switcher): Apple's AirPlay button, same place.
         val ox = rect.right - dp(34f)
+        if (features.glassControls) {
+            val rr0 = dp(20f)
+            val lift = glassLift(ox - rr0, cy - rr0, ox + rr0, cy + rr0)
+            if (lift > .02f) drawGlass(canvas, ox - rr0 * lift, cy - rr0 * lift, ox + rr0 * lift, cy + rr0 * lift, lift, late)
+        }
         drawOutputGlyph(canvas, ox, cy, dp(20f), withAlpha(GREY, late))
         musicOutputHit.set(ox - dp(22f), cy - dp(22f), ox + dp(22f), cy + dp(22f))
     }
@@ -2287,18 +2292,31 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val from = floor(pos).toInt().coerceIn(0, 2)
         val to = ceil(pos).toInt().coerceIn(0, 2)
         val highlight = ColorUtils.blendARGB(ringerTint(RINGER_ORDER[from]), ringerTint(RINGER_ORDER[to]), pos - from)
+        val glass = features.glassControls
         for (i in 0 until 4) {
             val x = l + i * (bw + gap)
-            fillPaint.color = withAlpha(off, alpha)
-            canvas.drawRoundRect(x, top, x + bw, top + h, h / 2f, h / 2f, fillPaint)
+            if (glass) drawGlass(canvas, x, top, x + bw, top + h, glassLift(x, top, x + bw, top + h), alpha, solid = off)
+            else {
+                fillPaint.color = withAlpha(off, alpha)
+                canvas.drawRoundRect(x, top, x + bw, top + h, h / 2f, h / 2f, fillPaint)
+            }
         }
-        // One highlight slides between ring, vibrate and silent.
-        fillPaint.color = withAlpha(highlight, alpha)
-        canvas.drawRoundRect(hx, top, hx + bw, top + h, h / 2f, h / 2f, fillPaint)
+        // One highlight slides between ring, vibrate and silent; in glass it is a liquid bead
+        // that stretches with its speed as it flows across.
+        if (glass) {
+            val stretch = if (reduceMotion) 0f else (abs(modeS.speed) * .1f).coerceAtMost(.35f) * bw
+            drawGlass(canvas, hx - stretch / 2f, top, hx + bw + stretch / 2f, top + h, 0f, alpha, solid = highlight)
+        } else {
+            fillPaint.color = withAlpha(highlight, alpha)
+            canvas.drawRoundRect(hx, top, hx + bw, top + h, h / 2f, h / 2f, fillPaint)
+        }
         if (a.dndOn) {
             val x = l + 3 * (bw + gap)
-            fillPaint.color = withAlpha(DND_PURPLE, alpha)
-            canvas.drawRoundRect(x, top, x + bw, top + h, h / 2f, h / 2f, fillPaint)
+            if (glass) drawGlass(canvas, x, top, x + bw, top + h, 0f, alpha, solid = DND_PURPLE)
+            else {
+                fillPaint.color = withAlpha(DND_PURPLE, alpha)
+                canvas.drawRoundRect(x, top, x + bw, top + h, h / 2f, h / 2f, fillPaint)
+            }
         }
         val g = dp(20f)
         for (i in 0 until 4) {
@@ -2381,6 +2399,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val level = torchLive ?: a.progress ?: 1f
         fillPaint.color = withAlpha(a.accent, (alpha * (0.25f + 0.35f * level)).toInt())
         canvas.drawCircle(l + icon / 2, cy, icon / 2, fillPaint)
+        if (features.glassControls) {
+            val lift = glassLift(l, cy - icon / 2, l + icon, cy + icon / 2)
+            drawGlass(canvas, l, cy - icon / 2, l + icon, cy + icon / 2, lift, alpha)
+        }
         IslandGlyphs.draw(canvas, Glyph.TORCH, l + icon / 2, cy, icon * 0.56f, withAlpha(Color.BLACK, alpha))
         torchOffHit.set(l - dp(6f), cy - icon / 2 - dp(6f), l + icon + dp(6f), cy + icon / 2 + dp(6f))
         val tx = l + icon + dp(10f)
@@ -2397,6 +2419,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fillPaint.color = withAlpha(a.accent, alpha)
         canvas.drawRoundRect(torchBar.left, torchBar.top, torchBar.left + max(bh, torchBar.width() * level), torchBar.bottom,
             bh / 2, bh / 2, fillPaint)
+        if (features.glassControls && glassBar == 3) {
+            val bead = dragGlassS.value
+            if (bead > .02f) {
+                val x = torchBar.left + torchBar.width() * level
+                val w = dp(32f) * bead
+                val hh = dp(24f) * bead
+                drawGlass(canvas, x - w / 2, torchBar.centerY() - hh / 2, x + w / 2, torchBar.centerY() + hh / 2, 1f, alpha)
+            }
+        }
     }
 
     private fun torchFraction(x: Float) = ((x - torchBar.left) / max(1f, torchBar.width())).coerceIn(0.05f, 1f)
@@ -3604,7 +3635,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 if (features.glassControls && presentation == Presentation.EXPANDED && !reduceMotion) {
                     glassX = e.x; glassY = e.y
                     glassPressS.target = 1f
-                    glassBar = if (seeking) 1 else if (volumeDragging) 2 else 0
+                    glassBar = if (seeking) 1 else if (volumeDragging) 2 else if (torchDragging) 3 else 0
                     if (glassBar != 0) dragGlassS.target = 1f
                 }
                 if (touchingSecondary) bubblePress.target = if (reduceMotion) 1f else 0.94f

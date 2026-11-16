@@ -274,8 +274,7 @@ fun <T> Choices(options: List<Pair<T, String>>, selected: T, horizontal: Boolean
                 .selectable(value == selected, role = Role.RadioButton) { onSelect(value) },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            RadioButton(value == selected, null, colors = RadioButtonDefaults.colors(
-                selectedColor = Fluid.foreground, unselectedColor = Fluid.muted))
+            LiquidRadio(value == selected)
             Spacer(Modifier.width(8.dp))
             Text(name, style = TextStyle(fontFamily = Fluid.body, fontSize = 16.sp, color = Fluid.foreground))
         }
