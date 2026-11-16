@@ -44,6 +44,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -85,8 +87,10 @@ object Fluid {
 /** Squashes a little under the finger and springs back with a slight overshoot when let go. */
 fun Modifier.pressSpring(source: MutableInteractionSource, pressed: Float = 0.955f): Modifier = composed {
     val down by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (down) pressed else 1f, Fluid.snappy(), label = "press")
-    graphicsLayer { scaleX = scale; scaleY = scale }
+    // Read the animating value only in the layer, so a press redraws on the GPU layer and never
+    // recomposes the button for each frame of the spring.
+    val scale = animateFloatAsState(if (down) pressed else 1f, Fluid.snappy(), label = "press")
+    graphicsLayer { scaleX = scale.value; scaleY = scale.value }
 }
 
 /**
@@ -173,7 +177,8 @@ fun ActionButton(text: String, modifier: Modifier = Modifier, enabled: Boolean =
 @Composable
 fun RowScope.Chip(text: String, selected: Boolean = false, description: String? = null, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
-    val fill by animateColorAsState(if (selected) Fluid.foreground else Fluid.surface, Fluid.liquid(), label = "chip")
+    // The fill flows while selection changes; read it only when drawing, not in composition.
+    val fill = animateColorAsState(if (selected) Fluid.foreground else Fluid.surface, Fluid.liquid(), label = "chip")
     val ink by animateColorAsState(if (selected) Color.Black else Fluid.foreground, Fluid.liquid(), label = "chipInk")
     val pop = remember { Animatable(1f) }
     LaunchedEffect(selected) {
@@ -184,7 +189,16 @@ fun RowScope.Chip(text: String, selected: Boolean = false, description: String? 
             .graphicsLayer { scaleX = pop.value; scaleY = pop.value }
             .pressSpring(source)
             .defaultMinSize(minHeight = 52.dp)
-            .background(fill, Fluid.pill).border(BorderStroke(1.dp, if (selected) fill else Fluid.line), Fluid.pill)
+            .drawBehind {
+                val corner = androidx.compose.ui.geometry.CornerRadius(18.dp.toPx())
+                drawRoundRect(fill.value, cornerRadius = corner)
+                val stroke = 1.dp.toPx()
+                drawRoundRect(if (selected) fill.value else Fluid.line, topLeft = androidx.compose.ui.geometry.Offset(stroke / 2, stroke / 2),
+                    size = androidx.compose.ui.geometry.Size(size.width - stroke, size.height - stroke),
+                    cornerRadius = androidx.compose.ui.geometry.CornerRadius(18.dp.toPx() - stroke / 2),
+                    style = androidx.compose.ui.graphics.drawscope.Stroke(stroke))
+            }
+            .clip(Fluid.pill)
             .selectable(selected, source, androidx.compose.material3.ripple(color = ink), role = Role.Tab, onClick = onClick)
             .semantics { description?.let { contentDescription = it } }
             .padding(horizontal = 10.dp, vertical = 14.dp),
