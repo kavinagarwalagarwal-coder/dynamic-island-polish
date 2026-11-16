@@ -498,13 +498,4 @@
     <string name="demo_score_text">IND は残り47球で30ラン必要</string>
     <string name="live_last_seen">最後のスコア通知:</string>
     <string name="live_none">まだありません。クリケットアプリでライブスコアまたはピン留めスコアをオンにしてください。</string>
-    <string name="live_chip_note">Android 16 はライブアップデートを時計の横にチップとしても表示し、アイランドと重複します。アイランドだけにするには、そのアプリのライブアップデート（ライブ情報を表示）をオフにしてください。アイランドには引き続き表示されます。</string>
-    <string name="live_chip_button">最後のアプリの Android チップを非表示</string>
-    <string name="feature_glass">リキッドガラスのコントロール</string>
-    <string name="feature_glass_note">開いたアイランドのボタンやバーが、触れるとガラスのように変わります（HyperOS 4 風）。</string>
-    <string name="glass_blur_on">開いたアイランドの背後のライブガラス：この端末で使用できます。</string>
-    <string name="glass_blur_off">開いたアイランドの背後のライブガラス：この端末は現在ウィンドウのぼかしを許可していません（バッテリーセーバー、開発者向けオプション、またはメーカーによる無効化）。カードは黒のままです。</string>
-    <string name="feature_clean_status">すっきりしたステータスバー</string>
-    <string name="feature_clean_status_note">Android の余分なアイコン（アラーム、Bluetooth、着信音、サイレント、位置情報、NFC など）を隠し、アイランドの横には時刻・電波・Wi-Fi・バッテリーだけを残します（iPhone 風）。オフにすると元の設定に戻ります。</string>
-    <string name="clean_status_needs_grant">ポップアップを隠す場合と同じ、パソコンからの一度だけの許可が必要です。</string>
 </resources>

@@ -106,7 +106,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private val refreshQuietRules = object : Runnable {
         override fun run() {
             render()
-            HeadsUpControl.sync(this@IslandOverlayService, island != null); StatusBarControl.sync(this@IslandOverlayService, island != null)
+            HeadsUpControl.sync(this@IslandOverlayService, island != null)
             if (IslandCustomization.quietEnabled(this@IslandOverlayService)) handler.postDelayed(this, 60_000L)
         }
     }
@@ -326,9 +326,10 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         events = SystemEvents(this, ::onActivity, ::onRemoved).also { it.start() }
         reply = ReplyPanel(this, ::onReplySent) { armTransientTimeout(transient) }
         IslandAccessibilityService.onVolumeKey = ::handleVolumeKey
-        IslandBus.listenerChanged = { HeadsUpControl.sync(this, island != null); StatusBarControl.sync(this, island != null) }
+        StatusBarCleanup.undo(this)
+        IslandBus.listenerChanged = { HeadsUpControl.sync(this, island != null) }
         IslandAccessibilityService.beforePopupSwipe = { passTouchesFor(it) }
-        HeadsUpControl.sync(this, island != null); StatusBarControl.sync(this, island != null)
+        HeadsUpControl.sync(this, island != null)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -355,7 +356,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
         if (intent?.action == ACTION_CUSTOMIZATION) {
             island?.applyFeatures(IslandFeatures.read(this))
-            HeadsUpControl.sync(this, island != null); StatusBarControl.sync(this, island != null)
+            HeadsUpControl.sync(this, island != null)
             devices?.stop(); devices?.start()
             events?.refresh()
             handler.removeCallbacks(refreshQuietRules)
@@ -397,8 +398,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         val (w, h) = view.windowSizeFor(null, Presentation.IDLE)
         val type = if (a11y != null) WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
         else WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        // The blur window is an app overlay, so it can only sit under an accessibility-hosted island.
-        islandAboveApps = a11y != null
         val lp = WindowManager.LayoutParams(
             w, h, type,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -443,7 +442,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private fun reattach() {
         detachWindow()
         if (attachWindow()) render()
-        HeadsUpControl.sync(this, island != null); StatusBarControl.sync(this, island != null)
+        HeadsUpControl.sync(this, island != null)
     }
 
     // ---------------------------------------------------------------- state
@@ -454,11 +453,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     private fun renderNow(absorb: Boolean) {
         val view = island ?: return
-        // Closing the card: go solid at once, and take the blur window away once it is.
-        if (presentation != Presentation.EXPANDED && view.backdrop) {
-            view.backdrop = false
-            handler.removeCallbacks(hideBackdrop); handler.postDelayed(hideBackdrop, 380L)
-        }
         val features = IslandFeatures.read(this)
         var t = transient?.takeIf { features.shows(it.mode) }
         handler.removeCallbacks(checkCompletion)
@@ -1096,36 +1090,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             changed = true
         }
         if (changed) applyIslandWindow() else updateTouchWindow()
-        updateBackdrop()
-    }
-
-    private var islandAboveApps = false
-    private var glass: GlassBackdrop? = null
-    private val backdropRect = android.graphics.RectF()
-    private val hideBackdrop = Runnable { if (island?.backdrop != true) glass?.hide() }
-
-    /**
-     * HyperOS look: Android's live window blur under the settled open card (frosted glass that
-     * follows whatever is on screen, rendered by the system like iOS). Off whenever it can't be
-     * done properly, and the card then stays solid black.
-     */
-    private fun updateBackdrop() {
-        val view = island ?: return
-        val f = IslandFeatures.read(this)
-        val wanted = Build.VERSION.SDK_INT >= 31 && islandAboveApps && f.look == IslandLook.HYPER && f.glassControls
-        val corner = if (wanted) view.cardOnScreen(backdropRect) else null
-        if (corner == null || Build.VERSION.SDK_INT < 31) {
-            if (view.backdrop) { view.backdrop = false; handler.removeCallbacks(hideBackdrop); handler.postDelayed(hideBackdrop, 380L) }
-            return
-        }
-        val g = glass ?: GlassBackdrop(this).also { gb ->
-            glass = gb
-            gb.onAvailability = { on -> if (!on) island?.backdrop = false else updateBackdrop() }
-        }
-        if (!g.available()) { view.backdrop = false; g.hide(); return }
-        handler.removeCallbacks(hideBackdrop)
-        g.show(backdropRect, corner)
-        view.backdrop = true
     }
 
     // ---------------------------------------------------------------- window
@@ -1269,8 +1233,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     override fun onDestroy() {
-        handler.removeCallbacks(hideBackdrop)
-        glass?.release(); glass = null
         if (IslandBus.listener === this) IslandBus.listener = null
         IslandAccessibilityService.onChanged = null
         IslandAccessibilityService.onForegroundPackage = null
@@ -1282,7 +1244,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         IslandAccessibilityService.beforePopupSwipe = null
         // The island is going away: the phone's own pop-ups must come back.
         HeadsUpControl.restore(this)
-        StatusBarControl.restore(this)
         devices?.stop()
         events?.stop()
         watcher?.stop()

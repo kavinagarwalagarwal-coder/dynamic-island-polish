@@ -129,9 +129,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     // ---------------------------------------------------------------- look (Apple / Nothing)
 
-    private val apple get() = features.look != IslandLook.NOTHING
-    /** HyperOS 4's Super Island: Soft Light Glass edges, touch light, music lighting. */
-    private val hyper get() = features.look == IslandLook.HYPER
+    private val apple get() = features.look == IslandLook.APPLE
     private val GREY: Int get() = if (apple) APPLE_GREY else NOTHING_GREY
     private val cMuted: Int get() = if (apple) APPLE_GREY else NothingStyle.muted
     private val cFg: Int get() = if (apple) Color.WHITE else NothingStyle.foreground
@@ -399,17 +397,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // Stiffer press so the squish lands on the finger's first frame.
     private val pressS = Spring(1f, 760f, 0.76f, 0.0008f)
     private val stretchS = Spring(0f, 360f, 0.78f, 0.5f)
-    /** Sideways drag: the island leans and stretches toward your finger, then springs back (Super Island). */
-    private val slideS = Spring(0f, 340f, 0.62f, 0.5f)
-    /** HyperOS touch light: brightens under your finger and follows the drag. */
-    private val touchLightS = Spring.apple(0f, .3f, 0f, .002f)
-    /** Live frosted glass under the open card (the service's window blur); 0 solid, 1 frosted. */
-    private val backdropS = Spring.apple(0f, .32f, 0f, .002f)
-    /** Set by the service once Android's blur window sits under the settled card. */
-    var backdrop = false
-        set(v) { field = v; if (!v) backdropS.target = 0f; kick() }
-    private var lightX = 0f
-    private var lightY = 0f
     private val absorbS = Spring(0f, 78f, 0.94f, 0.003f)
     private val appMorph = AppMorphGeometry()
     private var morphCard: Bitmap? = null
@@ -439,14 +426,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
     private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
-    /** Liquid glass (HyperOS 4): a touched control swells into a glass lens, and a dragged bar grows a glass bead. */
-    private val glassPressS = Spring.apple(0f, .34f, .22f, .002f)
-    private val dragGlassS = Spring.apple(0f, .34f, .22f, .002f)
-    private var glassX = -1f
-    private var glassY = -1f
-    /** Which bar the bead rides: 1 song, 2 volume. */
-    private var glassBar = 0
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA, glassPressS, dragGlassS, slideS, touchLightS, backdropS)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -596,10 +576,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (introHoldUntil == 0L && !sheenActive() && !isAbsorbing) restoreShapeSprings()
         presenceS.stiffness = 240f
         val spec = specFor(p, next)
-        val speed = next?.let { IslandCustomization.motionSpeed(context, it.packageName) } ?: 1f
-        if (next != null) shapeSprings.forEach { it.stiffness = IslandMotion.SHAPE_K / (speed * speed) }
-        // Folding back to the resting pill gets the same height-first choreography as any close.
-        leadAxes(spec, speed)
+        next?.let { activity ->
+            val speed = IslandCustomization.motionSpeed(context, activity.packageName)
+            shapeSprings.forEach { it.stiffness = IslandMotion.SHAPE_K / (speed * speed) }
+            leadAxes(spec, speed)
+        }
 
         if (isAbsorbing && (next?.key != old?.key || p != Presentation.COMPACT)) {
             absorbS.snap(0f); morphCard = null; softMorphCard = null; morphStart = 0L
@@ -983,24 +964,21 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val growing = spec.h > heightS.value + dp(2f)
         val shrinking = spec.h < heightS.value - dp(2f)
         if (!growing && !shrinking) return
-        if (features.motion == MotionStyle.APPLE || features.motion == MotionStyle.HYPER) {
-            val hyperMotion = features.motion == MotionStyle.HYPER
-            val d = (if (hyperMotion) IslandMotion.HYPER_DURATION else IslandMotion.APPLE_DURATION) * speed
+        if (features.motion == MotionStyle.APPLE) {
+            val d = IslandMotion.APPLE_DURATION * speed
             if (growing) {
-                val b = if (hyperMotion) IslandMotion.HYPER_OPEN_BOUNCE else IslandMotion.APPLE_OPEN_BOUNCE
+                val b = IslandMotion.APPLE_OPEN_BOUNCE
                 widthS.tune(d, b); centerS.tune(d, b / 2f); topS.tune(d, b / 2f)
                 heightS.tune(d * IslandMotion.AXIS_LAG, b * .8f); radiusS.tune(d * IslandMotion.AXIS_LAG, 0f)
             } else {
-                val b = if (hyperMotion) IslandMotion.HYPER_CLOSE_BOUNCE else IslandMotion.APPLE_CLOSE_BOUNCE
+                val b = IslandMotion.APPLE_CLOSE_BOUNCE
                 heightS.tune(d / IslandMotion.AXIS_LAG, b); radiusS.tune(d / IslandMotion.AXIS_LAG, 0f); topS.tune(d, 0f)
                 widthS.tune(d, b); centerS.tune(d, 0f)
             }
         } else {
-            // Set from the base each time, so repeated changes never compound.
-            val base = IslandMotion.SHAPE_K / (speed * speed)
-            val lagged = base / (IslandMotion.AXIS_LAG * IslandMotion.AXIS_LAG)
-            heightS.stiffness = if (growing) lagged else base; radiusS.stiffness = heightS.stiffness
-            widthS.stiffness = if (growing) base else lagged; centerS.stiffness = widthS.stiffness
+            val lag = 1f / (IslandMotion.AXIS_LAG * IslandMotion.AXIS_LAG)
+            if (growing) { heightS.stiffness *= lag; radiusS.stiffness *= lag }
+            else { widthS.stiffness *= lag; centerS.stiffness *= lag }
         }
     }
 
@@ -1014,7 +992,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 IslandMotion.FLUID_RADIUS_DAMPING, IslandMotion.FLUID_CENTER_DAMPING)
             MotionStyle.BOUNCY -> listOf(0.55f, 0.6f, 0.7f, 0.72f)
             MotionStyle.SMOOTH -> listOf(1f, 1f, 1f, 1f)
-            MotionStyle.HYPER -> listOf(0.66f, 0.7f, 0.82f, 0.78f)
         }
         widthS.dampingRatio = wd
         heightS.dampingRatio = hd
@@ -1024,11 +1001,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     /** How much the shape squashes and its edges flow with its speed, per motion style. */
-    private fun squash() = when (features.motion) {
-        MotionStyle.APPLE -> 0f; MotionStyle.LIQUID -> 1f; MotionStyle.BOUNCY -> 1.7f; MotionStyle.SMOOTH -> 0f
-        // A gentle jelly: it keeps its volume as it moves, without Liquid's wobble.
-        MotionStyle.HYPER -> .7f
-    }
+    private fun squash() = when (features.motion) { MotionStyle.APPLE -> 0f; MotionStyle.LIQUID -> 1f; MotionStyle.BOUNCY -> 1.7f; MotionStyle.SMOOTH -> 0f }
 
     /** Pixel size the overlay window needs for the current target state. */
     fun windowSizeFor(next: LiveActivity?, p: Presentation): Pair<Int, Int> {
@@ -1419,12 +1392,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         h = max(dp(1f), h * (1f - 0.11f * flowX + 0.03f * flowY))
         w *= 1f - 0.05f * flowY + 0.015f * flowX
         val top = topS.value
-        // Dragged sideways it leans toward the finger and stretches a little, like a held drop.
-        val lean = slideS.value
-        w += abs(lean) * .45f
-        h = max(dp(1f), h - abs(lean) * .06f)
-        val cxl = cx + lean * .55f
-        rect.set(cxl - w / 2f, top, cxl + w / 2f, top + h)
+        rect.set(cx - w / 2f, top, cx + w / 2f, top + h)
         var r = min(radiusS.value * press, h / 2f)
         val absorb = absorbS.value.coerceIn(0f, 1f)
         if (isAbsorbing) {
@@ -1457,30 +1425,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             drawGlow(canvas, a, r, glowAlpha)
         }
         shapePaint.color = Color.BLACK
-        // Frosted only while settled: a moving card would outrun the blur window under it.
-        backdropS.target = if (backdrop && presentation == Presentation.EXPANDED && !isAbsorbing &&
-            shapeSprings.all { it.isAtRest }) 1f else 0f
-        val glassy = backdropS.value.coerceIn(0f, 1f) * expandedA.value.coerceIn(0f, 1f)
         // In landscape there's no camera to cover, so the body lets the game or video show through.
-        shapePaint.alpha = if (seeThrough()) (bodyAlpha * LANDSCAPE_BODY).toInt()
-            else (bodyAlpha * (1f - BACKDROP_CLEAR * glassy)).toInt()
+        shapePaint.alpha = if (seeThrough()) (bodyAlpha * LANDSCAPE_BODY).toInt() else bodyAlpha
         // The edges flow too: they pinch in while the island stretches and bow out as it
         // shrinks, so a morph reads as liquid rather than a rubber rectangle.
         buildBody(body, rect, r, -flowX * dp(2.4f), -flowY * dp(3f))
         canvas.drawPath(body, shapePaint)
-        if (glassy > .01f) {
-            // The band over the camera stays solid black, fading into the frosted glass below it.
-            val band = baseTop + specFor(Presentation.IDLE, null).h + dp(6f)
-            matrix.setScale(1f, dp(18f)); matrix.postTranslate(0f, band - dp(6f))
-            backdropBand.setLocalMatrix(matrix)
-            fillPaint.shader = backdropBand
-            fillPaint.alpha = (bodyAlpha * glassy).toInt().coerceIn(0, 255)
-            canvas.save(); canvas.clipPath(body)
-            canvas.drawRect(rect.left, rect.top, rect.right, band + dp(12f), fillPaint)
-            canvas.restore()
-            fillPaint.shader = null
-        }
-        if (hyper && !isAbsorbing) drawSoftLight(canvas, r, bodyAlpha)
         if (a == null) { canvas.restore(); if (dimmed) canvas.restore(); if (layered) canvas.restore(); return }
         drawOutline(canvas, a, r, bodyAlpha)
 
@@ -1618,10 +1568,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             center + dropGeometry.radiusX, cy + dropGeometry.radiusY)
         val surfaceAlpha = (255 * intro * presenceS.value.coerceIn(0f, 1f)).toInt()
         fillPaint.color = withAlpha(Color.BLACK, surfaceAlpha)
-        // Android 12+: a real liquid join. Otherwise the drawn neck stands in for it.
-        if (!(Build.VERSION.SDK_INT >= 31 && canvas.isHardwareAccelerated && drawGoo(canvas, surfaceAlpha)))
-            drawDropNeck(canvas, surfaceAlpha)
-        fillPaint.color = withAlpha(Color.BLACK, surfaceAlpha)
+        drawDropNeck(canvas, surfaceAlpha)
         canvas.drawOval(secondaryRect, fillPaint)
         val alpha = (surfaceAlpha * dropGeometry.content).toInt()
         if (features.colouredBubbles && alpha > 2) drawBubbleRing(canvas, a, alpha)
@@ -1665,57 +1612,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             canvas.drawOval(arcRect, ringPaint)
         }
     }
-
-    private var gooNode: android.graphics.RenderNode? = null
-    private val gooPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
-    private val gooClip = Path()
-
-    /**
-     * The liquid split, done the way metaballs are: the pill and the droplet are blurred
-     * together and cut back to a hard edge, so where they are close the black flows between them
-     * like surface tension, thins out and snaps as the droplet pulls away, and pours back when it
-     * returns. The pill itself is clipped out, so only the bridge (and the droplet) is added and
-     * nothing covers the pill's content. The blur grows only while the droplet is leaving or
-     * arriving; at rest the two stay cleanly apart and no effect runs at all.
-     */
-    @android.annotation.TargetApi(31)
-    private fun drawGoo(canvas: Canvas, alpha: Int): Boolean {
-        val gap = secondaryRect.left - rect.right
-        if (reduceMotion || dropGeometry.neck < .01f || gap > dp(40f) || rect.height() > dp(64f)) return false
-        val node = gooNode ?: android.graphics.RenderNode("goo").also { gooNode = it }
-        val pad = dp(16f)
-        val l = (rect.right - rect.height() * 2f - pad).toInt()
-        val t = (min(rect.top, secondaryRect.top) - pad).toInt()
-        val r = (secondaryRect.right + pad).toInt() + 1
-        val b = (max(rect.bottom, secondaryRect.bottom) + pad).toInt() + 1
-        node.setPosition(l, t, r, b)
-        val sigma = dp(GOO_REST_BLUR_DP) + dp(GOO_BLUR_DP - GOO_REST_BLUR_DP) * dropGeometry.neck
-        node.setRenderEffect(android.graphics.RenderEffect.createChainEffect(
-            android.graphics.RenderEffect.createColorFilterEffect(gooThreshold),
-            android.graphics.RenderEffect.createBlurEffect(sigma, sigma, Shader.TileMode.DECAL)))
-        node.alpha = alpha / 255f
-        val c = node.beginRecording()
-        c.translate(-l.toFloat(), -t.toFloat())
-        val corner = min(radiusS.value, rect.height() / 2f)
-        c.drawRoundRect(rect, corner, corner, gooPaint)
-        c.drawOval(secondaryRect, gooPaint)
-        node.endRecording()
-        canvas.save()
-        gooClip.reset()
-        gooClip.addRoundRect(rect, corner, corner, Path.Direction.CW)
-        canvas.clipOutPath(gooClip)
-        canvas.drawRenderNode(node)
-        canvas.restore()
-        return true
-    }
-
-    /** Cuts the blurred shapes back to a crisp edge at half opacity, so flat edges stay put. */
-    private val gooThreshold = ColorMatrixColorFilter(ColorMatrix(floatArrayOf(
-        0f, 0f, 0f, 0f, 0f,
-        0f, 0f, 0f, 0f, 0f,
-        0f, 0f, 0f, 0f, 0f,
-        0f, 0f, 0f, 24f, -12f * 255f,
-    )))
 
     /** Two cubic edges pinch down before the droplet detaches. Draw behind both surfaces. */
     private fun drawDropNeck(canvas: Canvas, alpha: Int) {
@@ -1998,18 +1894,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             if (seeking || abs(musicBarS.value - fraction) < .004f || reduceMotion) musicBarS.snap(fraction)
             else { musicBarS.target = fraction; kick() }
             drawBar(canvas, barLeft, barRight, barY, musicBarS.value, userAccent ?: if (apple) Color.WHITE else waveColor, late,
-                if (seeking) dp(7f) else dp(4f), if (glassBar == 1) dragGlassS.value else 0f)
+                if (seeking) dp(7f) else dp(4f))
         }
 
         // Controls
         val cy = rect.top + dp(146f)
         val cx = rect.centerX()
-        // A pressed control blooms a glass droplet behind it.
-        if (features.glassControls) for (x in floatArrayOf(cx - dp(72f), cx, cx + dp(72f))) {
-            val r = dp(26f)
-            val lift = glassLift(x - r, cy - r, x + r, cy + r)
-            if (lift > .02f) drawGlass(canvas, x - r * lift, cy - r * lift, x + r * lift, cy + r * lift, lift, late)
-        }
         if (showsMediaAction(IslandBus.MEDIA_PREVIOUS))
             drawSkip(canvas, cx - dp(72f), cy, false, late)
         if (showsMediaAction(IslandBus.MEDIA_TOGGLE))
@@ -2018,11 +1908,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             drawSkip(canvas, cx + dp(72f), cy, true, late)
         // Where the sound plays (Android's output switcher): Apple's AirPlay button, same place.
         val ox = rect.right - dp(34f)
-        if (features.glassControls) {
-            val rr0 = dp(20f)
-            val lift = glassLift(ox - rr0, cy - rr0, ox + rr0, cy + rr0)
-            if (lift > .02f) drawGlass(canvas, ox - rr0 * lift, cy - rr0 * lift, ox + rr0 * lift, cy + rr0 * lift, lift, late)
-        }
         drawOutputGlyph(canvas, ox, cy, dp(20f), withAlpha(GREY, late))
         musicOutputHit.set(ox - dp(22f), cy - dp(22f), ox + dp(22f), cy + dp(22f))
     }
@@ -2278,8 +2163,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         volumeRight = rect.right - dp(18f)
         val pulse = barPulse.value.coerceIn(0f, 1f)
         val thick = dp(4f) + (if (volumeDragging) dp(3f) else dp(2f) * pulse)
-        drawBar(canvas, volumeLeft, volumeRight, rect.top + dp(VOLUME_HEIGHT_DP) - dp(14f), level, userAccent ?: waveColor, alpha, thick,
-            if (glassBar == 2) dragGlassS.value else 0f)
+        drawBar(canvas, volumeLeft, volumeRight, rect.top + dp(VOLUME_HEIGHT_DP) - dp(14f), level, userAccent ?: waveColor, alpha, thick)
         if (a.ringer != null) drawRingerControls(canvas, a, alpha)
     }
 
@@ -2314,31 +2198,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val from = floor(pos).toInt().coerceIn(0, 2)
         val to = ceil(pos).toInt().coerceIn(0, 2)
         val highlight = ColorUtils.blendARGB(ringerTint(RINGER_ORDER[from]), ringerTint(RINGER_ORDER[to]), pos - from)
-        val glass = features.glassControls
         for (i in 0 until 4) {
             val x = l + i * (bw + gap)
-            if (glass) drawGlass(canvas, x, top, x + bw, top + h, glassLift(x, top, x + bw, top + h), alpha, solid = off)
-            else {
-                fillPaint.color = withAlpha(off, alpha)
-                canvas.drawRoundRect(x, top, x + bw, top + h, h / 2f, h / 2f, fillPaint)
-            }
+            fillPaint.color = withAlpha(off, alpha)
+            canvas.drawRoundRect(x, top, x + bw, top + h, h / 2f, h / 2f, fillPaint)
         }
-        // One highlight slides between ring, vibrate and silent; in glass it is a liquid bead
-        // that stretches with its speed as it flows across.
-        if (glass) {
-            val stretch = if (reduceMotion) 0f else (abs(modeS.speed) * .1f).coerceAtMost(.35f) * bw
-            drawGlass(canvas, hx - stretch / 2f, top, hx + bw + stretch / 2f, top + h, 0f, alpha, solid = highlight)
-        } else {
-            fillPaint.color = withAlpha(highlight, alpha)
-            canvas.drawRoundRect(hx, top, hx + bw, top + h, h / 2f, h / 2f, fillPaint)
-        }
+        // One highlight slides between ring, vibrate and silent.
+        fillPaint.color = withAlpha(highlight, alpha)
+        canvas.drawRoundRect(hx, top, hx + bw, top + h, h / 2f, h / 2f, fillPaint)
         if (a.dndOn) {
             val x = l + 3 * (bw + gap)
-            if (glass) drawGlass(canvas, x, top, x + bw, top + h, 0f, alpha, solid = DND_PURPLE)
-            else {
-                fillPaint.color = withAlpha(DND_PURPLE, alpha)
-                canvas.drawRoundRect(x, top, x + bw, top + h, h / 2f, h / 2f, fillPaint)
-            }
+            fillPaint.color = withAlpha(DND_PURPLE, alpha)
+            canvas.drawRoundRect(x, top, x + bw, top + h, h / 2f, h / 2f, fillPaint)
         }
         val g = dp(20f)
         for (i in 0 until 4) {
@@ -2421,10 +2292,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val level = torchLive ?: a.progress ?: 1f
         fillPaint.color = withAlpha(a.accent, (alpha * (0.25f + 0.35f * level)).toInt())
         canvas.drawCircle(l + icon / 2, cy, icon / 2, fillPaint)
-        if (features.glassControls) {
-            val lift = glassLift(l, cy - icon / 2, l + icon, cy + icon / 2)
-            drawGlass(canvas, l, cy - icon / 2, l + icon, cy + icon / 2, lift, alpha)
-        }
         IslandGlyphs.draw(canvas, Glyph.TORCH, l + icon / 2, cy, icon * 0.56f, withAlpha(Color.BLACK, alpha))
         torchOffHit.set(l - dp(6f), cy - icon / 2 - dp(6f), l + icon + dp(6f), cy + icon / 2 + dp(6f))
         val tx = l + icon + dp(10f)
@@ -2441,15 +2308,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fillPaint.color = withAlpha(a.accent, alpha)
         canvas.drawRoundRect(torchBar.left, torchBar.top, torchBar.left + max(bh, torchBar.width() * level), torchBar.bottom,
             bh / 2, bh / 2, fillPaint)
-        if (features.glassControls && glassBar == 3) {
-            val bead = dragGlassS.value
-            if (bead > .02f) {
-                val x = torchBar.left + torchBar.width() * level
-                val w = dp(32f) * bead
-                val hh = dp(24f) * bead
-                drawGlass(canvas, x - w / 2, torchBar.centerY() - hh / 2, x + w / 2, torchBar.centerY() + hh / 2, 1f, alpha)
-            }
-        }
     }
 
     private fun torchFraction(x: Float) = ((x - torchBar.left) / max(1f, torchBar.width())).coerceIn(0.05f, 1f)
@@ -2642,86 +2500,16 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         canvas.drawRect(rect, fillPaint)
     }
 
-    private val backdropBand = LinearGradient(0f, 0f, 0f, 1f, Color.BLACK, Color.TRANSPARENT, Shader.TileMode.CLAMP)
-
-    /**
-     * Where the open card will sit when settled, in screen pixels, for the blur window under it;
-     * returns its corner radius in pixels, or null when there is no settled open card.
-     */
-    fun cardOnScreen(out: RectF): Float? {
-        if (presentation != Presentation.EXPANDED || activity == null || isAbsorbing || isConcealed) return null
-        val loc = IntArray(2)
-        getLocationOnScreen(loc)
-        val k = fit.scale
-        out.set(loc[0] + rect.left * k, loc[1] + rect.top * k, loc[0] + rect.right * k, loc[1] + rect.bottom * k)
-        return min(radiusS.target, (heightS.target) / 2f) * k
-    }
-
-    // Soft Light Glass edge: a hairline that is brighter along the top, like light on thick glass.
-    private val softRim = LinearGradient(0f, 0f, 0f, 1f, intArrayOf(0x4DFFFFFF, 0x14FFFFFF, 0x0AFFFFFF), floatArrayOf(0f, .45f, 1f), Shader.TileMode.CLAMP)
-    private val touchSpot = RadialGradient(0f, 0f, 1f, intArrayOf(0x2EFFFFFF, 0x10FFFFFF, 0x00FFFFFF), floatArrayOf(0f, .45f, 1f), Shader.TileMode.CLAMP)
-    private val touchRim = RadialGradient(0f, 0f, 1f, intArrayOf(0xCCFFFFFF.toInt(), 0x00FFFFFF), null, Shader.TileMode.CLAMP)
-    private val softPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val softRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-
-    /**
-     * HyperOS 4's Soft Light Glass on the island: a hairline edge that catches light (stronger
-     * while the island is moving, so light runs along it as it morphs), and "interactive lighting"
-     * that glows under your finger and follows the drag. The body stays pure black so the camera
-     * stays hidden; the open card alone gets the soft inner glow.
-     */
-    private fun drawSoftLight(canvas: Canvas, r: Float, alpha: Int) {
-        if (alpha < 8) return
-        val open = expandedA.value.coerceIn(0f, 1f)
-        val moving = if (reduceMotion) 0f else ((abs(widthS.speed) + abs(heightS.speed)) / dp(1400f)).coerceIn(0f, 1f)
-        val touch = touchLightS.value.coerceIn(0f, 1f)
-        val strength = (.35f + .65f * open) * (1f + 1.4f * moving)
-        val sw = dp(.9f)
-        matrix.setScale(1f, rect.height()); matrix.postTranslate(0f, rect.top)
-        softRim.setLocalMatrix(matrix)
-        softRimPaint.shader = softRim
-        softRimPaint.strokeWidth = sw
-        softRimPaint.alpha = (alpha * strength).toInt().coerceIn(0, 255)
-        canvas.drawPath(body, softRimPaint)
-        if (touch > .01f) {
-            // The edge nearest the finger lights up.
-            val reach = dp(90f)
-            matrix.setScale(reach, reach); matrix.postTranslate(lightX, lightY)
-            touchRim.setLocalMatrix(matrix)
-            softRimPaint.shader = touchRim
-            softRimPaint.strokeWidth = dp(1.4f)
-            softRimPaint.alpha = (alpha * touch).toInt().coerceIn(0, 255)
-            canvas.drawPath(body, softRimPaint)
-            // Inside the open card, a soft pool of light under the finger.
-            if (open > .05f) {
-                val pool = dp(120f)
-                matrix.setScale(pool, pool); matrix.postTranslate(lightX, lightY)
-                touchSpot.setLocalMatrix(matrix)
-                softPaint.shader = touchSpot
-                softPaint.alpha = (alpha * touch * open).toInt().coerceIn(0, 255)
-                canvas.save(); canvas.clipPath(body)
-                canvas.drawRect(rect, softPaint)
-                canvas.restore()
-            }
-        }
-        softRimPaint.shader = null
-        softPaint.shader = null
-    }
-
     /**
      * Soft halo: a few rings stepping outward and fading, so it costs no blur and looks the same on
      * every Android version. It brightens for a few seconds when something new arrives.
      */
     private fun drawGlow(canvas: Canvas, a: LiveActivity, r: Float, alpha: Int) {
-        // HyperOS lights the island while music plays, in the song's colour, breathing gently.
-        val mediaLight = hyper && a.mode == IslandMode.MUSIC && a.isPlaying
-        if ((!features.edgeGlow && !mediaLight) || isAbsorbing || alpha < 8) return
+        if (!features.edgeGlow || isAbsorbing || alpha < 8) return
         val base = ColorUtils.blendARGB(userAccent ?: a.accent.takeIf { ColorUtils.calculateLuminance(it) > .08 } ?: Color.WHITE,
             Color.WHITE, 0.3f)
         val now = SystemClock.uptimeMillis()
-        val breathe = if (mediaLight && !features.edgeGlow && !reduceMotion)
-            .55f + .3f * sin((now % 2400L) / 2400f * 2f * PI.toFloat()) else 1f
-        val flare = (if (now < eventOutlineUntil) 1f + 0.7f * ((eventOutlineUntil - now) / OUTLINE_EVENT_MS.toFloat()) else 1f) * breathe
+        val flare = if (now < eventOutlineUntil) 1f + 0.7f * ((eventOutlineUntil - now) / OUTLINE_EVENT_MS.toFloat()) else 1f
         // Many hairline rings with a smooth falloff read as one soft halo, not separate lines.
         val step = dp(GLOW_REACH_DP) / GLOW_STEPS
         haloPaint.strokeWidth = step * 1.25f
@@ -3162,11 +2950,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         var first = 0
         if (reply != null) {
             // The reply pill is filled white so it reads as the main action.
-            if (features.glassControls) drawGlass(canvas, l, t, l + w, t + h, glassLift(l, t, l + w, t + h), alpha, solid = cFg)
-            else {
-                fillPaint.color = withAlpha(cFg, alpha)
-                canvas.drawRoundRect(l, t, l + w, t + h, h / 2, h / 2, fillPaint)
-            }
+            fillPaint.color = withAlpha(cFg, alpha)
+            canvas.drawRoundRect(l, t, l + w, t + h, h / 2, h / 2, fillPaint)
             smallPaint.textAlign = Paint.Align.CENTER
             text(canvas, reply.label, l + w / 2, t + h / 2 + dp(4.5f), w - dp(16f), smallPaint, NothingStyle.background, alpha, center = true)
             smallPaint.textAlign = Paint.Align.LEFT
@@ -3176,11 +2961,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         actions.forEachIndexed { index, action ->
             val i = index + first
             val x = l + i * (w + gap)
-            if (features.glassControls) drawGlass(canvas, x, t, x + w, t + h, glassLift(x, t, x + w, t + h), alpha)
-            else {
-                fillPaint.color = withAlpha(cFg, alpha * 60 / 255)
-                canvas.drawRoundRect(x, t, x + w, t + h, h / 2, h / 2, fillPaint)
-            }
+            fillPaint.color = withAlpha(cFg, alpha * 60 / 255)
+            canvas.drawRoundRect(x, t, x + w, t + h, h / 2, h / 2, fillPaint)
             smallPaint.textAlign = Paint.Align.CENTER
             text(canvas, action.label, x + w / 2, t + h / 2 + dp(4.5f), w - dp(16f), smallPaint, lighten(cFg), alpha, center = true)
             smallPaint.textAlign = Paint.Align.LEFT
@@ -3533,22 +3315,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     /** One quiet bar style for every level and progress on the island. */
-    private fun drawBar(canvas: Canvas, left: Float, right: Float, cy: Float, fraction: Float, color: Int, alpha: Int, thick: Float = dp(4f),
-                        bead: Float = 0f) {
+    private fun drawBar(canvas: Canvas, left: Float, right: Float, cy: Float, fraction: Float, color: Int, alpha: Int, thick: Float = dp(4f)) {
         if (right <= left) return
-        if (bead > .02f) {
-            // While dragged, a glass bead rides the end of the fill (drawn last, over the bar).
-            drawBarFill(canvas, left, right, cy, fraction, color, alpha, thick)
-            val x = left + (right - left) * fraction.coerceIn(0f, 1f)
-            val w = dp(30f) * bead
-            val h = dp(20f) * bead
-            drawGlass(canvas, x - w / 2, cy - h / 2, x + w / 2, cy + h / 2, 1f, alpha)
-            return
-        }
-        drawBarFill(canvas, left, right, cy, fraction, color, alpha, thick)
-    }
-
-    private fun drawBarFill(canvas: Canvas, left: Float, right: Float, cy: Float, fraction: Float, color: Int, alpha: Int, thick: Float) {
         fillPaint.color = withAlpha(cFg, alpha * 38 / 255)
         canvas.drawRoundRect(left, cy - thick / 2, right, cy + thick / 2, thick / 2, thick / 2, fillPaint)
         val f = fraction.coerceIn(0f, 1f)
@@ -3557,64 +3325,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val end = max(left + thick, left + (right - left) * f)
         fillPaint.color = withAlpha(color, alpha)
         canvas.drawRoundRect(left, cy - thick / 2, end, cy + thick / 2, thick / 2, thick / 2, fillPaint)
-    }
-
-    /** How far the control in this box is lifted into glass by the current (or fading) touch. */
-    private fun glassLift(l: Float, t: Float, r: Float, b: Float): Float {
-        val v = glassPressS.value
-        if (v < .01f || glassX < 0f) return 0f
-        val slack = dp(6f)
-        return if (glassX >= l - slack && glassX <= r + slack && glassY >= t - slack && glassY <= b + slack) v.coerceIn(0f, 1.2f) else 0f
-    }
-
-    // Unit gradients stretched per call with the shared matrix, so glass allocates nothing per frame.
-    private val glassBody = LinearGradient(0f, 0f, 0f, 1f, intArrayOf(0x3DFFFFFF, 0x12FFFFFF), null, Shader.TileMode.CLAMP)
-    private val glassRim = LinearGradient(0f, 0f, 1f, 1f, intArrayOf(0xE6FFFFFF.toInt(), 0x1AFFFFFF, 0x99FFFFFF.toInt()), null, Shader.TileMode.CLAMP)
-    private val glassShine = LinearGradient(0f, 0f, 0f, 1f, 0xA6FFFFFF.toInt(), 0x00FFFFFF, Shader.TileMode.CLAMP)
-    private val glassPaint = Paint(Paint.ANTI_ALIAS_FLAG)
-    private val glassRimPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
-
-    /**
-     * A liquid-glass pill or droplet: a faint body, a lit rim (bright top-left and bottom-right)
-     * and a specular streak, swelling a little and brightening as [lift] rises. With [solid] it is
-     * a filled bead (the main action) that clears toward glass while pressed.
-     */
-    private fun drawGlass(canvas: Canvas, l: Float, t: Float, r: Float, b: Float, lift: Float, alpha: Int, solid: Int? = null) {
-        val k = lift.coerceIn(0f, 1.2f)
-        val cxg = (l + r) / 2f
-        val cyg = (t + b) / 2f
-        val w = (r - l) * (1f + .06f * k)
-        val h = (b - t) * (1f + .1f * k)
-        if (w < 1f || h < 1f) return
-        val L = cxg - w / 2f
-        val T = cyg - h / 2f
-        val rad = h / 2f
-        if (solid != null) {
-            fillPaint.color = withAlpha(solid, (alpha * (1f - .45f * k.coerceAtMost(1f))).toInt())
-            canvas.drawRoundRect(L, T, L + w, T + h, rad, rad, fillPaint)
-        }
-        matrix.setScale(1f, h); matrix.postTranslate(L, T)
-        glassBody.setLocalMatrix(matrix)
-        glassPaint.shader = glassBody
-        glassPaint.alpha = (alpha * (.85f + .9f * k)).toInt().coerceIn(0, 255)
-        canvas.drawRoundRect(L, T, L + w, T + h, rad, rad, glassPaint)
-        val sw = dp(.8f + .7f * k)
-        matrix.setScale(w, h); matrix.postTranslate(L, T)
-        glassRim.setLocalMatrix(matrix)
-        glassRimPaint.shader = glassRim
-        glassRimPaint.strokeWidth = sw
-        glassRimPaint.alpha = (alpha * (.55f + .45f * k.coerceAtMost(1f))).toInt().coerceIn(0, 255)
-        canvas.drawRoundRect(L + sw / 2, T + sw / 2, L + w - sw / 2, T + h - sw / 2, rad - sw / 2, rad - sw / 2, glassRimPaint)
-        val hw = w * .6f
-        val hh = h * .26f
-        val ht = T + h * .1f
-        matrix.setScale(1f, hh); matrix.postTranslate(cxg - hw / 2f, ht)
-        glassShine.setLocalMatrix(matrix)
-        glassPaint.shader = glassShine
-        glassPaint.alpha = (alpha * (.35f + .55f * k.coerceAtMost(1f))).toInt().coerceIn(0, 255)
-        canvas.drawRoundRect(cxg - hw / 2f, ht, cxg + hw / 2f, ht + hh, hh / 2f, hh / 2f, glassPaint)
-        glassPaint.shader = null
-        glassRimPaint.shader = null
     }
 
     private fun withAlpha(color: Int, alpha: Int) = ColorUtils.setAlphaComponent(color, alpha.coerceIn(0, 255))
@@ -3668,13 +3378,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 torchDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.TORCH && !torchBar.isEmpty &&
                     e.y > torchBar.top - dp(14f)
                 if (torchDragging) { torchLive = torchFraction(e.x); invalidate() }
-                if (hyper && !reduceMotion) { lightX = e.x; lightY = e.y; touchLightS.target = 1f }
-                if (features.glassControls && presentation == Presentation.EXPANDED && !reduceMotion) {
-                    glassX = e.x; glassY = e.y
-                    glassPressS.target = 1f
-                    glassBar = if (seeking) 1 else if (volumeDragging) 2 else if (torchDragging) 3 else 0
-                    if (glassBar != 0) dragGlassS.target = 1f
-                }
                 if (touchingSecondary) bubblePress.target = if (reduceMotion) 1f else 0.94f
                 else pressS.target = if (reduceMotion) 1f else if (presentation == Presentation.EXPANDED) 0.985f else 0.96f
                 if (presentation == Presentation.COMPACT) postDelayed(longPress, LONG_PRESS_MS)
@@ -3701,10 +3404,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     invalidate()
                 } else if (dragging) {
                     stretchS.snap(if (reduceMotion) 0f else rubber(dy))
-                    if (!reduceMotion && abs(dx) > abs(dy)) slideS.snap(rubber(dx) * .9f)
                     kick()
                 }
-                if (hyper) { lightX = e.x; lightY = e.y }
                 return true
             }
             MotionEvent.ACTION_UP -> {
@@ -3777,10 +3478,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         removeCallbacks(longPress)
         pressS.target = 1f
         bubblePress.target = 1f
-        glassPressS.target = 0f
-        dragGlassS.target = 0f
-        slideS.target = 0f
-        touchLightS.target = 0f
         stretchS.target = 0f
         settled = false
         kick()
@@ -3982,11 +3679,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private val DND_PURPLE = Color.rgb(150, 132, 255)
         private const val NUMBER_ROLL_MS = 260L
         private const val TEXT_FADE_MS = 300L
-        /** How far the open card clears over the live blur (0 solid … 1 none). */
-        private const val BACKDROP_CLEAR = .48f
-        /** Liquid split: blur while the droplet leaves or returns, and the floor it relaxes to. */
-        private const val GOO_BLUR_DP = 7f
-        private const val GOO_REST_BLUR_DP = 2.5f
         /** Frame spacing for slow, small motion, chosen for battery (see continuousDelay). */
         private const val COMPACT_WAVE_FRAME_MS = 50L
         private const val COMPACT_CLOCK_FRAME_MS = 100L

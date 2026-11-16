@@ -13,7 +13,6 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
@@ -79,10 +78,10 @@ internal fun MainActivity.MainScreen() {
                 transitionSpec = {
                     val forward = PAGE_ORDER.indexOf(targetState) >= PAGE_ORDER.indexOf(initialState)
                     if (reduce) fadeIn(tween(120)) togetherWith fadeOut(tween(80))
-                    else (fadeIn(Fluid.expand()) +
-                        slideInHorizontally(Fluid.expand()) { w -> (if (forward) w else -w) / 6 } +
-                        scaleIn(Fluid.expand(), initialScale = 0.97f)) togetherWith
-                        (fadeOut(Fluid.collapse()) + scaleOut(Fluid.collapse(), targetScale = 0.985f))
+                    else (fadeIn(spring(stiffness = 300f)) +
+                        slideInHorizontally(spring(dampingRatio = 0.82f, stiffness = 340f)) { w -> (if (forward) w else -w) / 6 } +
+                        scaleIn(spring(dampingRatio = 0.75f, stiffness = 340f), initialScale = 0.97f)) togetherWith
+                        fadeOut(tween(110))
                 },
                 label = "page",
                 modifier = Modifier.fillMaxWidth().weight(1f),
@@ -538,18 +537,6 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_show_navigation, "show_navigation", f.navigation)
         toggle(R.string.feature_live, "show_live", f.liveUpdates, R.string.feature_live_note)
         Note(stringResource(R.string.live_last_seen) + " " + remember { LiveDiagnostics.read(this@FeaturesPage) }, size = 13)
-        if (android.os.Build.VERSION.SDK_INT >= 36) {
-            // Android 16 shows its own chip by the clock for live updates, doubling the island.
-            // Apps can't remove it, but the user can turn it off per app in one switch.
-            val promoted = remember { LiveDiagnostics.promoted(this@FeaturesPage) }
-            Note(stringResource(R.string.live_chip_note), size = 13)
-            ActionButton(stringResource(R.string.live_chip_button)) {
-                val intent = if (promoted != null) Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
-                    .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, promoted)
-                else Intent(android.provider.Settings.ACTION_SETTINGS)
-                runCatching { startActivity(intent) }.onFailure { runCatching { startActivity(Intent(android.provider.Settings.ACTION_SETTINGS)) } }
-            }
-        }
         toggle(R.string.feature_recording, "show_recording", f.recording, R.string.feature_recording_note)
         Note(stringResource(R.string.feature_tuck_note), size = 14)
         toggle(R.string.feature_show_charging, "show_charging", f.charging)
@@ -565,19 +552,6 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_home_card, "home_card", f.homeCard, R.string.feature_home_card_note)
         toggle(R.string.feature_swipe_tracks, "swipe_tracks", f.swipeTracks, R.string.feature_swipe_tracks_note)
         toggle(R.string.feature_app_morph, "app_morph", f.appMorph, R.string.feature_app_morph_note)
-        toggle(R.string.feature_glass, "glass_controls", f.glassControls, R.string.feature_glass_note)
-        toggle(R.string.feature_clean_status, "clean_status_bar", f.cleanStatusBar, R.string.feature_clean_status_note)
-        if (f.cleanStatusBar && !StatusBarControl.canControl(this@FeaturesPage)) {
-            Note(stringResource(R.string.clean_status_needs_grant), size = 13)
-            ActionButton(stringResource(R.string.popups_grant_button)) { explainPopupGrant() }
-        }
-        // Whether this phone lets Android blur behind windows (the live frosted card needs it).
-        val blur = remember {
-            android.os.Build.VERSION.SDK_INT >= 31 && runCatching {
-                getSystemService(android.view.WindowManager::class.java)?.isCrossWindowBlurEnabled == true
-            }.getOrDefault(false)
-        }
-        Note(stringResource(if (blur) R.string.glass_blur_on else R.string.glass_blur_off), size = 13)
     }
     Column(flow.next()) {
         Heading(stringResource(R.string.features_events))
@@ -612,8 +586,7 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         Heading(stringResource(R.string.features_look))
         // Apple (Dynamic Island) or Nothing (the original monochrome, dot-matrix look).
         Label(stringResource(R.string.look_title))
-        Choices(listOf(IslandLook.HYPER to stringResource(R.string.look_hyper), IslandLook.APPLE to stringResource(R.string.look_apple),
-            IslandLook.NOTHING to stringResource(R.string.look_nothing)),
+        Choices(listOf(IslandLook.APPLE to stringResource(R.string.look_apple), IslandLook.NOTHING to stringResource(R.string.look_nothing)),
             f.look, horizontal = true) {
             IslandFeatures.setLook(this@FeaturesPage, it); applyFeaturesUpdate()
             showDemo(demoMusic(true), if (preview.presentation == Presentation.EXPANDED) Presentation.COMPACT else Presentation.EXPANDED)
@@ -632,7 +605,7 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_landscape, "landscape_see_through", f.landscapeSeeThrough, R.string.feature_landscape_note)
         Label(stringResource(R.string.feature_motion))
         Choices(listOf(MotionStyle.APPLE to stringResource(R.string.motion_apple), MotionStyle.LIQUID to stringResource(R.string.motion_liquid), MotionStyle.BOUNCY to stringResource(R.string.motion_bouncy),
-            MotionStyle.SMOOTH to stringResource(R.string.motion_smooth), MotionStyle.HYPER to stringResource(R.string.look_hyper)), f.motion, horizontal = true) {
+            MotionStyle.SMOOTH to stringResource(R.string.motion_smooth)), f.motion, horizontal = true) {
             IslandFeatures.setMotion(this@FeaturesPage, it); applyFeaturesUpdate()
             // Show the new motion straight away in the preview.
             showDemo(demoMusic(true), if (preview.presentation == Presentation.EXPANDED) Presentation.COMPACT else Presentation.EXPANDED)

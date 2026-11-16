@@ -509,14 +509,4 @@
     <string name="demo_score_text">IND need 30 runs from 47 balls</string>
     <string name="live_last_seen">Last score notification:</string>
     <string name="live_none">None yet. Turn on the live or pinned score in your cricket app.</string>
-    <string name="live_chip_note">Android 16 also shows live updates as a chip by the clock, doubling the island. To keep only the island, turn off live updates (Show live info) for that app. The island keeps showing it.</string>
-    <string name="live_chip_button">Hide Android\'s chip for the last app</string>
-    <string name="feature_glass">Liquid glass controls</string>
-    <string name="feature_glass_note">Buttons and bars in the open island turn to glass when you touch them, like HyperOS 4.</string>
-    <string name="look_hyper" translatable="false">HyperOS</string>
-    <string name="glass_blur_on">Live glass behind the open island: available on this phone.</string>
-    <string name="glass_blur_off">Live glass behind the open island: this phone isn\'t allowing window blur right now (battery saver, developer options, or turned off by the maker). The card stays black.</string>
-    <string name="feature_clean_status">Clean status bar</string>
-    <string name="feature_clean_status_note">Hides Android\'s extra icons (alarm, Bluetooth, ringer, Do Not Disturb, location, NFC…) so only the time, signal, Wi-Fi and battery sit beside the island, like iPhone. Your own settings come back when you turn this off.</string>
-    <string name="clean_status_needs_grant">This needs the same one-time computer permission as hiding the phone\'s pop-ups.</string>
 </resources>

@@ -60,3 +60,19 @@ object HeadsUpControl {
         }
     }
 }
+
+/**
+ * A build of Dynamic Droid briefly hid extra status-bar icons through Android's "icon_blacklist".
+ * That option is gone; if it was ever active, put the user's own value back once.
+ */
+object StatusBarCleanup {
+    fun undo(context: Context) {
+        val p = context.getSharedPreferences("status_bar", Context.MODE_PRIVATE)
+        if (!p.getBoolean("managed", false) || !HeadsUpControl.canControl(context)) return
+        runCatching {
+            val previous = if (p.getBoolean("had_previous", false)) p.getString("previous", null) else null
+            Settings.Secure.putString(context.contentResolver, "icon_blacklist", previous)
+            p.edit().putBoolean("managed", false).commit()
+        }
+    }
+}

@@ -498,13 +498,4 @@
     <string name="demo_score_text">IND\'nin 47 topta 30 sayıya ihtiyacı var</string>
     <string name="live_last_seen">Son skor bildirimi:</string>
     <string name="live_none">Henüz yok. Kriket uygulamanızda canlı veya sabitlenmiş skoru açın.</string>
-    <string name="live_chip_note">Android 16 canlı güncellemeleri saatin yanında bir çip olarak da gösterir ve adayı ikiler. Yalnızca adanın kalması için o uygulamada canlı güncellemeleri (Canlı bilgileri göster) kapatın. Ada göstermeye devam eder.</string>
-    <string name="live_chip_button">Son uygulama için Android çipini gizle</string>
-    <string name="feature_glass">Sıvı cam kontroller</string>
-    <string name="feature_glass_note">Açık adadaki düğmeler ve çubuklar dokunduğunuzda cama dönüşür, HyperOS 4\'teki gibi.</string>
-    <string name="glass_blur_on">Açık adanın arkasında canlı cam: bu telefonda kullanılabilir.</string>
-    <string name="glass_blur_off">Açık adanın arkasında canlı cam: bu telefon şu anda pencere bulanıklığına izin vermiyor (pil tasarrufu, geliştirici seçenekleri veya üretici tarafından kapatılmış). Kart siyah kalır.</string>
-    <string name="feature_clean_status">Sade durum çubuğu</string>
-    <string name="feature_clean_status_note">Android\'in ek simgelerini (alarm, Bluetooth, zil, Rahatsız Etmeyin, konum, NFC…) gizler; adanın yanında yalnızca saat, sinyal, Wi-Fi ve pil kalır, iPhone\'daki gibi. Kapattığınızda ayarlarınız geri gelir.</string>
-    <string name="clean_status_needs_grant">Açılır bildirimleri gizlemekle aynı tek seferlik bilgisayar izni gerekir.</string>
 </resources>

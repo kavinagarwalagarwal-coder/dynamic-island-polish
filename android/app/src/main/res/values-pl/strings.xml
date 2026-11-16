@@ -498,13 +498,4 @@
     <string name="demo_score_text">IND potrzebuje 30 runów z 47 piłek</string>
     <string name="live_last_seen">Ostatnie powiadomienie o wyniku:</string>
     <string name="live_none">Jeszcze żadnego. Włącz wynik na żywo lub przypięty w aplikacji do krykieta.</string>
-    <string name="live_chip_note">Android 16 pokazuje aktualizacje na żywo także jako chip obok zegara, dublując wyspę. Aby zostawić tylko wyspę, wyłącz aktualizacje na żywo (Pokazuj informacje na żywo) dla tej aplikacji. Wyspa nadal je pokaże.</string>
-    <string name="live_chip_button">Ukryj chip Androida dla ostatniej aplikacji</string>
-    <string name="feature_glass">Sterowanie z płynnego szkła</string>
-    <string name="feature_glass_note">Przyciski i paski w otwartej wyspie zmieniają się w szkło po dotknięciu, jak w HyperOS 4.</string>
-    <string name="glass_blur_on">Szkło na żywo za otwartą wyspą: dostępne na tym telefonie.</string>
-    <string name="glass_blur_off">Szkło na żywo za otwartą wyspą: ten telefon nie pozwala teraz na rozmycie okien (oszczędzanie baterii, opcje programisty lub wyłączone przez producenta). Karta pozostaje czarna.</string>
-    <string name="feature_clean_status">Czysty pasek stanu</string>
-    <string name="feature_clean_status_note">Ukrywa dodatkowe ikony Androida (budzik, Bluetooth, dzwonek, Nie przeszkadzać, lokalizacja, NFC…), żeby obok wyspy zostały tylko godzina, zasięg, Wi-Fi i bateria, jak w iPhonie. Po wyłączeniu wracają Twoje ustawienia.</string>
-    <string name="clean_status_needs_grant">Wymaga tego samego jednorazowego pozwolenia z komputera co ukrywanie wyskakujących powiadomień.</string>
 </resources>

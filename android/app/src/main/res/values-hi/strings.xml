@@ -498,13 +498,4 @@
     <string name="demo_score_text">IND को 47 गेंदों में 30 रन चाहिए</string>
     <string name="live_last_seen">पिछला स्कोर नोटिफ़िकेशन:</string>
     <string name="live_none">अभी तक कोई नहीं। अपने क्रिकेट ऐप में लाइव या पिन किया गया स्कोर चालू करें।</string>
-    <string name="live_chip_note">Android 16 लाइव अपडेट को घड़ी के पास एक चिप के रूप में भी दिखाता है, जिससे आइलैंड दोहरा हो जाता है। सिर्फ़ आइलैंड रखने के लिए उस ऐप के लाइव अपडेट (लाइव जानकारी दिखाएँ) बंद करें। आइलैंड उन्हें दिखाता रहेगा।</string>
-    <string name="live_chip_button">पिछले ऐप के लिए Android की चिप छिपाएँ</string>
-    <string name="feature_glass">लिक्विड ग्लास कंट्रोल</string>
-    <string name="feature_glass_note">खुले आइलैंड के बटन और बार छूने पर कांच जैसे बन जाते हैं, HyperOS 4 की तरह।</string>
-    <string name="glass_blur_on">खुले आइलैंड के पीछे लाइव ग्लास: इस फ़ोन पर उपलब्ध है।</string>
-    <string name="glass_blur_off">खुले आइलैंड के पीछे लाइव ग्लास: यह फ़ोन अभी विंडो ब्लर की अनुमति नहीं देता (बैटरी सेवर, डेवलपर विकल्प, या निर्माता ने बंद किया है)। कार्ड काला ही रहेगा।</string>
-    <string name="feature_clean_status">साफ़ स्टेटस बार</string>
-    <string name="feature_clean_status_note">Android के अतिरिक्त आइकन (अलार्म, ब्लूटूथ, रिंगर, परेशान न करें, लोकेशन, NFC…) छिपाता है ताकि आइलैंड के पास सिर्फ़ समय, सिग्नल, वाई-फ़ाई और बैटरी रहें, iPhone की तरह। बंद करने पर आपकी सेटिंग वापस आ जाती है।</string>
-    <string name="clean_status_needs_grant">इसके लिए वही एक बार की कंप्यूटर अनुमति चाहिए जो पॉप-अप छिपाने के लिए चाहिए।</string>
 </resources>

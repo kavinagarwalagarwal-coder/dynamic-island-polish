@@ -280,10 +280,6 @@ class IslandNotificationListener : NotificationListenerService() {
         if (mode == IslandMode.TIMER) timers[sbn.key] = activity
         if (mode == IslandMode.RECORDING) recordings += sbn.key
         if (liveScore && mode == IslandMode.LIVE) scores += sbn.key
-        // Android 16+ draws its own status-bar chip for this one; remember the app so Settings
-        // can take the user straight to the switch that hides that duplicate.
-        if (mode == IslandMode.LIVE && n.flags and LiveSignals.FLAG_PROMOTED_ONGOING != 0)
-            LiveDiagnostics.recordPromoted(this, sbn.packageName)
         IslandBus.post(activity)
     }
 

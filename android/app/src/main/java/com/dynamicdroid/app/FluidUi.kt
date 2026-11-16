@@ -29,6 +29,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -41,8 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -73,10 +74,6 @@ object Fluid {
     fun <T> snappy() = spring<T>(dampingRatio = 0.62f, stiffness = 520f)
     /** Soft and liquid: pages, sections and content flowing in. */
     fun <T> liquid() = spring<T>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
-    /** Things arriving or opening: a slight organic overshoot. */
-    fun <T> expand() = spring<T>(dampingRatio = 0.76f, stiffness = 380f)
-    /** Things leaving or closing: a snappy return with no wobble. */
-    fun <T> collapse() = spring<T>(dampingRatio = 0.86f, stiffness = 480f)
 
     val pill = RoundedCornerShape(18.dp)
 }
@@ -84,10 +81,8 @@ object Fluid {
 /** Squashes a little under the finger and springs back with a slight overshoot when let go. */
 fun Modifier.pressSpring(source: MutableInteractionSource, pressed: Float = 0.955f): Modifier = composed {
     val down by source.collectIsPressedAsState()
-    // Read the animating value only in the layer, so a press redraws on the GPU layer and never
-    // recomposes the button for each frame of the spring.
-    val scale = animateFloatAsState(if (down) pressed else 1f, Fluid.snappy(), label = "press")
-    graphicsLayer { scaleX = scale.value; scaleY = scale.value }
+    val scale by animateFloatAsState(if (down) pressed else 1f, Fluid.snappy(), label = "press")
+    graphicsLayer { scaleX = scale; scaleY = scale }
 }
 
 /**
@@ -141,7 +136,9 @@ fun SettingSwitch(title: String, checked: Boolean, note: String? = null, enabled
             Text(title, Modifier.weight(1f).padding(end = 12.dp),
                 style = TextStyle(fontFamily = Fluid.body, fontSize = 16.sp,
                     color = if (enabled) Fluid.foreground else Fluid.muted))
-            LiquidSwitch(checked, enabled, source)
+            Switch(checked, null, enabled = enabled, colors = SwitchDefaults.colors(
+                checkedThumbColor = Color.White, checkedTrackColor = Fluid.red, checkedBorderColor = Fluid.red,
+                uncheckedThumbColor = Fluid.muted, uncheckedTrackColor = Fluid.surface, uncheckedBorderColor = Fluid.line))
         }
         if (note != null) Text(note, Modifier.fillMaxWidth().padding(bottom = 6.dp),
             style = TextStyle(fontFamily = Fluid.body, fontSize = 13.sp, color = Fluid.muted, lineHeight = 17.sp))
@@ -152,15 +149,10 @@ fun SettingSwitch(title: String, checked: Boolean, note: String? = null, enabled
 @Composable
 fun ActionButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
-    val pressed by source.collectIsPressedAsState()
-    // Glass swells a touch under the finger (HyperOS 4), rather than sinking.
-    val lift = animateFloatAsState(if (pressed && enabled) 1f else 0f, if (pressed) Fluid.expand() else Fluid.collapse(), label = "glass")
     Box(
-        modifier.fillMaxWidth().padding(top = 10.dp)
-            .graphicsLayer { val k = 1f + .025f * lift.value; scaleX = k; scaleY = k }
+        modifier.fillMaxWidth().padding(top = 10.dp).pressSpring(source, 0.975f)
             .defaultMinSize(minHeight = 56.dp)
-            .background(Fluid.surface, Fluid.pill)
-            .drawBehind { drawGlassPill(lift.value, 18.dp.toPx()) }
+            .background(Fluid.surface, Fluid.pill).border(BorderStroke(1.dp, Fluid.line), Fluid.pill)
             .clickable(source, androidx.compose.material3.ripple(color = Fluid.foreground), enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center,
@@ -177,12 +169,9 @@ fun ActionButton(text: String, modifier: Modifier = Modifier, enabled: Boolean =
 @Composable
 fun RowScope.Chip(text: String, selected: Boolean = false, description: String? = null, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
-    // The fill flows while selection changes; read it only when drawing, not in composition.
-    val fill = animateColorAsState(if (selected) Fluid.foreground else Fluid.surface, Fluid.liquid(), label = "chip")
+    val fill by animateColorAsState(if (selected) Fluid.foreground else Fluid.surface, Fluid.liquid(), label = "chip")
     val ink by animateColorAsState(if (selected) Color.Black else Fluid.foreground, Fluid.liquid(), label = "chipInk")
     val pop = remember { Animatable(1f) }
-    val pressed by source.collectIsPressedAsState()
-    val lift = animateFloatAsState(if (pressed) 1f else 0f, if (pressed) Fluid.expand() else Fluid.collapse(), label = "chipGlass")
     LaunchedEffect(selected) {
         if (selected) { pop.snapTo(0.94f); pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 420f)) }
     }
@@ -191,13 +180,7 @@ fun RowScope.Chip(text: String, selected: Boolean = false, description: String? 
             .graphicsLayer { scaleX = pop.value; scaleY = pop.value }
             .pressSpring(source)
             .defaultMinSize(minHeight = 52.dp)
-            .drawBehind {
-                // The selected chip is a white bead; the others are clear glass. Both lift when touched.
-                val corner = androidx.compose.ui.geometry.CornerRadius(18.dp.toPx())
-                drawRoundRect(fill.value, cornerRadius = corner)
-                drawGlassPill(lift.value, 18.dp.toPx())
-            }
-            .clip(Fluid.pill)
+            .background(fill, Fluid.pill).border(BorderStroke(1.dp, if (selected) fill else Fluid.line), Fluid.pill)
             .selectable(selected, source, androidx.compose.material3.ripple(color = ink), role = Role.Tab, onClick = onClick)
             .semantics { description?.let { contentDescription = it } }
             .padding(horizontal = 10.dp, vertical = 14.dp),
@@ -222,7 +205,6 @@ fun ChipRow(content: @Composable RowScope.() -> Unit) =
  * after one step, so the slider only jumped to where it was tapped. Changes from outside (a
  * profile loaded, a reset) still move it once the finger is up.
  */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SliderSetting(
     title: @Composable (Int) -> String,
@@ -237,9 +219,6 @@ fun SliderSetting(
     LaunchedEffect(value) { if (!dragging) live = value.toFloat() }
     val current = live.roundToInt()
     val said = spoken(current)
-    val source = remember { MutableInteractionSource() }
-    val start = range.first.toFloat()
-    val span = (range.last - range.first).toFloat().coerceAtLeast(1f)
     Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
         Text(title(current), style = TextStyle(fontFamily = Fluid.body, fontSize = 16.sp, color = Fluid.foreground))
         Slider(
@@ -258,9 +237,8 @@ fun SliderSetting(
             valueRange = range.first.toFloat()..range.last.toFloat(),
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
                 .semantics { stateDescription = said },
-            interactionSource = source,
-            thumb = { LiquidSliderThumb(source) },
-            track = { LiquidSliderTrack((live - start) / span) },
+            colors = SliderDefaults.colors(thumbColor = Fluid.foreground, activeTrackColor = Fluid.red,
+                inactiveTrackColor = Fluid.surface),
         )
     }
 }
@@ -274,7 +252,8 @@ fun <T> Choices(options: List<Pair<T, String>>, selected: T, horizontal: Boolean
                 .selectable(value == selected, role = Role.RadioButton) { onSelect(value) },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            LiquidRadio(value == selected)
+            RadioButton(value == selected, null, colors = RadioButtonDefaults.colors(
+                selectedColor = Fluid.foreground, unselectedColor = Fluid.muted))
             Spacer(Modifier.width(8.dp))
             Text(name, style = TextStyle(fontFamily = Fluid.body, fontSize = 16.sp, color = Fluid.foreground))
         }

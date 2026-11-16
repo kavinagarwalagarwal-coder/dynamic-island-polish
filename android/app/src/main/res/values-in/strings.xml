@@ -498,13 +498,4 @@
     <string name="demo_score_text">IND butuh 30 run dari 47 bola</string>
     <string name="live_last_seen">Notifikasi skor terakhir:</string>
     <string name="live_none">Belum ada. Aktifkan skor langsung atau skor yang disematkan di aplikasi kriket Anda.</string>
-    <string name="live_chip_note">Android 16 juga menampilkan pembaruan langsung sebagai chip di dekat jam, menggandakan pulau. Agar hanya pulau yang tampil, matikan pembaruan langsung (Tampilkan info langsung) untuk aplikasi itu. Pulau tetap menampilkannya.</string>
-    <string name="live_chip_button">Sembunyikan chip Android untuk aplikasi terakhir</string>
-    <string name="feature_glass">Kontrol kaca cair</string>
-    <string name="feature_glass_note">Tombol dan bilah di pulau yang terbuka berubah menjadi kaca saat disentuh, seperti HyperOS 4.</string>
-    <string name="glass_blur_on">Kaca langsung di balik pulau yang terbuka: tersedia di ponsel ini.</string>
-    <string name="glass_blur_off">Kaca langsung di balik pulau yang terbuka: ponsel ini saat ini tidak mengizinkan blur jendela (penghemat baterai, opsi developer, atau dinonaktifkan produsen). Kartu tetap hitam.</string>
-    <string name="feature_clean_status">Bilah status bersih</string>
-    <string name="feature_clean_status_note">Menyembunyikan ikon tambahan Android (alarm, Bluetooth, dering, Jangan Ganggu, lokasi, NFC…) sehingga hanya jam, sinyal, Wi-Fi, dan baterai yang ada di sisi pulau, seperti iPhone. Setelan Anda kembali saat dimatikan.</string>
-    <string name="clean_status_needs_grant">Memerlukan izin satu kali dari komputer yang sama seperti menyembunyikan pop-up.</string>
 </resources>

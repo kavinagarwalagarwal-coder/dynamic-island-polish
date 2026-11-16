@@ -498,13 +498,4 @@
     <string name="demo_score_text">IND braucht 30 Runs aus 47 Bällen</string>
     <string name="live_last_seen">Letzte Ergebnis-Benachrichtigung:</string>
     <string name="live_none">Noch keine. Schalte in deiner Cricket-App den Live- oder angehefteten Spielstand ein.</string>
-    <string name="live_chip_note">Android 16 zeigt Live-Updates zusätzlich als Chip neben der Uhr, doppelt zur Insel. Damit nur die Insel bleibt, schalte für diese App Live-Updates (Live-Infos anzeigen) aus. Die Insel zeigt sie weiter.</string>
-    <string name="live_chip_button">Android-Chip für die letzte App ausblenden</string>
-    <string name="feature_glass">Flüssigglas-Bedienelemente</string>
-    <string name="feature_glass_note">Tasten und Leisten in der geöffneten Insel werden bei Berührung zu Glas, wie bei HyperOS 4.</string>
-    <string name="glass_blur_on">Live-Glas hinter der geöffneten Insel: auf diesem Telefon verfügbar.</string>
-    <string name="glass_blur_off">Live-Glas hinter der geöffneten Insel: Dieses Telefon erlaubt gerade keine Fensterunschärfe (Energiesparmodus, Entwickleroptionen oder vom Hersteller deaktiviert). Die Karte bleibt schwarz.</string>
-    <string name="feature_clean_status">Aufgeräumte Statusleiste</string>
-    <string name="feature_clean_status_note">Blendet Androids zusätzliche Symbole aus (Wecker, Bluetooth, Klingelton, Nicht stören, Standort, NFC…), sodass nur Uhrzeit, Mobilfunk, WLAN und Akku neben der Insel stehen, wie beim iPhone. Deine eigenen Einstellungen kommen zurück, wenn du das ausschaltest.</string>
-    <string name="clean_status_needs_grant">Dafür braucht Dynamic Droid dieselbe einmalige Freigabe per Computer wie zum Ausblenden der Pop-ups.</string>
 </resources>
