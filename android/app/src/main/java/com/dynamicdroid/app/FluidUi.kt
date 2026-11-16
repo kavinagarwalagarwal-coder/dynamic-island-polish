@@ -29,9 +29,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -144,9 +141,7 @@ fun SettingSwitch(title: String, checked: Boolean, note: String? = null, enabled
             Text(title, Modifier.weight(1f).padding(end = 12.dp),
                 style = TextStyle(fontFamily = Fluid.body, fontSize = 16.sp,
                     color = if (enabled) Fluid.foreground else Fluid.muted))
-            Switch(checked, null, enabled = enabled, colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White, checkedTrackColor = Fluid.red, checkedBorderColor = Fluid.red,
-                uncheckedThumbColor = Fluid.muted, uncheckedTrackColor = Fluid.surface, uncheckedBorderColor = Fluid.line))
+            LiquidSwitch(checked, enabled, source)
         }
         if (note != null) Text(note, Modifier.fillMaxWidth().padding(bottom = 6.dp),
             style = TextStyle(fontFamily = Fluid.body, fontSize = 13.sp, color = Fluid.muted, lineHeight = 17.sp))
@@ -223,6 +218,7 @@ fun ChipRow(content: @Composable RowScope.() -> Unit) =
  * after one step, so the slider only jumped to where it was tapped. Changes from outside (a
  * profile loaded, a reset) still move it once the finger is up.
  */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
 @Composable
 fun SliderSetting(
     title: @Composable (Int) -> String,
@@ -237,6 +233,9 @@ fun SliderSetting(
     LaunchedEffect(value) { if (!dragging) live = value.toFloat() }
     val current = live.roundToInt()
     val said = spoken(current)
+    val source = remember { MutableInteractionSource() }
+    val start = range.first.toFloat()
+    val span = (range.last - range.first).toFloat().coerceAtLeast(1f)
     Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
         Text(title(current), style = TextStyle(fontFamily = Fluid.body, fontSize = 16.sp, color = Fluid.foreground))
         Slider(
@@ -255,8 +254,9 @@ fun SliderSetting(
             valueRange = range.first.toFloat()..range.last.toFloat(),
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
                 .semantics { stateDescription = said },
-            colors = SliderDefaults.colors(thumbColor = Fluid.foreground, activeTrackColor = Fluid.red,
-                inactiveTrackColor = Fluid.surface),
+            interactionSource = source,
+            thumb = { LiquidSliderThumb(source) },
+            track = { LiquidSliderTrack((live - start) / span) },
         )
     }
 }
