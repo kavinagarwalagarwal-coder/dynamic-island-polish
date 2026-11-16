@@ -13,6 +13,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
@@ -78,10 +79,10 @@ internal fun MainActivity.MainScreen() {
                 transitionSpec = {
                     val forward = PAGE_ORDER.indexOf(targetState) >= PAGE_ORDER.indexOf(initialState)
                     if (reduce) fadeIn(tween(120)) togetherWith fadeOut(tween(80))
-                    else (fadeIn(spring(stiffness = 300f)) +
-                        slideInHorizontally(spring(dampingRatio = 0.82f, stiffness = 340f)) { w -> (if (forward) w else -w) / 6 } +
-                        scaleIn(spring(dampingRatio = 0.75f, stiffness = 340f), initialScale = 0.97f)) togetherWith
-                        fadeOut(tween(110))
+                    else (fadeIn(Fluid.expand()) +
+                        slideInHorizontally(Fluid.expand()) { w -> (if (forward) w else -w) / 6 } +
+                        scaleIn(Fluid.expand(), initialScale = 0.97f)) togetherWith
+                        (fadeOut(Fluid.collapse()) + scaleOut(Fluid.collapse(), targetScale = 0.985f))
                 },
                 label = "page",
                 modifier = Modifier.fillMaxWidth().weight(1f),

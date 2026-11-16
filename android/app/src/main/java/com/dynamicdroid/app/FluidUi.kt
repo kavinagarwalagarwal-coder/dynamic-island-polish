@@ -74,6 +74,10 @@ object Fluid {
     fun <T> snappy() = spring<T>(dampingRatio = 0.62f, stiffness = 520f)
     /** Soft and liquid: pages, sections and content flowing in. */
     fun <T> liquid() = spring<T>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
+    /** Things arriving or opening: a slight organic overshoot. */
+    fun <T> expand() = spring<T>(dampingRatio = 0.76f, stiffness = 380f)
+    /** Things leaving or closing: a snappy return with no wobble. */
+    fun <T> collapse() = spring<T>(dampingRatio = 0.86f, stiffness = 480f)
 
     val pill = RoundedCornerShape(18.dp)
 }
