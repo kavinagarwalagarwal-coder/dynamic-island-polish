@@ -403,6 +403,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val slideS = Spring(0f, 340f, 0.62f, 0.5f)
     /** HyperOS touch light: brightens under your finger and follows the drag. */
     private val touchLightS = Spring.apple(0f, .3f, 0f, .002f)
+    /** Live frosted glass under the open card (the service's window blur); 0 solid, 1 frosted. */
+    private val backdropS = Spring.apple(0f, .32f, 0f, .002f)
+    /** Set by the service once Android's blur window sits under the settled card. */
+    var backdrop = false
+        set(v) { field = v; if (!v) backdropS.target = 0f; kick() }
     private var lightX = 0f
     private var lightY = 0f
     private val absorbS = Spring(0f, 78f, 0.94f, 0.003f)
@@ -441,7 +446,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var glassY = -1f
     /** Which bar the bead rides: 1 song, 2 volume. */
     private var glassBar = 0
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA, glassPressS, dragGlassS, slideS, touchLightS)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA, glassPressS, dragGlassS, slideS, touchLightS, backdropS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -1452,12 +1457,29 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             drawGlow(canvas, a, r, glowAlpha)
         }
         shapePaint.color = Color.BLACK
+        // Frosted only while settled: a moving card would outrun the blur window under it.
+        backdropS.target = if (backdrop && presentation == Presentation.EXPANDED && !isAbsorbing &&
+            shapeSprings.all { it.isAtRest }) 1f else 0f
+        val glassy = backdropS.value.coerceIn(0f, 1f) * expandedA.value.coerceIn(0f, 1f)
         // In landscape there's no camera to cover, so the body lets the game or video show through.
-        shapePaint.alpha = if (seeThrough()) (bodyAlpha * LANDSCAPE_BODY).toInt() else bodyAlpha
+        shapePaint.alpha = if (seeThrough()) (bodyAlpha * LANDSCAPE_BODY).toInt()
+            else (bodyAlpha * (1f - BACKDROP_CLEAR * glassy)).toInt()
         // The edges flow too: they pinch in while the island stretches and bow out as it
         // shrinks, so a morph reads as liquid rather than a rubber rectangle.
         buildBody(body, rect, r, -flowX * dp(2.4f), -flowY * dp(3f))
         canvas.drawPath(body, shapePaint)
+        if (glassy > .01f) {
+            // The band over the camera stays solid black, fading into the frosted glass below it.
+            val band = baseTop + specFor(Presentation.IDLE, null).h + dp(6f)
+            matrix.setScale(1f, dp(18f)); matrix.postTranslate(0f, band - dp(6f))
+            backdropBand.setLocalMatrix(matrix)
+            fillPaint.shader = backdropBand
+            fillPaint.alpha = (bodyAlpha * glassy).toInt().coerceIn(0, 255)
+            canvas.save(); canvas.clipPath(body)
+            canvas.drawRect(rect.left, rect.top, rect.right, band + dp(12f), fillPaint)
+            canvas.restore()
+            fillPaint.shader = null
+        }
         if (hyper && !isAbsorbing) drawSoftLight(canvas, r, bodyAlpha)
         if (a == null) { canvas.restore(); if (dimmed) canvas.restore(); if (layered) canvas.restore(); return }
         drawOutline(canvas, a, r, bodyAlpha)
@@ -2618,6 +2640,21 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fillPaint.color = Color.BLACK
         fillPaint.alpha = (base * (ART_DIM + 0.12f * expandedA.value.coerceIn(0f, 1f))).toInt()
         canvas.drawRect(rect, fillPaint)
+    }
+
+    private val backdropBand = LinearGradient(0f, 0f, 0f, 1f, Color.BLACK, Color.TRANSPARENT, Shader.TileMode.CLAMP)
+
+    /**
+     * Where the open card will sit when settled, in screen pixels, for the blur window under it;
+     * returns its corner radius in pixels, or null when there is no settled open card.
+     */
+    fun cardOnScreen(out: RectF): Float? {
+        if (presentation != Presentation.EXPANDED || activity == null || isAbsorbing || isConcealed) return null
+        val loc = IntArray(2)
+        getLocationOnScreen(loc)
+        val k = fit.scale
+        out.set(loc[0] + rect.left * k, loc[1] + rect.top * k, loc[0] + rect.right * k, loc[1] + rect.bottom * k)
+        return min(radiusS.target, (heightS.target) / 2f) * k
     }
 
     // Soft Light Glass edge: a hairline that is brighter along the top, like light on thick glass.
@@ -3945,6 +3982,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private val DND_PURPLE = Color.rgb(150, 132, 255)
         private const val NUMBER_ROLL_MS = 260L
         private const val TEXT_FADE_MS = 300L
+        /** How far the open card clears over the live blur (0 solid … 1 none). */
+        private const val BACKDROP_CLEAR = .48f
         /** Liquid split: blur while the droplet leaves or returns, and the floor it relaxes to. */
         private const val GOO_BLUR_DP = 7f
         private const val GOO_REST_BLUR_DP = 2.5f
