@@ -2172,12 +2172,28 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         volumeRight = rect.right - dp(18f)
         val pulse = barPulse.value.coerceIn(0f, 1f)
         val thick = dp(4f) + (if (volumeDragging) dp(3f) else dp(2f) * pulse)
-        if (features.pixelScenes && !reduceMotion) {
-            // A car drives down a pixel street: where it is is the volume.
-            val sceneH = dp(28f)
-            val sceneTop = rect.top + compactHeight()
-            pixels.drive(canvas, volumeLeft, volumeRight, (sceneTop + rect.top + volumeHeight() - dp(4f)) / 2f, sceneH, level,
-                (levelS.speed / 3f).coerceIn(-1f, 1f), SystemClock.uptimeMillis(), PixelScenes.accentFor(userAccent ?: a.accent), alpha)
+        if (features.pixelScenes) {
+            // A road trip through a pixel landscape: the car is the slider. Drag it, or press
+            // the volume keys, and it drives along the road with its wheels rolling.
+            sceneRect.set(rect.left + dp(10f), rect.top + compactHeight() + dp(2f), rect.right - dp(10f), rect.top + volumeHeight() - dp(10f))
+            if (sceneRect.width() > dp(60f) && sceneRect.height() > dp(24f)) {
+                val cell = sceneRect.height() / 32f
+                val sign = cell * 12f
+                val half = cell * 25f / 2f
+                volumeLeft = sceneRect.left + sign + half
+                volumeRight = sceneRect.right - sign - half
+                val carX = volumeLeft + (volumeRight - volumeLeft) * level
+                val corner = dp(14f)
+                sceneClip.rewind()
+                sceneClip.addRoundRect(sceneRect, corner, corner, Path.Direction.CW)
+                canvas.save(); canvas.clipPath(sceneClip)
+                pixels.roadTrip(canvas, sceneRect, carX, level, SystemClock.uptimeMillis(),
+                    PixelScenes.accentFor(userAccent ?: a.accent), alpha)
+                val signY = sceneRect.top + sceneRect.height() * pixels.roadTop - cell * 5f
+                pixels.endSign(canvas, sceneRect.left + cell * 2f, signY, cell, false, alpha)
+                pixels.endSign(canvas, sceneRect.right - cell * 12f, signY, cell, true, alpha)
+                canvas.restore()
+            }
         } else drawBar(canvas, volumeLeft, volumeRight, rect.top + volumeHeight() - dp(14f), level, userAccent ?: waveColor, alpha, thick)
         if (a.ringer != null) drawRingerControls(canvas, a, alpha)
     }
@@ -2186,6 +2202,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun volumeHeight() = dp(VOLUME_HEIGHT_DP) + if (features.pixelScenes) dp(VOLUME_SCENE_EXTRA_DP) else 0f
 
     private val pixels by lazy { PixelScenes(density) }
+    private val sceneRect = RectF()
+    private val sceneClip = Path()
 
     private fun ringerIndex(state: RingerState?) = when (state) {
         RingerState.RING -> 0f; RingerState.VIBRATE -> 1f; RingerState.SILENT -> 2f; else -> null
@@ -2211,6 +2229,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val bw = (r - l - gap * 3) / 4f
         if (bw <= h * 0.8f || rect.bottom < top + h) return
         val cy = top + h / 2f
+        // Pixel scenes: chunky square-cornered buttons with a pixel frame, like the road trip above.
+        val pixel = features.pixelScenes
+        val br = if (pixel) dp(5f) else h / 2f
         val off = Color.rgb(30, 30, 30)
         ringerIndex(current)?.let { modeS.target = it }
         val pos = modeS.value.coerceIn(0f, 2f)
@@ -2221,15 +2242,24 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         for (i in 0 until 4) {
             val x = l + i * (bw + gap)
             fillPaint.color = withAlpha(off, alpha)
-            canvas.drawRoundRect(x, top, x + bw, top + h, h / 2f, h / 2f, fillPaint)
+            canvas.drawRoundRect(x, top, x + bw, top + h, br, br, fillPaint)
+            if (pixel) {
+                // Stepped pixel frame: top/bottom and side edges, corners left open.
+                val c = dp(2f)
+                fillPaint.color = withAlpha(Color.WHITE, alpha * 70 / 255)
+                canvas.drawRect(x + c, top, x + bw - c, top + c, fillPaint)
+                canvas.drawRect(x + c, top + h - c, x + bw - c, top + h, fillPaint)
+                canvas.drawRect(x, top + c, x + c, top + h - c, fillPaint)
+                canvas.drawRect(x + bw - c, top + c, x + bw, top + h - c, fillPaint)
+            }
         }
         // One highlight slides between ring, vibrate and silent.
         fillPaint.color = withAlpha(highlight, alpha)
-        canvas.drawRoundRect(hx, top, hx + bw, top + h, h / 2f, h / 2f, fillPaint)
+        canvas.drawRoundRect(hx, top, hx + bw, top + h, br, br, fillPaint)
         if (a.dndOn) {
             val x = l + 3 * (bw + gap)
             fillPaint.color = withAlpha(DND_PURPLE, alpha)
-            canvas.drawRoundRect(x, top, x + bw, top + h, h / 2f, h / 2f, fillPaint)
+            canvas.drawRoundRect(x, top, x + bw, top + h, br, br, fillPaint)
         }
         val g = dp(20f)
         for (i in 0 until 4) {
@@ -3719,7 +3749,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val MEDIUM_TEXT_BLOCK_DP = 44f
         private const val VOLUME_WIDTH_DP = 300f
         private const val VOLUME_HEIGHT_DP = 54f
-        private const val VOLUME_SCENE_EXTRA_DP = 14f
+        private const val VOLUME_SCENE_EXTRA_DP = 60f
         private val ALARM = Color.rgb(255, 184, 28)
     }
 }
