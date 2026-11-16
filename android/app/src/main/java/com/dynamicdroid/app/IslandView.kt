@@ -2174,8 +2174,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val thick = dp(4f) + (if (volumeDragging) dp(3f) else dp(2f) * pulse)
         if (features.pixelScenes && !reduceMotion) {
             // A car drives down a pixel street: where it is is the volume.
-            val sceneH = dp(24f)
-            pixels.drive(canvas, volumeLeft, volumeRight, rect.top + volumeHeight() - dp(6f) - sceneH / 2f, sceneH, level,
+            val sceneH = dp(28f)
+            val sceneTop = rect.top + compactHeight()
+            pixels.drive(canvas, volumeLeft, volumeRight, (sceneTop + rect.top + volumeHeight() - dp(4f)) / 2f, sceneH, level,
                 (levelS.speed / 3f).coerceIn(-1f, 1f), SystemClock.uptimeMillis(), PixelScenes.accentFor(userAccent ?: a.accent), alpha)
         } else drawBar(canvas, volumeLeft, volumeRight, rect.top + volumeHeight() - dp(14f), level, userAccent ?: waveColor, alpha, thick)
         if (a.ringer != null) drawRingerControls(canvas, a, alpha)

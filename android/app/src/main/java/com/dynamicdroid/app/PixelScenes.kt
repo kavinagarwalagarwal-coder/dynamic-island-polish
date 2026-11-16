@@ -68,7 +68,7 @@ class PixelScenes(private val density: Float) {
      */
     fun drive(canvas: Canvas, left: Float, right: Float, centerY: Float, height: Float, level: Float, speed: Float,
               now: Long, accent: Int, alpha: Int) {
-        val cell = max(dp(1.6f), height / 12f)
+        val cell = max(dp(1.6f), height / 10f)
         val dt = if (lastAt == 0L) 0f else ((now - lastAt).coerceIn(0L, 100L) / 1000f)
         lastAt = now
         val moving = abs(speed) > .02f
@@ -82,7 +82,7 @@ class PixelScenes(private val density: Float) {
         var bx = left - (roadOffset * .4f) % (cell * 5f)
         var k = 0
         while (bx < right) {
-            val tall = 3 + (k * 7 % 5)
+            val tall = 2 + (k * 7 % 4)
             for (h in 0 until tall) {
                 val y = bottom - cell * (4 + h)
                 if (y < top) break
@@ -133,8 +133,8 @@ class PixelScenes(private val density: Float) {
                 'B' -> body
                 'W' -> 0xFF9FD8FF.toInt()
                 'L' -> if (parked) Color.DKGRAY else 0xFFFFE08A.toInt()
-                'K' -> Color.rgb(30, 30, 30)
-                'k' -> Color.rgb(90, 90, 90)
+                'K' -> Color.rgb(96, 96, 96)
+                'k' -> Color.rgb(170, 170, 170)
                 else -> body
             }
         }
