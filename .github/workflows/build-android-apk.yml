@@ -124,9 +124,7 @@ jobs:
             gradle --no-daemon -p android :notification-fixture:assembleDebug
             adb install -r android/notification-fixture/build/outputs/apk/debug/notification-fixture-debug.apk
             adb shell pm grant com.dynamicdroid.fixture android.permission.POST_NOTIFICATIONS
-            gradle --no-daemon -p android :app:connectedStandardDebugAndroidTest ${{ inputs.tests && format('-Pandroid.testInstrumentationRunnerArguments.class={0} -Pandroid.testInstrumentationRunnerArguments.report=1', inputs.tests) || '' }} || status=$?
-            adb pull /sdcard/Pictures/IslandSmoke island-screenshots || true
-            exit ${status:-0}
+            gradle --no-daemon -p android :app:connectedStandardDebugAndroidTest ${{ inputs.tests && format('-Pandroid.testInstrumentationRunnerArguments.class={0} -Pandroid.testInstrumentationRunnerArguments.report=1', inputs.tests) || '' }}; s=$?; adb pull /sdcard/Pictures/IslandSmoke island-screenshots || true; exit $s
       - name: Print scene thumbnails
         if: always()
         run: |
