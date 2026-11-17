@@ -283,7 +283,12 @@ class MainActivity : AppCompatActivity() {
             val a = demo ?: return
             if (command == IslandBus.MEDIA_TOGGLE) showDemo(demoMusic(!a.isPlaying, a.livePositionMs()), demoPresentation)
             if (command == IslandBus.MEDIA_SEEK && positionMs != null) showDemo(demoMusic(a.isPlaying, positionMs), demoPresentation)
-            if (command == IslandBus.MEDIA_NEXT || command == IslandBus.MEDIA_PREVIOUS) showDemo(demoMusic(a.isPlaying, 0L), demoPresentation)
+            // The preview has a short playlist, so skipping visibly changes the song.
+            if (command == IslandBus.MEDIA_NEXT) { demoTrack = (demoTrack + 1) % DEMO_TRACKS.size; showDemo(demoMusic(a.isPlaying, 0L), demoPresentation) }
+            if (command == IslandBus.MEDIA_PREVIOUS) {
+                if (a.livePositionMs() < 3_000L) demoTrack = (demoTrack + DEMO_TRACKS.size - 1) % DEMO_TRACKS.size
+                showDemo(demoMusic(a.isPlaying, 0L), demoPresentation)
+            }
         }
         override fun onSecondaryExpand(activity: LiveActivity) {
             val previous = demo
@@ -311,11 +316,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var demoTrack = 0
+
     internal fun demoMusic(playing: Boolean, position: Long = 107_000L): LiveActivity {
-        val art = gradientArt(NothingStyle.red, NothingStyle.surface)
+        val track = DEMO_TRACKS[demoTrack % DEMO_TRACKS.size]
+        val art = gradientArt(track.third, NothingStyle.surface)
         return LiveActivity(
             key = "demo-music", packageName = "com.spotify.music", mode = IslandMode.MUSIC,
-            title = "Midnight City", subtitle = "M83", appLabel = "Spotify",
+            title = track.first, subtitle = track.second, appLabel = "Spotify",
             appIcon = AppStyle.icon(this, "com.spotify.music"), artwork = art,
             accent = NothingStyle.foreground,
             isPlaying = playing, positionMs = position, positionUpdatedAt = SystemClock.elapsedRealtime(), durationMs = 243_000L,
@@ -951,3 +959,9 @@ class MainActivity : AppCompatActivity() {
         startService(Intent(this, IslandOverlayService::class.java))
     }
 }
+
+private val DEMO_TRACKS = listOf(
+    Triple("Midnight City", "M83", NothingStyle.red),
+    Triple("Nightcall", "Kavinsky", android.graphics.Color.rgb(150, 70, 220)),
+    Triple("Resonance", "HOME", android.graphics.Color.rgb(60, 150, 230)),
+)

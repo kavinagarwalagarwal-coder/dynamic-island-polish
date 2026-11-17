@@ -492,4 +492,47 @@ class IslandRenderingTest {
         assertTrue("Content under the camera hole:\n" + offenders.joinToString("\n"), offenders.isEmpty())
     }
 
+
+    /** The night-drive music card's glovebox buttons skip tracks (and a near miss still counts). */
+    @Test fun nightDriveButtonsSkipTracks() {
+        val got = ArrayList<String>()
+        launchPlayground().use { scenario ->
+            var view: IslandView? = null
+            scenario.onActivity { activity ->
+                val v = findIsland(activity.window.decorView)!!
+                view = v
+                v.applyFeatures(IslandFeatures.read(activity).copy(pixelScenes = true, dotMusic = false, artworkBackdrop = false))
+                v.setSecondary(null)
+                v.callbacks = object : IslandView.Callbacks {
+                    override fun onMedia(activity: LiveActivity, command: String, positionMs: Long?) { got += command }
+                }
+                v.show(activity.demoMusic(false), Presentation.EXPANDED)
+            }
+            SystemClock.sleep(1500)
+            fun tapAt(cmd: String, nudge: Float) {
+                var at: FloatArray? = null
+                scenario.onActivity {
+                    val v = view!!
+                    val hits = field<ArrayList<Pair<RectF, String>>>(v, "driveHits")
+                    val r = hits.firstOrNull { it.second == cmd }?.first ?: error("No $cmd button on the drive card: $hits")
+                    val scale = field<IslandFit>(v, "fit").scale
+                    at = floatArrayOf((r.centerX() + nudge * r.width()) * scale, (r.centerY() + nudge * r.height()) * scale)
+                }
+                val (x, y) = at!!.let { it[0] to it[1] }
+                scenario.onActivity {
+                    val t = SystemClock.uptimeMillis()
+                    val down = android.view.MotionEvent.obtain(t, t, android.view.MotionEvent.ACTION_DOWN, x, y, 0)
+                    val up = android.view.MotionEvent.obtain(t, t + 60, android.view.MotionEvent.ACTION_UP, x, y, 0)
+                    view!!.dispatchTouchEvent(down); view!!.dispatchTouchEvent(up)
+                    down.recycle(); up.recycle()
+                }
+                SystemClock.sleep(400)
+            }
+            tapAt(IslandBus.MEDIA_NEXT, 0f)
+            tapAt(IslandBus.MEDIA_PREVIOUS, 0f)
+            tapAt(IslandBus.MEDIA_NEXT, .6f)
+        }
+        assertEquals(listOf(IslandBus.MEDIA_NEXT, IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_NEXT), got)
+    }
+
 }
