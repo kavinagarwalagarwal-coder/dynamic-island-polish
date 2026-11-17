@@ -230,6 +230,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     /** The home card is a mountain valley that follows the time of day (the pixel scenes look). */
     private fun showsHomeScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.HOME
     private val homeScene by lazy { HomeScene(resources) }
+    // The user's pictures for the timer (hourglass desert), Do Not Disturb (sleeping cat) and
+    // Bluetooth (aurora forest), in the pixel scenes look.
+    private fun showsTimerScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.TIMER && isLiveTimer(a)
+    private fun showsDndScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.RINGER && a.ringer == RingerState.DND_ON
+    private fun showsAuroraScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.DEVICE && !a.lost
+    private fun showsPictureScene(a: LiveActivity?) = showsTimerScene(a) || showsDndScene(a) || showsAuroraScene(a)
+    private val timerScene by lazy { TimerScene(resources) }
+    private val dndScene by lazy { DndScene(resources) }
+    private val auroraScene by lazy { AuroraScene(resources) }
     private val driveHits = ArrayList<Pair<RectF, String>>()
 
     /** Once per frame: feed the cover to both records and move them along. */
@@ -1131,7 +1140,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             IslandMode.CALL -> Spec(w, dp(88f), cardRadius(dp(44f)), screenCenter())
             IslandMode.MESSAGE -> Spec(w, dp(if (hasMessageButtons(a)) 134f else 84f), cardRadius(dp(40f)), screenCenter())
             IslandMode.CHARGING -> Spec(w, dp(64f), cardRadius(dp(32f)), screenCenter())
-            IslandMode.TIMER -> Spec(w, dp(if (visibleActions(a).isEmpty()) 88f else 138f), cardRadius(dp(44f)), screenCenter())
+            IslandMode.TIMER -> Spec(w, if (showsTimerScene(a)) max(dp(138f), PictureScene.heightFor(w))
+                else dp(if (visibleActions(a).isEmpty()) 88f else 138f), cardRadius(dp(44f)), screenCenter())
             IslandMode.ALARM -> Spec(w, dp(88f), cardRadius(dp(44f)), screenCenter())
             IslandMode.DOWNLOAD -> Spec(w, dp(100f), cardRadius(dp(40f)), screenCenter())
             IslandMode.VOLUME -> {
@@ -1139,6 +1149,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 Spec(openWidth(dp(VOLUME_WIDTH_DP)), h, min(h / 2f, volumeHeight() / 2f), openCenter())
             }
             IslandMode.DEVICE, IslandMode.EVENT -> {
+                if (showsAuroraScene(a)) return Spec(w, PictureScene.heightFor(w), cardRadius(dp(44f)), screenCenter())
                 val h = mediumRowHeight()
                 Spec(openWidth(dp(MEDIUM_WIDTH_DP)), h, min(h / 2f, cardRadius(dp(MEDIUM_HEIGHT_DP) / 2f)), openCenter())
             }
@@ -1149,6 +1160,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             IslandMode.SLEEP -> Spec(w, dp(150f), cardRadius(dp(44f)), screenCenter())
             IslandMode.HOME -> Spec(w, dp(162f), cardRadius(dp(44f)), screenCenter())
             IslandMode.RINGER -> {
+                if (showsDndScene(a)) return Spec(w, PictureScene.heightFor(w), cardRadius(dp(44f)), screenCenter())
                 // Just wide enough for the glyph and its word, like a small switch label.
                 val h = dp(RINGER_HEIGHT_DP)
                 val word = titlePaint.measureText(a.title)
@@ -1254,6 +1266,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             showsDrive(a) && presentation == Presentation.EXPANDED && !reduceMotion && (a.isPlaying || drive.moving) -> 33L
             // The valley's glitter, stars and birds are slow; 15 fps is plenty.
             showsHomeScene(a) && presentation == Presentation.EXPANDED && !reduceMotion -> 66L
+            (showsDndScene(a) || showsAuroraScene(a)) && presentation == Presentation.EXPANDED && !reduceMotion -> 66L
             a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else COMPACT_WAVE_FRAME_MS
             // A tap's ripple (or a burst between songs) finishes even while paused.
             usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling || fieldFading) -> 16L
@@ -1481,6 +1494,24 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val backdrop = bodyAlpha * (1f - absorb) * (0.25f + 0.75f * room)
         if (usesDots(a)) drawDotField(canvas, a, backdrop) else if (!showsDrive(a)) drawArtBackdrop(canvas, backdrop)
         driveHits.clear()
+        if (showsPictureScene(a)) {
+            val open = expandedA.value.coerceIn(0f, 1f) * reveal
+            val sa = (bodyAlpha * ((open - .2f) / .8f).coerceIn(0f, 1f)).toInt()
+            if (sa > 2) {
+                val sw = widthS.target; val sh = heightS.target
+                when {
+                    showsTimerScene(a) -> {
+                        val f = timerFraction(a)
+                        timerScene.draw(canvas, rect, sw, sh, sa, if (a.chronometerCountDown) f else 1f - f,
+                            a.pausedTimerMs == null && (a.clockMs() ?: 0L) > 0L, reduceMotion)
+                    }
+                    showsDndScene(a) -> dndScene.draw(canvas, rect, sw, sh, sa, reduceMotion,
+                        android.text.format.DateFormat.is24HourFormat(context))
+                    else -> auroraScene.draw(canvas, rect, sw, sh, sa, reduceMotion)
+                }
+                drawCameraWell(canvas, sa)
+            }
+        }
         if (showsHomeScene(a)) {
             val open = expandedA.value.coerceIn(0f, 1f) * reveal
             val sa = (bodyAlpha * ((open - .2f) / .8f).coerceIn(0f, 1f)).toInt()
@@ -2390,9 +2421,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     /** Headphones arriving, or any Bluetooth audio device dropping away. */
     private fun drawDeviceExpanded(canvas: Canvas, a: LiveActivity, alpha: Int) {
-        val cy = rect.centerY()
-        val icon = min(rect.height(), dp(MEDIUM_HEIGHT_DP)) - dp(20f)
-        val l = rect.left + dp(10f)
+        // Over the aurora picture the device row sits at the top of the card.
+        val scene = showsAuroraScene(a)
+        val rowH = if (scene) mediumRowHeight() else rect.height()
+        val rowTop = if (scene) rect.top + dp(6f) else rect.top
+        val cy = rowTop + rowH / 2f
+        val icon = min(rowH, dp(MEDIUM_HEIGHT_DP)) - dp(20f)
+        val l = rect.left + dp(if (scene) 16f else 10f)
         val tint = if (a.lost) cRed else (userAccent ?: AppStyle.GREEN)
         fillPaint.color = withAlpha(tint, alpha * 45 / 255)
         canvas.drawCircle(l + icon / 2, cy, icon / 2, fillPaint)
@@ -2400,14 +2435,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         else drawHeadphones(canvas, l + icon / 2, cy, icon * .5f, withAlpha(tint, alpha))
         val tx = l + icon + dp(10f)
         var right = rect.right - dp(18f)
-        val (titleY, detailY) = mediumBaselines(rect.top, rect.height())
+        val (titleY, detailY) = mediumBaselines(rowTop, rowH)
         val battery = a.progress
         if (battery != null && !a.lost) {
             val label = "${IslandSignals.percent(battery)}%"
             right = rolling(canvas, "battery", label, right, (titleY + detailY) / 2f + dp(3f), titlePaint, tint, alpha, alignRight = true) - dp(10f)
         }
         fadeText(canvas, a, 0, a.title, tx, titleY, right - tx, titlePaint, Color.WHITE, alpha)
-        fadeText(canvas, a, 1, a.subtitle, tx, detailY, right - tx, smallPaint, if (a.lost) cRed else GREY, alpha)
+        fadeText(canvas, a, 1, a.subtitle, tx, detailY, right - tx, smallPaint,
+            if (a.lost) cRed else if (scene) Color.argb(225, 225, 235, 250) else GREY, alpha)
     }
 
     // ---------------------------------------------------------------- events, flashlight, sleep, home
@@ -2689,8 +2725,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             else -> Color.WHITE
         }
         val color = withAlpha(tint, alpha)
-        val cy = rect.centerY()
-        val icon = rect.height() - dp(14f)
+        // Over the bedroom picture the glyph and word sit in a row at the top.
+        val scene = showsDndScene(a)
+        val rowH = if (scene) dp(RINGER_HEIGHT_DP) else rect.height()
+        val cy = if (scene) rect.top + dp(10f) + rowH / 2f else rect.centerY()
+        val icon = rowH - dp(14f)
         val gx = rect.left + dp(7f) + icon / 2f
         fillPaint.color = withAlpha(tint, alpha * 40 / 255)
         canvas.drawCircle(gx, cy, icon / 2f, fillPaint)
