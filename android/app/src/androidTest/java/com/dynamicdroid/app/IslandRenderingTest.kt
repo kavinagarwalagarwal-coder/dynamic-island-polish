@@ -562,6 +562,7 @@ class IslandRenderingTest {
                 add("silent-card", activity.demoRinger(RingerState.SILENT), Presentation.EXPANDED, .10f)
                 add("silent-pill", activity.demoRinger(RingerState.SILENT), Presentation.COMPACT, .02f)
                 add("bluetooth-card", activity.demoDevice(false), Presentation.EXPANDED, .12f)
+                add("volume-card", activity.demoVolume(.6f), Presentation.EXPANDED, .12f)
             }
             for ((name, show, min) in cases) {
                 scenario.onActivity { show() }

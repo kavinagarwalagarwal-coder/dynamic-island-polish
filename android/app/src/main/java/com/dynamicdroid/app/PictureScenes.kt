@@ -53,12 +53,30 @@ abstract class PictureScene(protected val res: Resources) {
     /** Seconds on a clock that stands still under reduced motion. */
     protected fun seconds(still: Boolean) = if (still) 0f else (SystemClock.uptimeMillis() % 3_600_000L) / 1000f
 
-    /** Starts drawing in picture pixels inside [card]. Pair with [end]. */
-    protected fun begin(canvas: Canvas, card: RectF, settledW: Float, settledH: Float) {
+    private var mapScale = 1f
+    private var mapX0 = 0f
+    private var mapY0 = 0f
+    private var mapL = 0f
+    private var mapT = 0f
+
+    /** Picture x → card x, as last drawn. */
+    fun x(px: Float) = mapL + (px - mapX0) * mapScale
+    /** Picture y → card y, as last drawn. */
+    fun y(py: Float) = mapT + (py - mapY0) * mapScale
+    /** Picture pixels → card pixels. */
+    fun len(v: Float) = v * mapScale
+
+    /**
+     * Starts drawing in picture pixels inside [card], showing the window [wl]..[wr] x [wt]..[wb]
+     * of the picture at the settled size (the whole picture by default). Pair with [end].
+     */
+    protected fun begin(canvas: Canvas, card: RectF, settledW: Float, settledH: Float,
+                        wl: Float = 0f, wt: Float = 0f, wr: Float = W, wb: Float = H) {
         val sw = max(settledW, 1f); val sh = max(settledH, 1f)
-        val scale = max(sw / W, sh / H)
-        val x0 = W / 2f - card.width() / scale / 2f
-        val y0 = H / 2f - card.height() / scale / 2f
+        val scale = max(sw / (wr - wl), sh / (wb - wt))
+        val x0 = (wl + wr) / 2f - card.width() / scale / 2f
+        val y0 = (wt + wb) / 2f - card.height() / scale / 2f
+        mapScale = scale; mapX0 = x0; mapY0 = y0; mapL = card.left; mapT = card.top
         saveCount = canvas.save()
         canvas.clipRect(card)
         canvas.translate(card.left, card.top)
@@ -392,5 +410,178 @@ class AuroraScene(res: Resources) : PictureScene(res) {
         private val STARS = floatArrayOf(273f, 64f, 340f, 28f, 46f, 121f, 775f, 137f, 393f, 106f, 999f, 128f, 82f, 41f,
             34f, 91f, 907f, 123f, 27f, 66f, 496f, 113f, 448f, 123f, 208f, 49f, 495f, 35f, 724f, 120f, 436f, 145f, 440f, 81f,
             470f, 101f, 803f, 81f)
+    }
+}
+
+/**
+ * The volume card as a wizard's desk at night. The glass tube is the volume: it fills with
+ * glowing magic as the volume goes up (bubbles rising, the surface rippling), and the room's
+ * candles burn brighter with it. The four rune stones are ring, vibrate, silent and Do Not
+ * Disturb: the active one glows and sinks a little, the others go dark.
+ */
+class WizardScene(res: Resources) : PictureScene(res) {
+    private val bg by lazy { decode(R.drawable.wiz_bg) }
+    private val hl by lazy { decode(R.drawable.wiz_hl) }
+    private val flame by lazy { glowBitmap(Color.argb(170, 255, 190, 100)) }
+    private val violet by lazy { glowBitmap(Color.argb(170, 200, 110, 255)) }
+    private val amber by lazy { glowBitmap(Color.argb(200, 255, 176, 80)) }
+    override fun prewarm() { bg; hl; flame; violet; amber }
+    private val add = Paint(Paint.FILTER_BITMAP_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.ADD) }
+    private val liquid = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var liquidFor = -1f
+    private val wave = android.graphics.Path()
+    private val icon = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND; strokeJoin = Paint.Join.ROUND }
+
+    /** [ringer] 0 ring, 1 vibrate, 2 silent (a float so the glow can slide), null when unknown. */
+    fun draw(canvas: Canvas, card: RectF, settledW: Float, settledH: Float, alpha: Int, level: Float,
+             ringer: Float?, dnd: Boolean, still: Boolean) {
+        val t = seconds(still)
+        val lv = level.coerceIn(0f, 1f)
+        begin(canvas, card, settledW, settledH, WL, WT, WR, WB)
+        bmp.alpha = alpha
+        canvas.drawBitmap(bg, 0f, 0f, bmp)
+        // The room darkens as the sound goes down.
+        fill.color = Color.argb((alpha * .38f * (1f - lv)).toInt(), 6, 3, 14)
+        canvas.drawRect(WL - 20f, WT - 20f, WR + 20f, WB + 20f, fill)
+        // Candles flicker, brighter with the volume.
+        for (i in FLAMES.indices step 2) {
+            val k = i / 2
+            val f = .75f + .15f * sin(t * 9f + k * 2f) + .1f * sin(t * 23f + k)
+            val rr = (20f + 10f * lv) * f
+            r.set(FLAMES[i] - rr, FLAMES[i + 1] - rr, FLAMES[i] + rr, FLAMES[i + 1] + rr)
+            add.alpha = (alpha * (.25f + .45f * lv) * f).toInt()
+            canvas.drawBitmap(flame, null, r, add)
+        }
+        drawLiquid(canvas, lv, t, alpha)
+        bmp.alpha = alpha
+        canvas.drawBitmap(hl, HL_X, HL_Y, bmp)
+        drawStones(canvas, ringer, dnd, t, alpha)
+        // Magic motes drifting up from the tube.
+        if (!still) for (k in 0 until 16) {
+            val p = ((t * (.12f + (k % 4) * .03f) + k * .173f) % 1f)
+            val x = TUBE_L + ((k * 61) % 320) + sin(t + k) * 6f
+            val y = TUBE_B - p * 150f
+            val a = (alpha * sin(p * PI.toFloat()) * (.35f + .65f * lv)).toInt()
+            fill.color = Color.argb(a, 220, 160, 255)
+            canvas.drawCircle(x, y, .9f + (k % 3) * .4f, fill)
+        }
+        end(canvas)
+        shade(canvas, card, alpha, .32f, 0f, 120)
+    }
+
+    private fun drawLiquid(canvas: Canvas, lv: Float, t: Float, alpha: Int) {
+        if (lv <= .002f) return
+        if (liquidFor != TUBE_T) {
+            liquidFor = TUBE_T
+            liquid.shader = LinearGradient(0f, TUBE_T, 0f, TUBE_B,
+                intArrayOf(Color.rgb(236, 170, 255), Color.rgb(176, 84, 240), Color.rgb(110, 40, 190)), null, Shader.TileMode.CLAMP)
+        }
+        val end = TUBE_L + (TUBE_R - TUBE_L) * lv
+        // The leading edge ripples like a living surface.
+        wave.rewind()
+        wave.moveTo(TUBE_L, TUBE_T)
+        var y = TUBE_T
+        while (y <= TUBE_B) {
+            wave.lineTo(end + sin(y * .45f + t * 6f) * 1.8f, y)
+            y += 2f
+        }
+        wave.lineTo(TUBE_L, TUBE_B)
+        wave.close()
+        canvas.save()
+        canvas.clipRect(TUBE_L, TUBE_T, TUBE_R, TUBE_B)
+        liquid.alpha = alpha * 215 / 255
+        canvas.drawPath(wave, liquid)
+        // Bubbles rising inside.
+        for (k in 0 until 10) {
+            val bx = TUBE_L + 6f + ((k * 37f + t * (8f + k)) % max(6f, end - TUBE_L - 6f))
+            val p = ((t * (.5f + (k % 3) * .2f) + k * .31f) % 1f)
+            val by = TUBE_B - 3f - p * (TUBE_B - TUBE_T - 6f)
+            fill.color = Color.argb((alpha * .6f * sin(p * PI.toFloat())).toInt(), 250, 220, 255)
+            canvas.drawCircle(bx, by, .8f + (k % 3) * .5f, fill)
+        }
+        // A bright line along the top of the liquid.
+        fill.color = Color.argb(alpha * 160 / 255, 255, 230, 255)
+        canvas.drawRect(TUBE_L, TUBE_T + 2f, end, TUBE_T + 3.2f, fill)
+        canvas.restore()
+        // Glow around the magic.
+        val gw = (end - TUBE_L) / 2f + 24f
+        r.set(TUBE_L + (end - TUBE_L) / 2f - gw, TUBE_T - 22f, TUBE_L + (end - TUBE_L) / 2f + gw, TUBE_B + 22f)
+        add.alpha = (alpha * (.35f + .1f * sin(t * 2f))).toInt()
+        canvas.drawBitmap(violet, null, r, add)
+    }
+
+    private fun drawStones(canvas: Canvas, ringer: Float?, dnd: Boolean, t: Float, alpha: Int) {
+        for (i in 0 until 4) {
+            val cx = STONES[i]
+            val on = if (i < 3) (if (ringer == null) 0f else (1f - kotlin.math.abs(ringer - i)).coerceIn(0f, 1f)) else if (dnd) 1f else 0f
+            // Dark stones for what's off.
+            fill.color = Color.argb((alpha * .62f * (1f - on)).toInt(), 24, 12, 8)
+            canvas.drawOval(cx - 33f, STONE_Y - 17f, cx + 33f, STONE_Y + 31f, fill)
+            if (on > 0f) {
+                val pulse = .85f + .15f * sin(t * 3f)
+                r.set(cx - 50f, STONE_Y - 34f, cx + 50f, STONE_Y + 44f)
+                add.alpha = (alpha * on * .55f * pulse).toInt()
+                canvas.drawBitmap(if (i == 3) violet else amber, null, r, add)
+            }
+            // The rune: the mode's symbol carved in light.
+            val c = if (i == 3) Color.rgb(226, 170, 255) else Color.rgb(255, 226, 160)
+            val dim = Color.rgb(120, 82, 56)
+            icon.color = blend(dim, c, on)
+            icon.alpha = alpha
+            icon.strokeWidth = 2.2f
+            val y = STONE_Y + 1f + (1f - on) * 0f + on * 1.2f
+            when (i) {
+                0 -> bell(canvas, cx, y)
+                1 -> { canvas.drawRoundRect(cx - 4.5f, y - 8f, cx + 4.5f, y + 8f, 2f, 2f, icon)
+                    canvas.drawLine(cx - 9f, y - 4f, cx - 9f, y + 4f, icon); canvas.drawLine(cx + 9f, y - 4f, cx + 9f, y + 4f, icon) }
+                2 -> { bell(canvas, cx, y); canvas.drawLine(cx - 9f, y - 9f, cx + 9f, y + 9f, icon) }
+                else -> {
+                    canvas.drawArc(cx - 8f, y - 8f, cx + 8f, y + 8f, 70f, 220f, false, icon)
+                    canvas.drawArc(cx - 2f, y - 9f, cx + 12f, y + 5f, 120f, 140f, false, icon)
+                }
+            }
+        }
+    }
+
+    private fun bell(canvas: Canvas, cx: Float, y: Float) {
+        wave.rewind()
+        wave.moveTo(cx - 8f, y + 5f)
+        wave.quadTo(cx - 6f, y + 3f, cx - 6f, y - 2f)
+        wave.cubicTo(cx - 6f, y - 9f, cx + 6f, y - 9f, cx + 6f, y - 2f)
+        wave.quadTo(cx + 6f, y + 3f, cx + 8f, y + 5f)
+        wave.close()
+        canvas.drawPath(wave, icon)
+        canvas.drawLine(cx - 1.5f, y + 8f, cx + 1.5f, y + 8f, icon)
+    }
+
+    private fun blend(a: Int, b: Int, f: Float): Int {
+        val k = f.coerceIn(0f, 1f)
+        return Color.rgb((Color.red(a) + (Color.red(b) - Color.red(a)) * k).toInt(),
+            (Color.green(a) + (Color.green(b) - Color.green(a)) * k).toInt(),
+            (Color.blue(a) + (Color.blue(b) - Color.blue(a)) * k).toInt())
+    }
+
+    /** Where the stones sit on the card, for taps (0 ring, 1 vibrate, 2 silent, 3 Do Not Disturb). */
+    fun stoneRect(i: Int, out: RectF) = out.set(x(STONES[i] - 36f), y(STONE_Y - 22f), x(STONES[i] + 36f), y(STONE_Y + 36f))
+    val tubeLeft get() = x(TUBE_L)
+    val tubeRight get() = x(TUBE_R)
+    val tubeBottom get() = y(TUBE_B + 8f)
+    val stonesTop get() = y(STONE_Y - 22f)
+
+    companion object {
+        const val WL = 190f
+        const val WT = 96f
+        const val WR = 834f
+        const val WB = 400f
+        fun heightFor(width: Float) = width * (WB - WT) / (WR - WL)
+        private const val TUBE_L = 351f
+        private const val TUBE_R = 675f
+        private const val TUBE_T = 248f
+        private const val TUBE_B = 281f
+        private const val HL_X = 336f
+        private const val HL_Y = 236f
+        private const val STONE_Y = 313f
+        private val STONES = floatArrayOf(379f, 467f, 556f, 645f)
+        private val FLAMES = floatArrayOf(168f, 171f, 293f, 107f, 654f, 159f, 731f, 102f)
     }
 }

@@ -220,6 +220,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             showsTimerScene(a) -> timerScene::prewarm
             showsDndScene(a) -> dndScene::prewarm
             showsAuroraScene(a) -> auroraScene::prewarm
+            showsWizard(a) -> wizard::prewarm
             else -> return
         }
         val tag = if (showsDrive(a)) "drive" else a.mode.name + a.ringer
@@ -252,6 +253,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         showsTimerScene(a) -> "timer"
         showsDndScene(a) -> "bedroom"
         showsAuroraScene(a) -> "aurora"
+        showsWizard(a) -> "wizard"
         else -> null
     }
     private var sceneKindNow: String? = null
@@ -303,6 +305,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             showsDndScene(a) -> dndScene.draw(canvas, rect, sw, sh, sa, reduceMotion,
                 android.text.format.DateFormat.is24HourFormat(context), dim = a.ringer == RingerState.SILENT)
             showsAuroraScene(a) -> auroraScene.draw(canvas, rect, sw, sh, sa, reduceMotion)
+            showsWizard(a) -> wizard.draw(canvas, rect, sw, sh, sa, levelS.value, a.ringer?.let { modeS.value }, a.dndOn, reduceMotion)
         }
     }
 
@@ -341,6 +344,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val timerScene by lazy { TimerScene(resources) }
     private val dndScene by lazy { DndScene(resources) }
     private val auroraScene by lazy { AuroraScene(resources) }
+    /** The volume card as the wizard's desk: the tube is the volume, the rune stones the modes. */
+    private fun showsWizard(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.VOLUME
+    private val wizard by lazy { WizardScene(resources) }
+    private var volumeDragBottom = 0f
     private val driveHits = ArrayList<Pair<RectF, String>>()
 
     /** Once per frame: feed the cover to both records and move them along. */
@@ -1250,6 +1257,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             IslandMode.ALARM -> Spec(w, dp(88f), cardRadius(dp(44f)), screenCenter())
             IslandMode.DOWNLOAD -> Spec(w, dp(100f), cardRadius(dp(40f)), screenCenter())
             IslandMode.VOLUME -> {
+                if (showsWizard(a)) return Spec(w, WizardScene.heightFor(w), cardRadius(dp(44f)), screenCenter())
                 val h = volumeHeight() + if (a.ringer != null) dp(RINGER_ROW_DP) else 0f
                 Spec(openWidth(dp(VOLUME_WIDTH_DP)), h, min(h / 2f, volumeHeight() / 2f), openCenter())
             }
@@ -2384,7 +2392,35 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
      * Volume: icon and percent sit either side of the camera, the level bar runs underneath.
      * Drag the bar to set the level directly.
      */
+    private val stoneRect = RectF()
+
+    /**
+     * The wizard's desk volume card: the tube is the slider (drag along it), the four rune stones
+     * are ring, vibrate, silent and Do Not Disturb. The picture itself is drawn with the scenes.
+     */
+    private fun drawWizardVolume(canvas: Canvas, a: LiveActivity, alpha: Int) {
+        val level = levelS.value.coerceIn(0f, 1f)
+        val rowY = rect.top + dp(22f)
+        drawSpeaker(canvas, rect.left + dp(26f), rowY, dp(15f), level, alpha)
+        rolling(canvas, "volume", "${IslandSignals.percent(a.progress ?: level)}", rect.right - dp(22f), rowY + dp(4.5f),
+            smallPaint, Color.WHITE, alpha, alignRight = true)
+        volumeLeft = wizard.tubeLeft
+        volumeRight = wizard.tubeRight
+        volumeDragBottom = wizard.tubeBottom
+        val current = a.ringer ?: return
+        ringerIndex(current)?.let { modeS.target = it }
+        for (i in 0 until 4) {
+            wizard.stoneRect(i, stoneRect)
+            val state = when (i) {
+                0 -> RingerState.RING; 1 -> RingerState.VIBRATE; 2 -> RingerState.SILENT
+                else -> if (a.dndOn) RingerState.DND_OFF else RingerState.DND_ON
+            }
+            modeHits.add(RectF(stoneRect) to state)
+        }
+    }
+
     private fun drawVolumeExpanded(canvas: Canvas, a: LiveActivity, alpha: Int) {
+        if (showsWizard(a)) { drawWizardVolume(canvas, a, alpha); return }
         val level = levelS.value.coerceIn(0f, 1f)
         val rowY = rect.top + compactHeight() / 2f
         drawSpeaker(canvas, rect.left + dp(24f), rowY, dp(15f), level, alpha)
@@ -3661,7 +3697,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 if (a != null && usesDots(a) && !reduceMotion && !touchingSecondary) { cardDots.ripple(0.9f, e.x, e.y); kick() }
                 // Only the slider row drags; the ringer buttons below it are taps.
                 volumeDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.VOLUME &&
-                    e.y < rect.top + volumeHeight() + dp(2f)
+                    e.y < (if (showsWizard(a)) volumeDragBottom else rect.top + volumeHeight() + dp(2f))
                 if (volumeDragging) setVolumeFromTouch(e.x)
                 torchDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.TORCH && !torchBar.isEmpty &&
                     e.y > torchBar.top - dp(14f)
