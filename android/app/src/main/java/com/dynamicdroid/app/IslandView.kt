@@ -2652,7 +2652,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         canvas.drawRoundRect(bl, by, rr, by + bh, dp(4f), dp(4f), outlinePaint)
         fillPaint.color = withAlpha(if (level <= 0.15f) cRed else AppStyle.GREEN, alpha)
         canvas.drawRoundRect(bl + dp(2.5f), by + dp(2.5f), bl + dp(2.5f) + (bw - dp(5f)) * level, by + bh - dp(2.5f), dp(2f), dp(2f), fillPaint)
-        text(canvas, "${IslandSignals.percent(level)}%", bl - dp(8f), by + bh - dp(2f), dp(60f), smallPaint, GREY, alpha, alignRight = true)
+        text(canvas, "${IslandSignals.percent(level)}%", bl - dp(8f), by + bh - dp(2f), dp(60f), smallPaint,
+            if (showsHomeScene(a)) Color.argb(235, 240, 244, 250) else GREY, alpha, alignRight = true)
         drawActions(canvas, a, l, rect.bottom - dp(18f) - dp(36f), rr, alpha * later / 255)
     }
 
@@ -3080,7 +3081,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             a.chronometerCountDown -> context.getString(R.string.timer_label)
             else -> context.getString(R.string.timer_stopwatch)
         }
-        text(canvas, status, l + dp(34f), rect.top + dp(64f), dp(76f), smallPaint, GREY, alpha)
+        text(canvas, status, l + dp(34f), rect.top + dp(64f), dp(76f), smallPaint,
+            if (showsTimerScene(a)) Color.argb(235, 255, 236, 214) else GREY, alpha)
         drawTimerActions(canvas, a, l, rect.top + dp(86f), rr, late)
     }
 
