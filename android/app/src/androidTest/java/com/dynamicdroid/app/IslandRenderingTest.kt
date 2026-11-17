@@ -516,7 +516,7 @@ class IslandRenderingTest {
                     val hits = field<ArrayList<Pair<RectF, String>>>(v, "driveHits")
                     val r = hits.firstOrNull { it.second == cmd }?.first ?: error("No $cmd button on the drive card: $hits")
                     val scale = field<IslandFit>(v, "fit").scale
-                    at = floatArrayOf((r.centerX() + nudge * r.width()) * scale, (r.centerY() + nudge * r.height()) * scale)
+                    at = floatArrayOf((r.centerX() + nudge * r.width()) * scale, r.centerY() * scale)
                 }
                 val (x, y) = at!!.let { it[0] to it[1] }
                 scenario.onActivity {

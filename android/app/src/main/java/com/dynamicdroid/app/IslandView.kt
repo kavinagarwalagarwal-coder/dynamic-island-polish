@@ -1312,8 +1312,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             // The small island's waveform reads fine at 30 fps; the open card's progress bar gets 60.
             // Battery: the small waveform is a few short bars and reads as smooth at 20 fps.
             // The night drive runs at 30 fps, and keeps going while the car rolls to a stop.
-            showsDrive(a) && !reduceMotion && (a.isPlaying || drive.moving) ->
-                if (presentation == Presentation.EXPANDED) 33L else COMPACT_WAVE_FRAME_MS
+            // The small pill just freezes when paused; only the open card lets the car roll to a stop.
+            showsDrive(a) && !reduceMotion && presentation == Presentation.EXPANDED && (a.isPlaying || drive.moving) -> 33L
+            showsDrive(a) && !reduceMotion && a.isPlaying -> COMPACT_WAVE_FRAME_MS
             // The valley's glitter, stars and birds are slow; 15 fps is plenty.
             showsHomeScene(a) && presentation == Presentation.EXPANDED && !reduceMotion -> 66L
             (showsDndScene(a) || showsAuroraScene(a)) && !reduceMotion -> 66L
