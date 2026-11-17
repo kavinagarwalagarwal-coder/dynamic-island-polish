@@ -205,6 +205,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     /** The open music card is a night drive (the pixel scenes look) unless the dot player is on. */
     private fun showsDrive(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.MUSIC && !usesDots(a)
     private val drive by lazy { MusicDrive(resources) }
+    /** The home card is a mountain valley that follows the time of day (the pixel scenes look). */
+    private fun showsHomeScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.HOME
+    private val homeScene by lazy { HomeScene(resources) }
     private val driveHits = ArrayList<Pair<RectF, String>>()
 
     /** Once per frame: feed the cover to both records and move them along. */
@@ -1227,6 +1230,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             // Battery: the small waveform is a few short bars and reads as smooth at 20 fps.
             // The night drive runs at 30 fps, and keeps going while the car rolls to a stop.
             showsDrive(a) && presentation == Presentation.EXPANDED && !reduceMotion && (a.isPlaying || drive.moving) -> 33L
+            // The valley's glitter, stars and birds are slow; 15 fps is plenty.
+            showsHomeScene(a) && presentation == Presentation.EXPANDED && !reduceMotion -> 66L
             a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else COMPACT_WAVE_FRAME_MS
             // A tap's ripple (or a burst between songs) finishes even while paused.
             usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling || fieldFading) -> 16L
@@ -1454,6 +1459,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val backdrop = bodyAlpha * (1f - absorb) * (0.25f + 0.75f * room)
         if (usesDots(a)) drawDotField(canvas, a, backdrop) else if (!showsDrive(a)) drawArtBackdrop(canvas, backdrop)
         driveHits.clear()
+        if (showsHomeScene(a)) {
+            val open = expandedA.value.coerceIn(0f, 1f) * reveal
+            val sa = (bodyAlpha * ((open - .2f) / .8f).coerceIn(0f, 1f)).toInt()
+            if (sa > 2) homeScene.draw(canvas, rect, widthS.target, heightS.target, sa, reduceMotion)
+        }
         if (showsDrive(a)) {
             // The drive opens with the card: it fades in once the shape has made room.
             val open = expandedA.value.coerceIn(0f, 1f) * reveal
@@ -2484,7 +2494,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val top = rect.top + dp(18f)
         fadeText(canvas, a, 0, a.title, l, top + dp(34f), rr - l - dp(90f), bigPaint.apply { textSize = dp(34f) }, Color.WHITE, alpha)
         bigPaint.textSize = dp(26f)
-        fadeText(canvas, a, 1, a.subtitle, l, top + dp(56f), rr - l - dp(90f), bodyPaint, GREY, alpha)
+        fadeText(canvas, a, 1, a.subtitle, l, top + dp(56f), rr - l - dp(90f), bodyPaint,
+            if (showsHomeScene(a)) Color.argb(225, 235, 240, 250) else GREY, alpha)
         // Battery, top right.
         val level = a.progress ?: 0f
         val bw = dp(30f); val bh = dp(14f)
