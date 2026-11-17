@@ -243,7 +243,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     a.pausedTimerMs == null && (a.clockMs() ?: 0L) > 0L, reduceMotion)
             }
             showsDndScene(a) -> dndScene.draw(canvas, rect, sw, sh, sa, reduceMotion,
-                android.text.format.DateFormat.is24HourFormat(context))
+                android.text.format.DateFormat.is24HourFormat(context), dim = a.ringer == RingerState.SILENT)
             else -> auroraScene.draw(canvas, rect, sw, sh, sa, reduceMotion)
         }
         if (open < 1f) {
@@ -282,7 +282,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     // The user's pictures for the timer (hourglass desert), Do Not Disturb (sleeping cat) and
     // Bluetooth (aurora forest), in the pixel scenes look.
     private fun showsTimerScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.TIMER && isLiveTimer(a)
-    private fun showsDndScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.RINGER && a.ringer == RingerState.DND_ON
+    private fun showsDndScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.RINGER &&
+        (a.ringer == RingerState.DND_ON || a.ringer == RingerState.SILENT)
     private fun showsAuroraScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.DEVICE && !a.lost
     private fun showsPictureScene(a: LiveActivity?) = showsTimerScene(a) || showsDndScene(a) || showsAuroraScene(a)
     private val timerScene by lazy { TimerScene(resources) }

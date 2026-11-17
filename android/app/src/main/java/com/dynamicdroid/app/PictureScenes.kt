@@ -235,7 +235,7 @@ class TimerScene(res: Resources) : PictureScene(res) {
 }
 
 /**
- * Do Not Disturb as a cosy bedroom at night: the cat sleeps and breathes, "z"s drift up, the
+ * Do Not Disturb (and, a little dimmer, silent mode) as a cosy bedroom at night: the cat sleeps and breathes, "z"s drift up, the
  * fairy lights and stars twinkle, steam curls from the mug, the lamp glows, and the bedside
  * clock shows the real time.
  */
@@ -253,7 +253,7 @@ class DndScene(res: Resources) : PictureScene(res) {
     private val zPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD) }
     private val catDst = RectF()
 
-    fun draw(canvas: Canvas, card: RectF, settledW: Float, settledH: Float, alpha: Int, still: Boolean, is24h: Boolean) {
+    fun draw(canvas: Canvas, card: RectF, settledW: Float, settledH: Float, alpha: Int, still: Boolean, is24h: Boolean, dim: Boolean = false) {
         val t = seconds(still)
         begin(canvas, card, settledW, settledH)
         bmp.alpha = alpha
@@ -309,6 +309,11 @@ class DndScene(res: Resources) : PictureScene(res) {
         if (tw > 38f) clockPaint.textSize = 13f * 38f / tw
         canvas.drawText(text, CLOCK_X - clockPaint.measureText(text) / 2f, CLOCK_Y, clockPaint)
         end(canvas)
+        // Silent: the same room with the lights turned down a little.
+        if (dim) {
+            fill.color = Color.argb(alpha * 70 / 255, 8, 6, 24)
+            canvas.drawRect(card, fill)
+        }
         shade(canvas, card, alpha, .45f, 0f, 150)
     }
 
