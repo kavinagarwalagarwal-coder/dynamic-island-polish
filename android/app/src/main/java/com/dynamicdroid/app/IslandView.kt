@@ -205,6 +205,28 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     /** The open music card is a night drive (the pixel scenes look) unless the dot player is on. */
     private fun showsDrive(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.MUSIC && !usesDots(a)
     private val drive by lazy { MusicDrive(resources) }
+    private val wellPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private var wellR = -1f
+
+    /**
+     * A picture behind the island would show around the camera, so the scenes fade to black in a
+     * soft circle there: the lens sits in a little dark well, like the island itself.
+     */
+    private fun drawCameraWell(canvas: Canvas, alpha: Int) {
+        if (!onCamera()) return
+        val r = restingDiameter() / 2f
+        val outer = r * 2.4f
+        if (outer != wellR) {
+            wellR = outer
+            wellPaint.shader = RadialGradient(0f, 0f, outer, intArrayOf(Color.BLACK, Color.BLACK, Color.TRANSPARENT),
+                floatArrayOf(0f, r * 1.2f / outer, 1f), Shader.TileMode.CLAMP)
+        }
+        wellPaint.alpha = alpha
+        canvas.save()
+        canvas.translate(cameraCenter(), restingTop() + r)
+        canvas.drawCircle(0f, 0f, outer, wellPaint)
+        canvas.restore()
+    }
     /** The home card is a mountain valley that follows the time of day (the pixel scenes look). */
     private fun showsHomeScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.HOME
     private val homeScene by lazy { HomeScene(resources) }
@@ -1462,13 +1484,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (showsHomeScene(a)) {
             val open = expandedA.value.coerceIn(0f, 1f) * reveal
             val sa = (bodyAlpha * ((open - .2f) / .8f).coerceIn(0f, 1f)).toInt()
-            if (sa > 2) homeScene.draw(canvas, rect, widthS.target, heightS.target, sa, reduceMotion)
+            if (sa > 2) { homeScene.draw(canvas, rect, widthS.target, heightS.target, sa, reduceMotion); drawCameraWell(canvas, sa) }
         }
         if (showsDrive(a)) {
             // The drive opens with the card: it fades in once the shape has made room.
             val open = expandedA.value.coerceIn(0f, 1f) * reveal
             val sa = (bodyAlpha * ((open - .2f) / .8f).coerceIn(0f, 1f)).toInt()
-            if (sa > 2) drive.draw(canvas, rect, widthS.target, heightS.target, sa, a.isPlaying, reduceMotion, a.title, a.subtitle)
+            if (sa > 2) { drive.draw(canvas, rect, widthS.target, heightS.target, sa, a.isPlaying, reduceMotion, a.title, a.subtitle); drawCameraWell(canvas, sa) }
         }
 
         val ea = expandedA.value.coerceIn(0f, 1f) * reveal
