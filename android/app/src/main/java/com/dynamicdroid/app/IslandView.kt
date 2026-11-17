@@ -245,18 +245,56 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
      * from the open card's size, so the pill is a window onto the same scene and opening simply
      * reveals more of it. The pill gets a darker veil so its text stays clear.
      */
+    private fun sceneKind(a: LiveActivity?): String? = when {
+        a == null -> null
+        showsDrive(a) -> "drive"
+        showsHomeScene(a) -> "home"
+        showsTimerScene(a) -> "timer"
+        showsDndScene(a) -> "bedroom"
+        showsAuroraScene(a) -> "aurora"
+        else -> null
+    }
+    private var sceneKindNow: String? = null
+    private var sceneNow: LiveActivity? = null
+    private var scenePrev: LiveActivity? = null
+    private var sceneSwapAt = 0L
+    private val sceneSwapping get() = scenePrev != null && SystemClock.uptimeMillis() - sceneSwapAt < SCENE_FADE_MS
+
     private fun drawScene(canvas: Canvas, a: LiveActivity, bodyAlpha: Int, reveal: Float) {
-        val drive = showsDrive(a); val home = showsHomeScene(a); val picture = showsPictureScene(a)
-        if (!drive && !home && !picture) return
+        val kind = sceneKind(a)
+        // A different scene crossfades in over the old one instead of cutting.
+        if (kind != sceneKindNow) {
+            scenePrev = if (sceneKindNow != null && !reduceMotion) sceneNow else null
+            sceneSwapAt = SystemClock.uptimeMillis()
+            sceneKindNow = kind
+        }
+        sceneNow = if (kind != null) a else null
+        val prev = scenePrev?.takeIf { sceneSwapping }
+        if (prev == null) scenePrev = null
+        if (kind == null && prev == null) return
         val open = expandedA.value.coerceIn(0f, 1f)
         val vis = max(open, compactA.value.coerceIn(0f, 1f)) * reveal
         val sa = (bodyAlpha * ((vis - .2f) / .8f).coerceIn(0f, 1f)).toInt()
         if (sa <= 2) return
+        val t = if (prev == null) 1f else ((SystemClock.uptimeMillis() - sceneSwapAt) / SCENE_FADE_MS.toFloat()).coerceIn(0f, 1f)
+        if (prev != null) drawSceneOf(canvas, prev, (sa * (1f - t)).toInt())
+        if (kind != null) drawSceneOf(canvas, a, (sa * t).toInt())
+        if (prev != null) kick()
+        if (open < 1f) {
+            sceneDim.color = Color.BLACK
+            sceneDim.alpha = ((1f - open) * 120f * sa / 255f).toInt()
+            canvas.drawRect(rect, sceneDim)
+        }
+        drawCameraWell(canvas, sa)
+    }
+
+    private fun drawSceneOf(canvas: Canvas, a: LiveActivity, sa: Int) {
+        if (sa <= 2) return
         val card = specFor(Presentation.EXPANDED, a)
         val sw = card.w; val sh = card.h
         when {
-            drive -> this.drive.draw(canvas, rect, sw, sh, sa, a.isPlaying, reduceMotion, a.title, a.subtitle)
-            home -> homeScene.draw(canvas, rect, sw, sh, sa, reduceMotion)
+            showsDrive(a) -> this.drive.draw(canvas, rect, sw, sh, sa, a.isPlaying, reduceMotion, a.title, a.subtitle)
+            showsHomeScene(a) -> homeScene.draw(canvas, rect, sw, sh, sa, reduceMotion)
             showsTimerScene(a) -> {
                 val f = timerFraction(a)
                 timerScene.draw(canvas, rect, sw, sh, sa, if (a.chronometerCountDown) f else 1f - f,
@@ -264,14 +302,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             }
             showsDndScene(a) -> dndScene.draw(canvas, rect, sw, sh, sa, reduceMotion,
                 android.text.format.DateFormat.is24HourFormat(context), dim = a.ringer == RingerState.SILENT)
-            else -> auroraScene.draw(canvas, rect, sw, sh, sa, reduceMotion)
+            showsAuroraScene(a) -> auroraScene.draw(canvas, rect, sw, sh, sa, reduceMotion)
         }
-        if (open < 1f) {
-            sceneDim.color = Color.BLACK
-            sceneDim.alpha = ((1f - open) * 120f * sa / 255f).toInt()
-            canvas.drawRect(rect, sceneDim)
-        }
-        drawCameraWell(canvas, sa)
     }
 
     private val wellPaint = Paint(Paint.ANTI_ALIAS_FLAG)
@@ -635,6 +667,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
         val p = if (next == null) Presentation.IDLE else nextPresentation
         prewarmScene(next)
+        // Nothing showing: the next scene appears fresh rather than fading from an old one.
+        if (next == null) { sceneKindNow = null; sceneNow = null; scenePrev = null }
         val old = activity
         if (old != null && next != null && old.key == next.key && next.mode == IslandMode.TIMER &&
             ((old.pausedTimerMs == null) != (next.pausedTimerMs == null) ||
@@ -1318,6 +1352,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     /** Waveforms and clocks keep redrawing even when the shape is at rest. */
     private fun continuousDelay(): Long? {
         if (SystemClock.uptimeMillis() < rollingUntil) return 16L
+        if (sceneSwapping) return 16L
         val a = activity ?: return null
         if (presentation == Presentation.IDLE) return null
         if (isConcealed || introS.value < 0.01f || !isShown) return null
@@ -3936,6 +3971,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val TEXT_FADE_MS = 300L
         /** Frame spacing for slow, small motion, chosen for battery (see continuousDelay). */
         private const val COMPACT_WAVE_FRAME_MS = 50L
+        private const val SCENE_FADE_MS = 360L
         private const val COMPACT_CLOCK_FRAME_MS = 100L
         private const val BUBBLE_FRAME_MS = 66L
         private const val TEXT_FADE_BLUR_DP = 4f
