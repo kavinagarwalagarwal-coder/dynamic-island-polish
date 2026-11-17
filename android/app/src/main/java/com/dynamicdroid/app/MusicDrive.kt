@@ -72,6 +72,9 @@ class MusicDrive(private val res: Resources) {
     private var marquee = 0f
     private var lastMs = 0L
 
+    /** Decodes the pictures ahead of the first frame (any thread). */
+    fun prewarm() { bg; fg; glow }
+
     /** True while the car is still moving (rolling to a stop after a pause included). */
     val moving get() = speed > 0.003f
 

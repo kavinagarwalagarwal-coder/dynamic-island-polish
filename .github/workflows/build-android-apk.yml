@@ -126,6 +126,25 @@ jobs:
             adb shell pm grant com.dynamicdroid.fixture android.permission.POST_NOTIFICATIONS
             gradle --no-daemon -p android :app:connectedStandardDebugAndroidTest ${{ inputs.tests && format('-Pandroid.testInstrumentationRunnerArguments.class={0} -Pandroid.testInstrumentationRunnerArguments.report=1', inputs.tests) || '' }}
             adb pull /sdcard/Pictures/IslandSmoke island-screenshots
+      - name: Print scene thumbnails
+        if: always()
+        run: |
+          pip install --quiet pillow || true
+          python3 - <<'PY'
+          import base64, glob, io
+          try:
+              from PIL import Image
+          except ImportError:
+              raise SystemExit(0)
+          for path in sorted(glob.glob("island-screenshots/**/scene-*.png", recursive=True)):
+              im = Image.open(path).convert("RGB")
+              im.thumbnail((360, 240))
+              buf = io.BytesIO(); im.save(buf, "PNG", optimize=True)
+              data = base64.b64encode(buf.getvalue()).decode()
+              print(f"SCENE-BEGIN {path.split('/')[-1]}")
+              for i in range(0, len(data), 3000): print("SCENE-DATA " + data[i:i+3000])
+              print("SCENE-END")
+          PY
       - name: Report failed instrumentation tests
         if: failure()
         run: |

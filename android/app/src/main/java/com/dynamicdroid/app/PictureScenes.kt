@@ -36,6 +36,9 @@ abstract class PictureScene(protected val res: Resources) {
     private var shadeKey = -1f
     private var saveCount = 0
 
+    /** Decodes the scene's pictures ahead of the first frame (any thread). */
+    abstract fun prewarm()
+
     protected fun decode(id: Int): Bitmap = BitmapFactory.decodeResource(res, id, opts)
 
     protected fun glowBitmap(c: Int): Bitmap {
@@ -115,6 +118,7 @@ class TimerScene(res: Resources) : PictureScene(res) {
     private val bg by lazy { decode(R.drawable.timer_bg) }
     private val hl by lazy { decode(R.drawable.timer_hl) }
     private val sunGlow by lazy { glowBitmap(Color.argb(140, 255, 214, 120)) }
+    override fun prewarm() { bg; hl; sunGlow }
     private val topArea = FloatArray(NECK_ROW + 1)
     private val bottomRows = HW.size - BOTTOM_ROW
     private var topTotal = 0f
@@ -244,6 +248,7 @@ class DndScene(res: Resources) : PictureScene(res) {
     private val cat by lazy { decode(R.drawable.dnd_cat) }
     private val warm by lazy { glowBitmap(Color.argb(150, 255, 200, 110)) }
     private val bulbGlow by lazy { glowBitmap(Color.argb(200, 255, 214, 140)) }
+    override fun prewarm() { bg; cat; warm; bulbGlow }
     private val clockPaint = Paint().apply {
         isAntiAlias = false
         typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD)
@@ -338,6 +343,7 @@ class DndScene(res: Resources) : PictureScene(res) {
 class AuroraScene(res: Resources) : PictureScene(res) {
     private val bg by lazy { decode(R.drawable.bt_bg) }
     private val aurora by lazy { decode(R.drawable.bt_aurora) }
+    override fun prewarm() { bg; aurora }
     private val add = Paint(Paint.FILTER_BITMAP_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.ADD) }
     private val strip = android.graphics.Rect()
     private val stripDst = RectF()

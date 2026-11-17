@@ -206,6 +206,26 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun showsDrive(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.MUSIC && !usesDots(a)
     private val drive by lazy { MusicDrive(resources) }
     private val sceneDim = Paint()
+    private val warmed = HashSet<String>()
+
+    /**
+     * Decodes a scene's pictures on a worker thread as soon as its activity arrives, so the
+     * first frame never waits on decoding a 1024-pixel picture.
+     */
+    private fun prewarmScene(a: LiveActivity?) {
+        val job: (() -> Unit) = when {
+            a == null -> return
+            showsDrive(a) -> drive::prewarm
+            showsHomeScene(a) -> homeScene::prewarm
+            showsTimerScene(a) -> timerScene::prewarm
+            showsDndScene(a) -> dndScene::prewarm
+            showsAuroraScene(a) -> auroraScene::prewarm
+            else -> return
+        }
+        val tag = if (showsDrive(a)) "drive" else a.mode.name + a.ringer
+        if (!warmed.add(tag)) return
+        Thread({ runCatching(job) }, "scene-warm").apply { priority = Thread.MIN_PRIORITY }.start()
+    }
 
     /**
      * Which glovebox button a tap means. The whole glovebox row counts, split between the three
@@ -614,6 +634,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         reduceMotion = android.provider.Settings.Global.getFloat(context.contentResolver,
             android.provider.Settings.Global.ANIMATOR_DURATION_SCALE, 1f) == 0f
         val p = if (next == null) Presentation.IDLE else nextPresentation
+        prewarmScene(next)
         val old = activity
         if (old != null && next != null && old.key == next.key && next.mode == IslandMode.TIMER &&
             ((old.pausedTimerMs == null) != (next.pausedTimerMs == null) ||

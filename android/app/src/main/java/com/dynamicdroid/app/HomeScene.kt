@@ -40,6 +40,9 @@ class HomeScene(private val res: Resources) {
     private val moonGlow: Bitmap by lazy { glowBitmap(Color.argb(120, 170, 210, 255)) }
     private val r = RectF()
 
+    /** Decodes the picture for the current time of day ahead of the first frame (any thread). */
+    fun prewarm() { if (nightness() < 1f) day; if (nightness() > 0f) night }
+
     private fun glowBitmap(c: Int): Bitmap {
         val n = 64
         return Bitmap.createBitmap(n, n, Bitmap.Config.ARGB_8888).also { b ->

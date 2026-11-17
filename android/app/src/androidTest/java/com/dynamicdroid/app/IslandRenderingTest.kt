@@ -535,4 +535,62 @@ class IslandRenderingTest {
         assertEquals(listOf(IslandBus.MEDIA_NEXT, IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_NEXT), got)
     }
 
+
+    /**
+     * Every picture scene shows where it should: the open card and the small pill for music,
+     * timer, Do Not Disturb, silent and Bluetooth, and the home card. Each one is saved
+     * (scene-*.png) and must actually show colourful picture, not a black island.
+     */
+    @Test fun pictureScenesShowWhereTheyShould() {
+        val problems = ArrayList<String>()
+        launchPlayground().use { scenario ->
+            var view: IslandView? = null
+            val cases = ArrayList<Triple<String, () -> Unit, Float>>()
+            scenario.onActivity { activity ->
+                val v = findIsland(activity.window.decorView)!!
+                view = v
+                v.applyFeatures(IslandFeatures.read(activity).copy(pixelScenes = true, dotMusic = false, artworkBackdrop = false,
+                    edgeGlow = false, cameraFade = false))
+                v.setSecondary(null)
+                fun add(name: String, a: LiveActivity, p: Presentation, min: Float) { cases += Triple(name, { v.show(a, p) }, min) }
+                add("music-card", activity.demoMusic(true), Presentation.EXPANDED, .12f)
+                add("music-pill", activity.demoMusic(true), Presentation.COMPACT, .02f)
+                add("timer-card", activity.demoTimer(95), Presentation.EXPANDED, .12f)
+                add("timer-pill", activity.demoTimer(95), Presentation.COMPACT, .02f)
+                add("home-card", activity.demoHome(), Presentation.EXPANDED, .12f)
+                add("dnd-card", activity.demoRinger(RingerState.DND_ON), Presentation.EXPANDED, .12f)
+                add("silent-card", activity.demoRinger(RingerState.SILENT), Presentation.EXPANDED, .10f)
+                add("silent-pill", activity.demoRinger(RingerState.SILENT), Presentation.COMPACT, .02f)
+                add("bluetooth-card", activity.demoDevice(false), Presentation.EXPANDED, .12f)
+            }
+            for ((name, show, min) in cases) {
+                scenario.onActivity { show() }
+                SystemClock.sleep(1600)
+                val at = IntArray(2); var box = RectF()
+                scenario.onActivity {
+                    val v = view!!
+                    v.getLocationOnScreen(at)
+                    val r = field<RectF>(v, "rect"); val sc = field<IslandFit>(v, "fit").scale
+                    box = RectF(at[0] + r.left * sc, at[1] + r.top * sc, at[0] + r.right * sc, at[1] + r.bottom * sc)
+                }
+                val shot = instrumentation.uiAutomation.takeScreenshot() ?: error("No emulator screenshot")
+                val l = box.left.toInt().coerceIn(0, shot.width - 2); val t = box.top.toInt().coerceIn(0, shot.height - 2)
+                val w = box.width().toInt().coerceIn(1, shot.width - l); val h = box.height().toInt().coerceIn(1, shot.height - t)
+                val crop = Bitmap.createBitmap(shot, l, t, w, h)
+                shot.recycle()
+                var colourful = 0; var total = 0
+                val hsv = FloatArray(3)
+                for (y in 0 until h step 2) for (x in 0 until w step 2) {
+                    total++
+                    android.graphics.Color.colorToHSV(crop.getPixel(x, y), hsv)
+                    if (hsv[1] > .25f && hsv[2] > .18f) colourful++
+                }
+                val share = colourful.toFloat() / max(1, total)
+                if (share < min) problems += "$name: only ${(share * 100).toInt()}% picture (want ${(min * 100).toInt()}%)"
+                saveBitmap("scene-$name", crop)
+            }
+        }
+        assertTrue("Scenes missing:\n" + problems.joinToString("\n"), problems.isEmpty())
+    }
+
 }
