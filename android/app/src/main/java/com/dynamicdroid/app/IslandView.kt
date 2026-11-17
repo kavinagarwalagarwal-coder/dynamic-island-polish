@@ -205,6 +205,55 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     /** The open music card is a night drive (the pixel scenes look) unless the dot player is on. */
     private fun showsDrive(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.MUSIC && !usesDots(a)
     private val drive by lazy { MusicDrive(resources) }
+    private val sceneDim = Paint()
+
+    /**
+     * Which glovebox button a tap means. The whole glovebox row counts, split between the three
+     * buttons, so a slightly-off tap still skips instead of opening the app.
+     */
+    private fun drivePick(x: Float, y: Float): String? {
+        driveHits.firstOrNull { it.first.contains(x, y) }?.let { return it.second }
+        if (driveHits.isEmpty()) return null
+        val top = driveHits.minOf { it.first.top } - dp(10f)
+        val left = driveHits.minOf { it.first.left } - dp(16f)
+        if (y < top || x < left) return null
+        return driveHits.minByOrNull { abs(it.first.centerX() - x) }?.second
+    }
+
+    /**
+     * The picture scenes, behind both the open card and the small pill. The zoom always comes
+     * from the open card's size, so the pill is a window onto the same scene and opening simply
+     * reveals more of it. The pill gets a darker veil so its text stays clear.
+     */
+    private fun drawScene(canvas: Canvas, a: LiveActivity, bodyAlpha: Int, reveal: Float) {
+        val drive = showsDrive(a); val home = showsHomeScene(a); val picture = showsPictureScene(a)
+        if (!drive && !home && !picture) return
+        val open = expandedA.value.coerceIn(0f, 1f)
+        val vis = max(open, compactA.value.coerceIn(0f, 1f)) * reveal
+        val sa = (bodyAlpha * ((vis - .2f) / .8f).coerceIn(0f, 1f)).toInt()
+        if (sa <= 2) return
+        val card = specFor(Presentation.EXPANDED, a)
+        val sw = card.w; val sh = card.h
+        when {
+            drive -> this.drive.draw(canvas, rect, sw, sh, sa, a.isPlaying, reduceMotion, a.title, a.subtitle)
+            home -> homeScene.draw(canvas, rect, sw, sh, sa, reduceMotion)
+            showsTimerScene(a) -> {
+                val f = timerFraction(a)
+                timerScene.draw(canvas, rect, sw, sh, sa, if (a.chronometerCountDown) f else 1f - f,
+                    a.pausedTimerMs == null && (a.clockMs() ?: 0L) > 0L, reduceMotion)
+            }
+            showsDndScene(a) -> dndScene.draw(canvas, rect, sw, sh, sa, reduceMotion,
+                android.text.format.DateFormat.is24HourFormat(context))
+            else -> auroraScene.draw(canvas, rect, sw, sh, sa, reduceMotion)
+        }
+        if (open < 1f) {
+            sceneDim.color = Color.BLACK
+            sceneDim.alpha = ((1f - open) * 120f * sa / 255f).toInt()
+            canvas.drawRect(rect, sceneDim)
+        }
+        drawCameraWell(canvas, sa)
+    }
+
     private val wellPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private var wellR = -1f
 
@@ -1263,10 +1312,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             // The small island's waveform reads fine at 30 fps; the open card's progress bar gets 60.
             // Battery: the small waveform is a few short bars and reads as smooth at 20 fps.
             // The night drive runs at 30 fps, and keeps going while the car rolls to a stop.
-            showsDrive(a) && presentation == Presentation.EXPANDED && !reduceMotion && (a.isPlaying || drive.moving) -> 33L
+            showsDrive(a) && !reduceMotion && (a.isPlaying || drive.moving) ->
+                if (presentation == Presentation.EXPANDED) 33L else COMPACT_WAVE_FRAME_MS
             // The valley's glitter, stars and birds are slow; 15 fps is plenty.
             showsHomeScene(a) && presentation == Presentation.EXPANDED && !reduceMotion -> 66L
-            (showsDndScene(a) || showsAuroraScene(a)) && presentation == Presentation.EXPANDED && !reduceMotion -> 66L
+            (showsDndScene(a) || showsAuroraScene(a)) && !reduceMotion -> 66L
             a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else COMPACT_WAVE_FRAME_MS
             // A tap's ripple (or a burst between songs) finishes even while paused.
             usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling || fieldFading) -> 16L
@@ -1494,35 +1544,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val backdrop = bodyAlpha * (1f - absorb) * (0.25f + 0.75f * room)
         if (usesDots(a)) drawDotField(canvas, a, backdrop) else if (!showsDrive(a)) drawArtBackdrop(canvas, backdrop)
         driveHits.clear()
-        if (showsPictureScene(a)) {
-            val open = expandedA.value.coerceIn(0f, 1f) * reveal
-            val sa = (bodyAlpha * ((open - .2f) / .8f).coerceIn(0f, 1f)).toInt()
-            if (sa > 2) {
-                val sw = widthS.target; val sh = heightS.target
-                when {
-                    showsTimerScene(a) -> {
-                        val f = timerFraction(a)
-                        timerScene.draw(canvas, rect, sw, sh, sa, if (a.chronometerCountDown) f else 1f - f,
-                            a.pausedTimerMs == null && (a.clockMs() ?: 0L) > 0L, reduceMotion)
-                    }
-                    showsDndScene(a) -> dndScene.draw(canvas, rect, sw, sh, sa, reduceMotion,
-                        android.text.format.DateFormat.is24HourFormat(context))
-                    else -> auroraScene.draw(canvas, rect, sw, sh, sa, reduceMotion)
-                }
-                drawCameraWell(canvas, sa)
-            }
-        }
-        if (showsHomeScene(a)) {
-            val open = expandedA.value.coerceIn(0f, 1f) * reveal
-            val sa = (bodyAlpha * ((open - .2f) / .8f).coerceIn(0f, 1f)).toInt()
-            if (sa > 2) { homeScene.draw(canvas, rect, widthS.target, heightS.target, sa, reduceMotion); drawCameraWell(canvas, sa) }
-        }
-        if (showsDrive(a)) {
-            // The drive opens with the card: it fades in once the shape has made room.
-            val open = expandedA.value.coerceIn(0f, 1f) * reveal
-            val sa = (bodyAlpha * ((open - .2f) / .8f).coerceIn(0f, 1f)).toInt()
-            if (sa > 2) { drive.draw(canvas, rect, widthS.target, heightS.target, sa, a.isPlaying, reduceMotion, a.title, a.subtitle); drawCameraWell(canvas, sa) }
-        }
+        drawScene(canvas, a, bodyAlpha, reveal)
 
         val ea = expandedA.value.coerceIn(0f, 1f) * reveal
         val ca = compactA.value.coerceIn(0f, 1f) * reveal
@@ -3761,7 +3783,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 } else if (a.mode == IslandMode.MUSIC && y > barY + dp(16f)) {
                     val cx = rect.centerX()
                     val drv = showsDrive(a)
-                    val pick = if (drv) driveHits.firstOrNull { it.first.contains(x, y) }?.second else null
+                    val pick = if (drv) drivePick(x, y) else null
                     when {
                         drv && pick == null -> callbacks?.onOpen(a)
                         drv && pick != IslandBus.MEDIA_TOGGLE -> callbacks?.onMedia(a, pick!!)
