@@ -202,6 +202,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var dotsAt = 0L
 
     private fun usesDots(a: LiveActivity?) = features.dotMusic && a?.mode == IslandMode.MUSIC
+    /** The open music card is a night drive (the pixel scenes look) unless the dot player is on. */
+    private fun showsDrive(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.MUSIC && !usesDots(a)
+    private val drive by lazy { MusicDrive(resources) }
+    private val driveHits = ArrayList<Pair<RectF, String>>()
 
     /** Once per frame: feed the cover to both records and move them along. */
     private fun advanceDots(a: LiveActivity) = DrawProfile.span("step") { advanceDotsNow(a) }
@@ -1098,7 +1102,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
         val w = expandedWidth()
         return when (a.mode) {
-            IslandMode.MUSIC -> Spec(w, dp(178f), cardRadius(dp(46f)), screenCenter())
+            IslandMode.MUSIC -> Spec(w, if (showsDrive(a)) max(dp(178f), drive.heightFor(w)) else dp(178f), cardRadius(dp(46f)), screenCenter())
             IslandMode.CALL -> Spec(w, dp(88f), cardRadius(dp(44f)), screenCenter())
             IslandMode.MESSAGE -> Spec(w, dp(if (hasMessageButtons(a)) 134f else 84f), cardRadius(dp(40f)), screenCenter())
             IslandMode.CHARGING -> Spec(w, dp(64f), cardRadius(dp(32f)), screenCenter())
@@ -1221,6 +1225,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         return when {
             // The small island's waveform reads fine at 30 fps; the open card's progress bar gets 60.
             // Battery: the small waveform is a few short bars and reads as smooth at 20 fps.
+            // The night drive runs at 30 fps, and keeps going while the car rolls to a stop.
+            showsDrive(a) && presentation == Presentation.EXPANDED && !reduceMotion && (a.isPlaying || drive.moving) -> 33L
             a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else COMPACT_WAVE_FRAME_MS
             // A tap's ripple (or a burst between songs) finishes even while paused.
             usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling || fieldFading) -> 16L
@@ -1446,7 +1452,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 resizing = shapeSprings.any { !it.isAtRest } || !pressS.isAtRest || !stretchS.isAtRest)
         }
         val backdrop = bodyAlpha * (1f - absorb) * (0.25f + 0.75f * room)
-        if (usesDots(a)) drawDotField(canvas, a, backdrop) else drawArtBackdrop(canvas, backdrop)
+        if (usesDots(a)) drawDotField(canvas, a, backdrop) else if (!showsDrive(a)) drawArtBackdrop(canvas, backdrop)
+        driveHits.clear()
+        if (showsDrive(a)) {
+            // The drive opens with the card: it fades in once the shape has made room.
+            val open = expandedA.value.coerceIn(0f, 1f) * reveal
+            val sa = (bodyAlpha * ((open - .2f) / .8f).coerceIn(0f, 1f)).toInt()
+            if (sa > 2) drive.draw(canvas, rect, widthS.target, heightS.target, sa, a.isPlaying, reduceMotion, a.title, a.subtitle)
+        }
 
         val ea = expandedA.value.coerceIn(0f, 1f) * reveal
         val ca = compactA.value.coerceIn(0f, 1f) * reveal
@@ -1858,6 +1871,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     private fun drawMusicExpanded(canvas: Canvas, a: LiveActivity, alpha: Int, late: Int) {
+        if (showsDrive(a)) { drawMusicDrive(canvas, a, alpha, late); return }
         val pad = dp(22f)
         val l = rect.left + pad
         val t = rect.top + pad
@@ -1913,6 +1927,64 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val ox = rect.right - dp(34f)
         drawOutputGlyph(canvas, ox, cy, dp(20f), withAlpha(GREY, late))
         musicOutputHit.set(ox - dp(22f), cy - dp(22f), ox + dp(22f), cy + dp(22f))
+    }
+
+    /**
+     * The night-drive music card: the song over the sky, the scrubber along the top of the
+     * dashboard, and the buttons on the glovebox. The radio scrolls the song too.
+     */
+    private fun drawMusicDrive(canvas: Canvas, a: LiveActivity, alpha: Int, late: Int) {
+        val pad = dp(18f)
+        val l = rect.left + pad
+        val t = rect.top + dp(16f)
+        val rr = rect.right - pad
+        val art = dp(44f)
+        drawArtwork(canvas, a, l, t, art, concentric(pad, art), alpha)
+        musicArtHit.set(l - dp(6f), t - dp(6f), l + art + dp(6f), t + art + dp(6f))
+        val tx = l + art + dp(12f)
+        val ox = rr - dp(10f)
+        val oy = t + art / 2f
+        drawOutputGlyph(canvas, ox, oy, dp(20f), withAlpha(Color.WHITE, late * 200 / 255))
+        musicOutputHit.set(ox - dp(22f), oy - dp(22f), ox + dp(22f), oy + dp(22f))
+        val waveW = dp(20f)
+        val wx = ox - dp(22f) - waveW
+        drawWave(canvas, wx, t + dp(13f), waveW, dp(16f), artTint(a), waveS.value, alpha)
+        fadeText(canvas, a, 0, a.title, tx, t + dp(19f), wx - dp(10f) - tx, titlePaint, Color.WHITE, alpha)
+        fadeText(canvas, a, 1, a.subtitle, tx, t + dp(38f), wx - dp(10f) - tx, bodyPaint, Color.argb(220, 220, 210, 235), alpha)
+
+        // Scrubber along the top of the dashboard.
+        barY = drive.y(MusicDrive.BAR_Y)
+        barLeft = drive.x(MusicDrive.BAR_L)
+        barRight = drive.x(MusicDrive.BAR_R)
+        val pos = if (seeking) (a.durationMs * seekFraction).toLong() else a.livePositionMs()
+        if (showsMediaAction(IslandBus.MEDIA_SEEK)) {
+            val above = barY - dp(7f)
+            rolling(canvas, "elapsed", formatDuration(pos), barLeft, above, smallPaint, Color.argb(210, 230, 220, 240), late, travel = .4f)
+            rolling(canvas, "remaining", "-" + formatDuration((a.durationMs - pos).coerceAtLeast(0L)), barRight, above, smallPaint,
+                Color.argb(210, 230, 220, 240), late, alignRight = true, travel = .4f)
+            val fraction = if (a.durationMs > 0L) (pos.toFloat() / a.durationMs).coerceIn(0f, 1f) else 0f
+            if (seeking || abs(musicBarS.value - fraction) < .004f || reduceMotion) musicBarS.snap(fraction)
+            else { musicBarS.target = fraction; kick() }
+            drawBar(canvas, barLeft, barRight, barY, musicBarS.value, userAccent ?: Color.rgb(255, 150, 92), late,
+                if (seeking) dp(6f) else dp(3.5f))
+        }
+
+        // Buttons on the glovebox, a little smaller than the plain card's.
+        val cy = drive.y(MusicDrive.CONTROLS_Y)
+        val gap = drive.len(MusicDrive.CONTROLS_GAP)
+        val cx = drive.x(MusicDrive.CONTROLS_X)
+        val hit = max(gap / 2f, dp(22f))
+        fun button(x: Float, cmd: String, draw: () -> Unit) {
+            if (!showsMediaAction(cmd)) return
+            canvas.save()
+            canvas.scale(.72f, .72f, x, cy)
+            draw()
+            canvas.restore()
+            driveHits.add(RectF(x - hit, cy - dp(22f), x + hit, cy + dp(22f)) to cmd)
+        }
+        button(cx - gap, IslandBus.MEDIA_PREVIOUS) { drawSkip(canvas, cx - gap, cy, false, late) }
+        button(cx, IslandBus.MEDIA_TOGGLE) { drawPlayPause(canvas, cx, cy, a.isPlaying, late) }
+        button(cx + gap, IslandBus.MEDIA_NEXT) { drawSkip(canvas, cx + gap, cy, true, late) }
     }
 
     private val outputPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeCap = Paint.Cap.ROUND }
@@ -3616,10 +3688,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     callbacks?.onDotPlayer()
                 } else if (a.mode == IslandMode.MUSIC && y > barY + dp(16f)) {
                     val cx = rect.centerX()
+                    val drv = showsDrive(a)
+                    val pick = if (drv) driveHits.firstOrNull { it.first.contains(x, y) }?.second else null
                     when {
-                        x < cx - dp(36f) && showsMediaAction(IslandBus.MEDIA_PREVIOUS) -> callbacks?.onMedia(a, IslandBus.MEDIA_PREVIOUS)
-                        x > cx + dp(36f) && x < musicOutputHit.left && showsMediaAction(IslandBus.MEDIA_NEXT) -> callbacks?.onMedia(a, IslandBus.MEDIA_NEXT)
-                        x in (cx - dp(36f))..(cx + dp(36f)) && showsMediaAction(IslandBus.MEDIA_TOGGLE) -> {
+                        drv && pick == null -> callbacks?.onOpen(a)
+                        drv && pick != IslandBus.MEDIA_TOGGLE -> callbacks?.onMedia(a, pick!!)
+                        !drv && x < cx - dp(36f) && showsMediaAction(IslandBus.MEDIA_PREVIOUS) -> callbacks?.onMedia(a, IslandBus.MEDIA_PREVIOUS)
+                        !drv && x > cx + dp(36f) && x < musicOutputHit.left && showsMediaAction(IslandBus.MEDIA_NEXT) -> callbacks?.onMedia(a, IslandBus.MEDIA_NEXT)
+                        (drv || x in (cx - dp(36f))..(cx + dp(36f))) && showsMediaAction(IslandBus.MEDIA_TOGGLE) -> {
                             // Flip instantly so the button feels responsive; the real state follows.
                             activity = a.copy(
                                 isPlaying = !a.isPlaying,
