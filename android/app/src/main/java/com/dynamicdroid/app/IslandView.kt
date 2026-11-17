@@ -1318,7 +1318,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             showsDrive(a) && !reduceMotion && a.isPlaying -> COMPACT_WAVE_FRAME_MS
             // The valley's glitter, stars and birds are slow; 15 fps is plenty.
             showsHomeScene(a) && presentation == Presentation.EXPANDED && !reduceMotion -> 66L
-            (showsDndScene(a) || showsAuroraScene(a)) && !reduceMotion -> 66L
+            // The silent pill can stay up for hours, so its sleeping cat ticks at a gentle 8 fps.
+            (showsDndScene(a) || showsAuroraScene(a)) && !reduceMotion -> if (presentation == Presentation.EXPANDED) 66L else 125L
             a.mode == IslandMode.MUSIC && a.isPlaying -> if (presentation == Presentation.EXPANDED) 16L else COMPACT_WAVE_FRAME_MS
             // A tap's ripple (or a burst between songs) finishes even while paused.
             usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling || fieldFading) -> 16L
@@ -1878,6 +1879,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 drawPhone(canvas, l + s / 2, cy, dp(13f), leadAlpha, false)
             }
             IslandMode.CHARGING -> drawBolt(canvas, l + s / 2, cy, dp(14f), withAlpha(cGreen, leadAlpha))
+            IslandMode.RINGER -> {
+                val c = withAlpha(if (a.ringer == RingerState.SILENT) SILENT_RED else DND_PURPLE, leadAlpha)
+                if (a.ringer == RingerState.SILENT) { drawBell(canvas, l + s / 2, cy, dp(17f), c); drawSlash(canvas, l + s / 2, cy, dp(17f), c, 1f) }
+                else drawCrescent(canvas, l + s / 2, cy, dp(17f), c)
+            }
             IslandMode.ALARM -> drawAlarmGlyph(canvas, l + s / 2, cy, dp(16f), withAlpha(ALARM, leadAlpha))
             IslandMode.RECORDING -> {
                 // A red recording dot that breathes, like the iPhone's screen-recording indicator.
@@ -1904,6 +1910,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         // Text on the right never runs in behind the camera (narrow "small island" pills too).
         val roomRight = cameraKeepOut()?.let { right - it.second }?.takeIf { it < rect.width() } ?: rect.width() / 2f - dp(24f)
         when (a.mode) {
+            IslandMode.RINGER -> text(canvas, a.title, right, cy + dp(4.5f), roomRight, smallPaint,
+                if (a.ringer == RingerState.SILENT) SILENT_RED else DND_PURPLE, alpha, alignRight = true)
             IslandMode.MUSIC -> {
                 // Artwork and waveform flank the camera, matching the SwiftUI compact layout.
                 if (usesDots(a)) compactDots.drawMeter(canvas, fillPaint, right - dp(22f), cy, dp(22f), dp(17f), 4, 7,

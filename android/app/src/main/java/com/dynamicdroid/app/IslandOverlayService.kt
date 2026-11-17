@@ -150,6 +150,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                     val mode = audio?.ringerMode ?: return
                     if (mode == lastRingerMode) return
                     lastRingerMode = mode
+                    silentPillHidden = false
                     when (mode) {
                         AudioManager.RINGER_MODE_SILENT -> RingerState.SILENT
                         AudioManager.RINGER_MODE_VIBRATE -> RingerState.VIBRATE
@@ -168,6 +169,20 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             if (transient?.mode == IslandMode.VOLUME) { audio?.let { showVolume(it, volumeStream(it)) }; return }
             if (IslandFeatures.read(this@IslandOverlayService).ringer) showRinger(state)
         }
+    }
+
+    // While the phone is on silent, a small pill with the sleeping cat stays up (pixel scenes).
+    // Swiping it away hides it until the ringer changes again.
+    private var silentPillHidden = false
+
+    private fun silentPill(features: IslandFeatureSet): LiveActivity? {
+        if (!features.pixelScenes || !features.ringer || silentPillHidden || !features.shows(IslandMode.RINGER)) return null
+        if (audio?.ringerMode != AudioManager.RINGER_MODE_SILENT) return null
+        return LiveActivity(
+            key = SILENT_KEY, packageName = packageName, mode = IslandMode.RINGER,
+            title = getString(R.string.ringer_silent), subtitle = "", appLabel = getString(R.string.mode_ringer),
+            appIcon = null, artwork = null, accent = Color.WHITE, ringer = RingerState.SILENT,
+        )
     }
 
     private fun showRinger(state: RingerState) {
@@ -497,7 +512,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             placementTest != null -> placementTest to presentation
             t != null -> t to transientPresentation(t)
             o != null -> o to presentation
-            else -> null to Presentation.IDLE
+            else -> silentPill(features)?.let { it to Presentation.COMPACT } ?: (null to Presentation.IDLE)
         }
         // Returning from an app is animated by the island itself (see IslandView.playReturn).
         if (absorb) {
@@ -673,6 +688,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     // ---------------------------------------------------------------- island callbacks
 
     override fun onOpen(activity: LiveActivity) {
+        // The silent pill opens the bedroom card, whose tap then steps the ringer.
+        if (activity.key == SILENT_KEY) { showRinger(RingerState.SILENT); return }
         launch(activity.contentIntent, activity.packageName)
         if (activity === transient || activity.key == transient?.key) {
             reply?.dismiss(notify = false)
@@ -762,6 +779,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
      * minimise) and the resting pill shows until it is swiped down, its app is opened, or it ends.
      */
     override fun onDismiss(activity: LiveActivity) {
+        if (activity.key == SILENT_KEY) { silentPillHidden = true; render(); return }
         if (transient == null && presentation == Presentation.COMPACT && !activity.isTransient &&
             activities.all().any { it.key == activity.key }) {
             tucked += activity.key
@@ -1287,6 +1305,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         private const val VOLUME_TIMEOUT_MS = 1_600L
         private const val DEVICE_TIMEOUT_MS = 3_600L
         private const val RINGER_TIMEOUT_MS = 2_000L
+        private const val SILENT_KEY = "silent-pill"
         private const val SENT_TIMEOUT_MS = 1_400L
         /** Lets the system's unlock animation finish so the intro is actually visible. */
         private const val UNLOCK_SETTLE_MS = 320L
