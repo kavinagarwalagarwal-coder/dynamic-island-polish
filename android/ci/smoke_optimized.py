@@ -96,7 +96,8 @@ def main():
     # runner: wait for the main screen instead of failing on the first look.
     for attempt in range(12):
         labels = [(n.get("text", "") or n.get("content-desc", "")) for n in hierarchy().iter("node")]
-        if any(l.casefold() == "playground" for l in labels):
+        # The main screen's bottom bar: Home, Islands, Look, More.
+        if any(l.casefold() == "home" for l in labels) and any(l.casefold() == "islands" for l in labels):
             break
         if any(l.casefold() == "skip" for l in labels):
             click_if_present("Skip", wait=1)
@@ -106,11 +107,11 @@ def main():
                 adb("shell", "am", "start", "-W", "-n", PACKAGE + "/" + CODE + ".MainActivity")
         time.sleep(1)
     else:
-        raise AssertionError("Main screen never showed 'Playground'; visible: " + ", ".join(l for l in labels if l)[:600])
-    click("Playground")
+        raise AssertionError("Main screen never showed its Home page; visible: " + ", ".join(l for l in labels if l)[:600])
+    click("Home")
     time.sleep(1.5)
     check_crash()
-    assert adb("shell", "pidof", PACKAGE).strip(), "Optimized app stopped on the Playground"
+    assert adb("shell", "pidof", PACKAGE).strip(), "Optimized app stopped on the Home page"
     adb("shell", "pm", "grant", "com.dynamicdroid.fixture", "android.permission.POST_NOTIFICATIONS")
     adb("shell", "appops", "set", PACKAGE, "SYSTEM_ALERT_WINDOW", "allow")
     adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + CODE + ".IslandNotificationListener")
@@ -184,7 +185,7 @@ def main():
     check_crash()
     assert adb("shell", "pidof", PACKAGE).strip() == before, "App restarted during the live handoff"
     assert returned, "The island did not grow back after leaving the player"
-    print("Optimized standalone APK: Playground and real player-to-Home return passed.")
+    print("Optimized standalone APK: Home page and real player-to-Home return passed.")
 
 try:
     main()
