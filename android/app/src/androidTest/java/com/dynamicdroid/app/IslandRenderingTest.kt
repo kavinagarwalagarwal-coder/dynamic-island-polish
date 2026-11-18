@@ -47,7 +47,7 @@ class IslandRenderingTest {
 
     @Test fun navigationExposesSetupAppearanceAndPlacementWithoutLongSettingsScroll() {
         launchPlayground().use { scenario ->
-            for (name in listOf("Setup", "Phone fit", "Appearance", "Playground")) {
+            for (name in listOf("More", "Look", "Islands", "Home")) {
                 scenario.onActivity { activity ->
                     activity.openPage(name)
                     assertTrue("Page $name did not open", activity.page == name)

@@ -266,11 +266,11 @@
     <string name="onb_side_title">Two at once</string>
     <string name="onb_side_body">When two things are live, the second waits in a bubble. Swipe sideways to swap them, or hold the bubble to open it.</string>
     <string name="onb_volume_title">Volume, alarms and more</string>
-    <string name="onb_volume_body">Volume keys, headphones, downloads and alarms get islands of their own. Switch each one on or off in Features.</string>
+    <string name="onb_volume_body">Volume keys, headphones, downloads and alarms get islands of their own. Switch each one on or off in Islands.</string>
     <string name="onb_finish_title">Connect your island</string>
     <string name="onb_finish_body">Give Dynamic Droid notification access and the camera-area overlay, and your island comes to life.</string>
     <string name="onb_ready_title">You\'re all set</string>
-    <string name="onb_ready_body">Your island is connected. Replay this tour any time from Playground.</string>
+    <string name="onb_ready_body">Your island is connected. Replay this tour any time from More.</string>
 
     <!-- Phone pop-ups -->
     <string name="feature_hide_popups">Hide the phone\'s pop-up notifications</string>
@@ -511,4 +511,35 @@
     <string name="live_none">None yet. Turn on the live or pinned score in your cricket app.</string>
     <string name="feature_pixel_scenes">Pixel scenes</string>
     <string name="feature_pixel_scenes_note">Volume is a car driving down a pixel street, a download is a rocket flying to a planet, and charging is a pixel battery with a spark running through it.</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_islands">Islands</string>
+    <string name="nav_look">Look</string>
+    <string name="nav_more">More</string>
+    <string name="home_ready">Your island is on</string>
+    <string name="home_setup">Finish setting up</string>
+    <string name="home_try">Try your island</string>
+    <string name="home_ready_note">Tap any island below to see it in action. Hold the preview to expand it, swipe up to tuck it away.</string>
+    <string name="home_real_timer">Start a real timer</string>
+    <string name="islands_intro">Choose what your island shows. Tap a card for its options.</string>
+    <string name="card_count">%1$d of %2$d on</string>
+    <string name="group_music_note">Song, controls and the fly-in from your player</string>
+    <string name="group_calls">Calls</string>
+    <string name="group_messages">Messages</string>
+    <string name="group_timers">Timers &amp; alarms</string>
+    <string name="group_live">Live activities</string>
+    <string name="group_sound">Volume &amp; ringer</string>
+    <string name="group_devices">Devices &amp; battery</string>
+    <string name="group_extras">Torch, sleep &amp; home card</string>
+    <string name="group_rules">Priority &amp; apps</string>
+    <string name="group_quiet">Quiet hours</string>
+    <string name="look_style">Style &amp; motion</string>
+    <string name="look_colours">Colours</string>
+    <string name="look_size">Size &amp; position</string>
+    <string name="look_effects">Glow &amp; outline</string>
+    <string name="look_glass">Wallpaper glass</string>
+    <string name="more_setup">Setup</string>
+    <string name="more_behaviour">Behaviour</string>
+    <string name="more_touch">Touch &amp; haptics</string>
+    <string name="more_permissions">Permissions</string>
+    <string name="more_help">Help &amp; updates</string>
 </resources>

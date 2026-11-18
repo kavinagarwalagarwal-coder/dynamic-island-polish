@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +44,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
@@ -76,6 +78,7 @@ object Fluid {
     fun <T> liquid() = spring<T>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
 
     val pill = RoundedCornerShape(18.dp)
+    val card = RoundedCornerShape(24.dp)
 }
 
 /** Squashes a little under the finger and springs back with a slight overshoot when let go. */
@@ -268,3 +271,145 @@ fun Swatch(color: Color, description: String) = Box(
     Modifier.padding(end = 10.dp).size(28.dp).background(color, CircleShape).border(1.dp, Fluid.line, CircleShape)
         .semantics { contentDescription = description },
 )
+
+/**
+ * A rounded card that folds open: a title, a one-line summary, and (for a whole group of islands)
+ * a master switch. Tapping the header unfolds its settings on a liquid spring and turns the
+ * chevron; folded, the screen stays short and calm.
+ */
+@Composable
+fun SettingsCard(
+    title: String,
+    summary: String? = null,
+    modifier: Modifier = Modifier,
+    startOpen: Boolean = false,
+    checked: Boolean? = null,
+    onChecked: (Boolean) -> Unit = {},
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
+    var open by androidx.compose.runtime.saveable.rememberSaveable(title) { mutableStateOf(startOpen) }
+    val source = remember { MutableInteractionSource() }
+    val turn by animateFloatAsState(if (open) 90f else 0f, Fluid.snappy(), label = "chevron")
+    val edge by animateColorAsState(if (open) Fluid.muted.copy(alpha = 0.55f) else Fluid.line, Fluid.liquid(), label = "cardEdge")
+    Column(
+        modifier.fillMaxWidth().padding(top = 12.dp)
+            .background(Fluid.surface, Fluid.card).border(1.dp, edge, Fluid.card)
+            .clip(Fluid.card),
+    ) {
+        Row(
+            Modifier.fillMaxWidth().pressSpring(source, 0.985f)
+                .clickable(source, androidx.compose.material3.ripple(color = Fluid.foreground), role = Role.Button) { open = !open }
+                .defaultMinSize(minHeight = 64.dp)
+                .padding(start = 18.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(title, Modifier.semantics { heading() },
+                    style = TextStyle(fontFamily = Fluid.body, fontSize = 17.sp, color = Fluid.foreground, fontWeight = FontWeight.Medium))
+                if (summary != null) Text(summary, Modifier.padding(top = 2.dp),
+                    style = TextStyle(fontFamily = Fluid.body, fontSize = 13.sp, color = Fluid.muted, lineHeight = 17.sp), maxLines = 2,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+            }
+            if (checked != null) {
+                Switch(checked, onChecked, Modifier.padding(start = 8.dp), colors = SwitchDefaults.colors(
+                    checkedThumbColor = Color.White, checkedTrackColor = Fluid.red, checkedBorderColor = Fluid.red,
+                    uncheckedThumbColor = Fluid.muted, uncheckedTrackColor = Fluid.background, uncheckedBorderColor = Fluid.line))
+            }
+            Text("›", Modifier.padding(start = 10.dp, end = 4.dp).graphicsLayer { rotationZ = turn },
+                style = TextStyle(fontFamily = Fluid.body, fontSize = 26.sp, color = Fluid.muted))
+        }
+        androidx.compose.animation.AnimatedVisibility(
+            open,
+            enter = androidx.compose.animation.expandVertically(Fluid.liquid()) + androidx.compose.animation.fadeIn(spring(stiffness = 300f)),
+            exit = androidx.compose.animation.shrinkVertically(Fluid.liquid()) + androidx.compose.animation.fadeOut(spring(stiffness = 600f)),
+        ) {
+            Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 16.dp), content = content)
+        }
+    }
+}
+
+
+/**
+ * Side-by-side choices with a highlight that slides (and slightly overshoots) to the picked one,
+ * like the island itself. Replaces stacked radio buttons.
+ */
+@Composable
+fun <T> Segmented(options: List<Pair<T, String>>, selected: T, modifier: Modifier = Modifier, onSelect: (T) -> Unit) {
+    val index = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
+    val pos by animateFloatAsState(index.toFloat(), spring(dampingRatio = 0.7f, stiffness = 420f), label = "segment")
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        modifier.fillMaxWidth().padding(top = 10.dp).defaultMinSize(minHeight = 48.dp)
+            .background(Fluid.background, Fluid.pill).border(1.dp, Fluid.line, Fluid.pill).padding(4.dp),
+    ) {
+        val w = maxWidth / options.size
+        Box(Modifier.width(w).defaultMinSize(minHeight = 40.dp).graphicsLayer { translationX = w.toPx() * pos }
+            .background(Fluid.foreground, RoundedCornerShape(14.dp)))
+        Row(Modifier.fillMaxWidth()) {
+            options.forEachIndexed { i, (value, name) ->
+                val ink by animateColorAsState(if (i == index) Color.Black else Fluid.foreground, Fluid.liquid(), label = "segInk")
+                Box(
+                    Modifier.weight(1f).defaultMinSize(minHeight = 40.dp)
+                        .selectable(i == index, role = Role.RadioButton) { onSelect(value) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(name, style = TextStyle(fontFamily = Fluid.body, fontSize = 14.sp, color = ink,
+                        fontWeight = if (i == index) FontWeight.Medium else FontWeight.Normal), maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+/** A chip that sizes to its text, for horizontally scrolling rows. */
+@Composable
+fun PillChip(text: String, selected: Boolean = false, onClick: () -> Unit) {
+    val source = remember { MutableInteractionSource() }
+    val fill by animateColorAsState(if (selected) Fluid.foreground else Fluid.surface, Fluid.liquid(), label = "pill")
+    val ink by animateColorAsState(if (selected) Color.Black else Fluid.foreground, Fluid.liquid(), label = "pillInk")
+    Box(
+        Modifier.padding(end = 8.dp).pressSpring(source)
+            .defaultMinSize(minHeight = 44.dp)
+            .background(fill, Fluid.pill).border(1.dp, if (selected) fill else Fluid.line, Fluid.pill)
+            .clickable(source, androidx.compose.material3.ripple(color = ink), role = Role.Button, onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(text, style = TextStyle(fontFamily = Fluid.body, fontSize = 15.sp, color = ink), maxLines = 1) }
+}
+
+/** A horizontally scrolling row of [PillChip]s. */
+@Composable
+fun ScrollChips(modifier: Modifier = Modifier, content: @Composable RowScope.() -> Unit) =
+    Row(modifier.fillMaxWidth().padding(top = 10.dp).horizontalScroll(androidx.compose.foundation.rememberScrollState()), content = content)
+
+/**
+ * The floating bottom bar: one pill with the pages, and a highlight that glides between them on
+ * a spring, the same way the island moves.
+ */
+@Composable
+fun NavBar(items: List<Pair<String, String>>, selected: String, modifier: Modifier = Modifier, onSelect: (String) -> Unit) {
+    val index = items.indexOfFirst { it.first == selected }.coerceAtLeast(0)
+    val pos by animateFloatAsState(index.toFloat(), spring(dampingRatio = 0.68f, stiffness = 380f), label = "nav")
+    androidx.compose.foundation.layout.BoxWithConstraints(
+        modifier.fillMaxWidth().defaultMinSize(minHeight = 60.dp)
+            .background(Color(0xFF121212), RoundedCornerShape(30.dp)).border(1.dp, Fluid.line, RoundedCornerShape(30.dp))
+            .padding(5.dp),
+    ) {
+        val w = maxWidth / items.size
+        Box(Modifier.width(w).defaultMinSize(minHeight = 50.dp).graphicsLayer { translationX = w.toPx() * pos }
+            .background(Fluid.foreground, RoundedCornerShape(25.dp)))
+        Row(Modifier.fillMaxWidth()) {
+            items.forEachIndexed { i, (key, label) ->
+                val ink by animateColorAsState(if (i == index) Color.Black else Fluid.muted, Fluid.liquid(), label = "navInk")
+                val source = remember { MutableInteractionSource() }
+                Box(
+                    Modifier.weight(1f).defaultMinSize(minHeight = 50.dp).pressSpring(source, 0.94f)
+                        .selectable(i == index, source, null, role = Role.Tab) { onSelect(key) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(label, style = TextStyle(fontFamily = Fluid.body, fontSize = 15.sp, color = ink,
+                        fontWeight = if (i == index) FontWeight.Medium else FontWeight.Normal), maxLines = 1)
+                }
+            }
+        }
+    }
+}

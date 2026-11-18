@@ -48,7 +48,7 @@ class MainActivity : AppCompatActivity() {
 
     // ---------------------------------------------------------------- screen state (Compose)
 
-    internal var page by mutableStateOf("Playground")
+    internal var page by mutableStateOf("Home")
     internal var features by mutableStateOf(IslandFeatureSet())
     internal var fit by mutableStateOf(IslandFit())
     internal var theme by mutableStateOf(IslandTheme())
@@ -130,8 +130,8 @@ class MainActivity : AppCompatActivity() {
         window.statusBarColor = NothingStyle.background
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         buildPreviews()
-        val connected = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
-        page = if (connected) "Playground" else "Setup"
+        // Home shows the next setup step first when something is missing, so it's always the start.
+        page = "Home"
         setContent { MainScreen() }
         showDemo(demoMusic(true), Presentation.EXPANDED)
         applyThemeUpdate()
@@ -201,19 +201,19 @@ class MainActivity : AppCompatActivity() {
             }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         }
         root.addView(sheet, FrameLayout.LayoutParams(-1, -1))
-        logo.play(80L, 1_050L)
-        word.play(520L, 620L)
-        tagline.animate().alpha(1f).setStartDelay(980L).setDuration(300L).start()
+        logo.play(60L, 800L)
+        word.play(380L, 520L)
+        tagline.animate().alpha(1f).setStartDelay(700L).setDuration(260L).start()
         sheet.postDelayed({
-            logo.animate().scaleX(1.18f).scaleY(1.18f).setDuration(380L).start()
-            sheet.animate().alpha(0f).setDuration(380L).withEndAction {
+            logo.animate().scaleX(1.18f).scaleY(1.18f).setDuration(320L).start()
+            sheet.animate().alpha(0f).setDuration(320L).withEndAction {
                 root.removeView(sheet)
                 then()
             }.start()
             entered = true
             visit++
             headerLogo?.play(220L, 900L)
-        }, 1_650L)
+        }, 1_200L)
     }
 
     internal fun showOnboarding() {
@@ -224,7 +224,7 @@ class MainActivity : AppCompatActivity() {
             onboarding = null
             tourBack.isEnabled = false
             getSharedPreferences("onboarding", MODE_PRIVATE).edit().putBoolean("seen", true).apply()
-            if (openSetup) selectPage("Setup") else headerLogo?.play(0L, 800L)
+            selectPage("Home"); headerLogo?.play(0L, 800L)
             askNotificationPermission()
         }
         onboarding = tour
@@ -246,8 +246,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Switches page; the logo rebuilds and the new page's parts flow in. */
-    internal fun selectPage(name: String) {
-        if (name == "Rules") refreshCustomization()
+    internal fun selectPage(requested: String) {
+        // Older page names (from before the four-page layout) still land somewhere sensible.
+        val name = when (requested) {
+            "Playground" -> "Home"
+            "Setup" -> "More"
+            "Appearance", "Phone fit" -> "Look"
+            "Rules", "Features" -> "Islands"
+            else -> requested
+        }
+        if (name == "Islands") refreshCustomization()
         if (name == page) return
         page = name
         visit++
@@ -837,12 +845,10 @@ class MainActivity : AppCompatActivity() {
         }.setNegativeButton(getString(R.string.common_done), null).show()
     }
     internal fun navLabel(key: String) = getString(when (key) {
-        "Playground" -> R.string.nav_playground
-        "Setup" -> R.string.nav_setup
-        "Appearance" -> R.string.nav_appearance
-        "Rules" -> R.string.nav_rules
-        "Phone fit" -> R.string.nav_phone_fit
-        else -> R.string.nav_features
+        "Home" -> R.string.nav_home
+        "Islands" -> R.string.nav_islands
+        "Look" -> R.string.nav_look
+        else -> R.string.nav_more
     })
 
     internal fun modeName(mode: IslandMode) = getString(when (mode) {
