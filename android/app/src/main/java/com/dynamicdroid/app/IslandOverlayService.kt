@@ -1250,6 +1250,13 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
     }
 
+    /** Android is short of memory: the island lets go of the pictures of scenes not on screen. */
+    @Suppress("DEPRECATION")
+    override fun onTrimMemory(level: Int) {
+        super.onTrimMemory(level)
+        if (level >= android.content.ComponentCallbacks2.TRIM_MEMORY_RUNNING_LOW) runCatching { island?.trimScenes() }
+    }
+
     override fun onDestroy() {
         if (IslandBus.listener === this) IslandBus.listener = null
         IslandAccessibilityService.onChanged = null

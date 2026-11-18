@@ -203,8 +203,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun usesDots(a: LiveActivity?) = features.dotMusic && a?.mode == IslandMode.MUSIC
     /** The open music card is a night drive (the pixel scenes look) unless the dot player is on. */
-    private fun showsDrive(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.MUSIC && !usesDots(a)
-    private val drive by lazy { MusicDrive(resources) }
+    private fun showsDrive(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.MUSIC && !usesDots(a) && "drive" !in brokenScenes
+    private var driveRef: MusicDrive? = null
+    private val drive get() = driveRef ?: MusicDrive(resources).also { driveRef = it }
+    /** Scenes that failed to draw (a picture that wouldn't decode, say): their cards fall back to the plain look. */
+    private val brokenScenes = HashSet<String>()
     private val sceneDim = Paint()
     private val warmed = HashSet<String>()
 
@@ -279,8 +282,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val sa = (bodyAlpha * ((vis - .2f) / .8f).coerceIn(0f, 1f)).toInt()
         if (sa <= 2) return
         val t = if (prev == null) 1f else ((SystemClock.uptimeMillis() - sceneSwapAt) / SCENE_FADE_MS.toFloat()).coerceIn(0f, 1f)
-        if (prev != null) drawSceneOf(canvas, prev, (sa * (1f - t)).toInt())
-        if (kind != null) drawSceneOf(canvas, a, (sa * t).toInt())
+        if (prev != null) safeScene(canvas, prev, (sa * (1f - t)).toInt())
+        if (kind != null) safeScene(canvas, a, (sa * t).toInt())
         if (prev != null) kick()
         if (open < 1f) {
             sceneDim.color = Color.BLACK
@@ -288,6 +291,20 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             canvas.drawRect(rect, sceneDim)
         }
         drawCameraWell(canvas, sa)
+    }
+
+    /**
+     * Draws a scene, and if it ever fails (out of memory decoding a picture, say) switches that
+     * scene off for this run and records why, so the card carries on in its plain look instead of
+     * the whole island going blank every frame.
+     */
+    private fun safeScene(canvas: Canvas, a: LiveActivity, sa: Int) {
+        val save = canvas.save()
+        try { drawSceneOf(canvas, a, sa) } catch (t: Throwable) {
+            sceneKind(a)?.let { brokenScenes += it }
+            CrashLog.caught(context, "scene ${sceneKind(a)}", t)
+            trimScenes()
+        } finally { canvas.restoreToCount(save) }
     }
 
     private fun drawSceneOf(canvas: Canvas, a: LiveActivity, sa: Int) {
@@ -332,21 +349,41 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         canvas.restore()
     }
     /** The home card is a mountain valley that follows the time of day (the pixel scenes look). */
-    private fun showsHomeScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.HOME
-    private val homeScene by lazy { HomeScene(resources) }
+    private fun showsHomeScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.HOME && "home" !in brokenScenes
+    private var homeRef: HomeScene? = null
+    private val homeScene get() = homeRef ?: HomeScene(resources).also { homeRef = it }
     // The user's pictures for the timer (hourglass desert), Do Not Disturb (sleeping cat) and
     // Bluetooth (aurora forest), in the pixel scenes look.
-    private fun showsTimerScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.TIMER && isLiveTimer(a)
+    private fun showsTimerScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.TIMER && isLiveTimer(a) && "timer" !in brokenScenes
     private fun showsDndScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.RINGER &&
-        (a.ringer == RingerState.DND_ON || a.ringer == RingerState.SILENT)
-    private fun showsAuroraScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.DEVICE && !a.lost
+        (a.ringer == RingerState.DND_ON || a.ringer == RingerState.SILENT) && "bedroom" !in brokenScenes
+    private fun showsAuroraScene(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.DEVICE && !a.lost && "aurora" !in brokenScenes
     private fun showsPictureScene(a: LiveActivity?) = showsTimerScene(a) || showsDndScene(a) || showsAuroraScene(a)
-    private val timerScene by lazy { TimerScene(resources) }
-    private val dndScene by lazy { DndScene(resources) }
-    private val auroraScene by lazy { AuroraScene(resources) }
+    private var timerRef: TimerScene? = null
+    private val timerScene get() = timerRef ?: TimerScene(resources).also { timerRef = it }
+    private var dndRef: DndScene? = null
+    private val dndScene get() = dndRef ?: DndScene(resources).also { dndRef = it }
+    private var auroraRef: AuroraScene? = null
+    private val auroraScene get() = auroraRef ?: AuroraScene(resources).also { auroraRef = it }
     /** The volume card as the wizard's desk: the tube is the volume, the rune stones the modes. */
-    private fun showsWizard(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.VOLUME
-    private val wizard by lazy { WizardScene(resources) }
+    private fun showsWizard(a: LiveActivity?) = features.pixelScenes && a?.mode == IslandMode.VOLUME && "wizard" !in brokenScenes
+    private var wizardRef: WizardScene? = null
+    private val wizard get() = wizardRef ?: WizardScene(resources).also { wizardRef = it }
+
+    /**
+     * Lets go of the scenes' pictures (about 2 MB each) so Android can reclaim them when memory is
+     * short; whichever scene shows next decodes its pictures again. The one on screen is kept.
+     */
+    fun trimScenes() {
+        val keep = sceneKind(activity)
+        if (keep != "drive") driveRef = null
+        if (keep != "home") homeRef = null
+        if (keep != "timer") timerRef = null
+        if (keep != "bedroom") dndRef = null
+        if (keep != "aurora") auroraRef = null
+        if (keep != "wizard") wizardRef = null
+        warmed.clear()
+    }
     private var volumeDragBottom = 0f
     private val driveHits = ArrayList<Pair<RectF, String>>()
 

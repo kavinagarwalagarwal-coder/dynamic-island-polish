@@ -594,4 +594,89 @@ class IslandRenderingTest {
         assertTrue("Scenes missing:\n" + problems.joinToString("\n"), problems.isEmpty())
     }
 
+
+    /**
+     * Each scene's frame stays cheap: draws every open scene card 30 times into a software canvas
+     * (slower than the phone's GPU, so this is a worst case) and records the average in the
+     * screenshot names. Fails only if a scene is badly slow.
+     */
+    @Test fun sceneFramesStayCheap() {
+        val slow = ArrayList<String>()
+        launchPlayground().use { scenario ->
+            var view: IslandView? = null
+            val cases = ArrayList<Pair<String, () -> Unit>>()
+            scenario.onActivity { activity ->
+                val v = findIsland(activity.window.decorView)!!
+                view = v
+                v.applyFeatures(IslandFeatures.read(activity).copy(pixelScenes = true, dotMusic = false, artworkBackdrop = false))
+                v.setSecondary(null)
+                cases += "music" to { v.show(activity.demoMusic(true), Presentation.EXPANDED) }
+                cases += "timer" to { v.show(activity.demoTimer(95), Presentation.EXPANDED) }
+                cases += "home" to { v.show(activity.demoHome(), Presentation.EXPANDED) }
+                cases += "silent" to { v.show(activity.demoRinger(RingerState.SILENT), Presentation.EXPANDED) }
+                cases += "bluetooth" to { v.show(activity.demoDevice(false), Presentation.EXPANDED) }
+                cases += "volume" to { v.show(activity.demoVolume(.6f), Presentation.EXPANDED) }
+                cases += "music-pill" to { v.show(activity.demoMusic(true), Presentation.COMPACT) }
+            }
+            for ((name, show) in cases) {
+                scenario.onActivity { show() }
+                SystemClock.sleep(1400)
+                var avg = 0.0
+                scenario.onActivity {
+                    val v = view!!
+                    val bmp = Bitmap.createBitmap(v.width.coerceAtLeast(1), v.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888)
+                    val c = android.graphics.Canvas(bmp)
+                    repeat(3) { v.draw(c) }
+                    val t0 = System.nanoTime()
+                    repeat(30) { v.draw(c) }
+                    avg = (System.nanoTime() - t0) / 30.0 / 1e6
+                    bmp.recycle()
+                }
+                if (avg > 60.0) slow += "$name ${"%.1f".format(avg)} ms"
+                saveBitmap("scene-perf-$name-${"%.1f".format(avg)}ms", Bitmap.createBitmap(4, 4, Bitmap.Config.ARGB_8888))
+            }
+        }
+        assertTrue("Slow scene frames: $slow", slow.isEmpty())
+    }
+
+    /**
+     * The island never errors under a storm of changes: every scene card and pill, switched,
+     * opened, collapsed and replaced in quick random order, with a second activity coming and
+     * going, and the scenes' memory trimmed midway. Any error the island records fails the test.
+     */
+    @Test fun islandSurvivesRapidChangesWithoutErrors() {
+        launchPlayground().use { scenario ->
+            var view: IslandView? = null
+            val acts = ArrayList<LiveActivity>()
+            scenario.onActivity { activity ->
+                CrashLog.clear(activity)
+                val v = findIsland(activity.window.decorView)!!
+                view = v
+                v.applyFeatures(IslandFeatures.read(activity).copy(pixelScenes = true, dotMusic = false))
+                acts += listOf(activity.demoMusic(true), activity.demoMusic(false), activity.demoTimer(95), activity.demoHome(),
+                    activity.demoRinger(RingerState.SILENT), activity.demoRinger(RingerState.DND_ON), activity.demoRinger(RingerState.RING),
+                    activity.demoDevice(false), activity.demoDevice(true), activity.demoVolume(.2f), activity.demoVolume(.9f),
+                    activity.demoCall(), activity.demoMessage(), activity.demoDownload(), activity.demoAlarm())
+            }
+            val rnd = java.util.Random(7)
+            val presentations = listOf(Presentation.EXPANDED, Presentation.COMPACT, Presentation.EXPANDED, Presentation.IDLE)
+            repeat(140) { step ->
+                scenario.onActivity {
+                    val v = view!!
+                    val a = acts[rnd.nextInt(acts.size)]
+                    val p = presentations[rnd.nextInt(presentations.size)]
+                    if (p == Presentation.IDLE) v.show(null, Presentation.IDLE) else v.show(a, p)
+                    if (rnd.nextInt(5) == 0) v.setSecondary(acts[rnd.nextInt(acts.size)].takeIf { rnd.nextBoolean() })
+                    if (step == 70) v.trimScenes()
+                }
+                SystemClock.sleep((20 + rnd.nextInt(140)).toLong())
+            }
+            SystemClock.sleep(800)
+            scenario.onActivity { activity ->
+                val errors = CrashLog.read(activity)
+                assertTrue("The island recorded errors:\n$errors", errors.isNullOrBlank())
+            }
+        }
+    }
+
 }

@@ -41,7 +41,7 @@ class HomeScene(private val res: Resources) {
     private val r = RectF()
 
     /** Decodes the picture for the current time of day ahead of the first frame (any thread). */
-    fun prewarm() { if (nightness() < 1f) day; if (nightness() > 0f) night }
+    fun prewarm() { val n = nightness(); if (n < 1f) day; if (n > 0f) night }
 
     private fun glowBitmap(c: Int): Bitmap {
         val n = 64
@@ -57,6 +57,16 @@ class HomeScene(private val res: Resources) {
      * How much of the night picture shows: 0 by day, 1 at night, fading over an hour around
      * sunrise (5:30 to 6:30) and an hour and a half around sunset (17:30 to 19:00).
      */
+    private var nightAt = -1L
+    private var nightCached = 0f
+
+    /** [nightness] for now, worked out at most every 20 seconds rather than every frame. */
+    fun nightNow(): Float {
+        val now = System.currentTimeMillis() / 20_000L
+        if (now != nightAt) { nightAt = now; nightCached = nightness() }
+        return nightCached
+    }
+
     fun nightness(cal: Calendar = Calendar.getInstance()): Float {
         val h = cal.get(Calendar.HOUR_OF_DAY) + cal.get(Calendar.MINUTE) / 60f
         return when {
@@ -70,7 +80,7 @@ class HomeScene(private val res: Resources) {
 
     fun draw(canvas: Canvas, card: RectF, settledW: Float, settledH: Float, alpha: Int, still: Boolean) {
         val t = if (still) 0f else (SystemClock.uptimeMillis() % 3_600_000L) / 1000f
-        val n = nightness()
+        val n = nightNow()
         // Fixed zoom from the settled card, so opening reveals the valley instead of stretching it.
         val sw = max(settledW, 1f); val sh = max(settledH, 1f)
         val scale = max(sw / W, sh / H)
@@ -95,19 +105,20 @@ class HomeScene(private val res: Resources) {
         canvas.restoreToCount(save)
 
         // Shade behind the time at the top and the shortcuts at the bottom, so they always read.
+        // Built once in a unit square and scaled, so a growing card makes no new shaders.
         val h = card.height()
-        if (h != shadeFor) {
-            shadeFor = h
-            topShade.shader = LinearGradient(0f, 0f, 0f, h * .55f, Color.argb(140, 4, 10, 24), Color.argb(0, 4, 10, 24), Shader.TileMode.CLAMP)
-            bottomShade.shader = LinearGradient(0f, h * .55f, 0f, h, Color.argb(0, 4, 10, 24), Color.argb(150, 4, 10, 24), Shader.TileMode.CLAMP)
+        if (shadeFor < 0f) {
+            shadeFor = 1f
+            topShade.shader = LinearGradient(0f, 0f, 0f, 1f, Color.argb(140, 4, 10, 24), Color.argb(0, 4, 10, 24), Shader.TileMode.CLAMP)
+            bottomShade.shader = LinearGradient(0f, 0f, 0f, 1f, Color.argb(0, 4, 10, 24), Color.argb(150, 4, 10, 24), Shader.TileMode.CLAMP)
         }
-        canvas.save()
-        canvas.translate(card.left, card.top)
+        if (h <= 0f || card.width() <= 0f) return
         topShade.alpha = alpha
         bottomShade.alpha = alpha
-        canvas.drawRect(0f, 0f, card.width(), h * .55f, topShade)
-        canvas.drawRect(0f, h * .55f, card.width(), h, bottomShade)
-        canvas.restore()
+        canvas.save(); canvas.translate(card.left, card.top); canvas.scale(card.width(), h * .55f)
+        canvas.drawRect(0f, 0f, 1f, 1f, topShade); canvas.restore()
+        canvas.save(); canvas.translate(card.left, card.top + h * .55f); canvas.scale(card.width(), h * .45f)
+        canvas.drawRect(0f, 0f, 1f, 1f, bottomShade); canvas.restore()
     }
 
     private fun glitter(canvas: Canvas, pts: FloatArray, t: Float, alpha: Int, rgb: Int) {

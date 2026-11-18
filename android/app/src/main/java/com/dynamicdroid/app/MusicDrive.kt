@@ -95,6 +95,9 @@ class MusicDrive(private val res: Resources) {
 
     // The radio's display: the song as a tiny pixel bitmap, scrolled behind the display's window.
     private var lcdText: String? = null
+    private var lcdTitle: String? = null
+    private var lcdArtist: String? = null
+    private var lcdJoined = ""
     private var lcd: Bitmap? = null
     private val lcdPaint = Paint().apply {
         isAntiAlias = false
@@ -162,17 +165,19 @@ class MusicDrive(private val res: Resources) {
         drawLcd(canvas, alpha, title, artist)
         canvas.restoreToCount(save)
 
-        // A soft shade under the song's name at the top of the card.
-        val sh = card.height() * .42f
-        if (sh != scrimH) {
-            scrimH = sh
-            scrim.shader = LinearGradient(0f, 0f, 0f, sh, Color.argb(150, 6, 2, 16), Color.argb(0, 6, 2, 16), Shader.TileMode.CLAMP)
+        // A soft shade under the song's name at the top of the card (a unit gradient, scaled).
+        if (scrimH < 0f) {
+            scrimH = 1f
+            scrim.shader = LinearGradient(0f, 0f, 0f, 1f, Color.argb(150, 6, 2, 16), Color.argb(0, 6, 2, 16), Shader.TileMode.CLAMP)
         }
-        scrim.alpha = alpha
-        canvas.save()
-        canvas.translate(card.left, card.top)
-        canvas.drawRect(0f, 0f, card.width(), sh, scrim)
-        canvas.restore()
+        if (card.width() > 0f && card.height() > 0f) {
+            scrim.alpha = alpha
+            canvas.save()
+            canvas.translate(card.left, card.top)
+            canvas.scale(card.width(), card.height() * .42f)
+            canvas.drawRect(0f, 0f, 1f, 1f, scrim)
+            canvas.restore()
+        }
     }
 
     private fun px(x: Float, z: Float) = VX + F * x / z
@@ -326,7 +331,12 @@ class MusicDrive(private val res: Resources) {
     }
 
     private fun drawLcd(canvas: Canvas, alpha: Int, title: String, artist: String) {
-        val text = listOf(title, artist).filter { it.isNotBlank() }.joinToString("  ·  ").uppercase()
+        // Only rebuilt when the song changes, not every frame.
+        if (title !== lcdTitle || artist !== lcdArtist) {
+            lcdTitle = title; lcdArtist = artist
+            lcdJoined = listOf(title, artist).filter { it.isNotBlank() }.joinToString("  ·  ").uppercase()
+        }
+        val text = lcdJoined
         if (text != lcdText) {
             lcdText = text
             lcd?.recycle()

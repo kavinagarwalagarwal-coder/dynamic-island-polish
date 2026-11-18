@@ -86,22 +86,30 @@ abstract class PictureScene(protected val res: Resources) {
 
     protected fun end(canvas: Canvas) = canvas.restoreToCount(saveCount)
 
-    /** Dark shades at the top (and optionally the bottom) of the card, behind the island's text. */
+    /**
+     * Dark shades at the top (and optionally the bottom) of the card, behind the island's text.
+     * The gradients are built once in a unit square and scaled to the card, so a card that is
+     * still growing doesn't make new shaders every frame.
+     */
     protected fun shade(canvas: Canvas, card: RectF, alpha: Int, top: Float, bottom: Float, strength: Int = 150) {
-        val h = card.height()
-        val key = h * 31f + top * 7f + bottom + strength
+        val key = top * 7f + bottom + strength * 31f
         if (key != shadeKey) {
             shadeKey = key
-            shadeTop.shader = LinearGradient(0f, 0f, 0f, h * top, Color.argb(strength, 6, 6, 18), Color.argb(0, 6, 6, 18), Shader.TileMode.CLAMP)
-            shadeBottom.shader = LinearGradient(0f, h * (1f - bottom), 0f, h, Color.argb(0, 6, 6, 18), Color.argb(strength, 6, 6, 18), Shader.TileMode.CLAMP)
+            shadeTop.shader = LinearGradient(0f, 0f, 0f, 1f, Color.argb(strength, 6, 6, 18), Color.argb(0, 6, 6, 18), Shader.TileMode.CLAMP)
+            shadeBottom.shader = LinearGradient(0f, 0f, 0f, 1f, Color.argb(0, 6, 6, 18), Color.argb(strength, 6, 6, 18), Shader.TileMode.CLAMP)
         }
-        canvas.save()
-        canvas.translate(card.left, card.top)
+        val h = card.height()
+        if (h <= 0f || card.width() <= 0f) return
         shadeTop.alpha = alpha
-        if (top > 0f) canvas.drawRect(0f, 0f, card.width(), h * top, shadeTop)
         shadeBottom.alpha = alpha
-        if (bottom > 0f) canvas.drawRect(0f, h * (1f - bottom), card.width(), h, shadeBottom)
-        canvas.restore()
+        if (top > 0f) {
+            canvas.save(); canvas.translate(card.left, card.top); canvas.scale(card.width(), h * top)
+            canvas.drawRect(0f, 0f, 1f, 1f, shadeTop); canvas.restore()
+        }
+        if (bottom > 0f) {
+            canvas.save(); canvas.translate(card.left, card.top + h * (1f - bottom)); canvas.scale(card.width(), h * bottom)
+            canvas.drawRect(0f, 0f, 1f, 1f, shadeBottom); canvas.restore()
+        }
     }
 
     protected fun twinkle(canvas: Canvas, pts: FloatArray, t: Float, alpha: Int, size: Float, rgb: Int) {
@@ -274,6 +282,9 @@ class DndScene(res: Resources) : PictureScene(res) {
         color = Color.rgb(150, 230, 140)
     }
     private val zPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { typeface = Typeface.create(Typeface.MONOSPACE, Typeface.BOLD) }
+    private var clockMinute = -1L
+    private var clock24 = false
+    private var clockText = ""
     private val catDst = RectF()
 
     fun draw(canvas: Canvas, card: RectF, settledW: Float, settledH: Float, alpha: Int, still: Boolean, is24h: Boolean, dim: Boolean = false) {
@@ -322,10 +333,15 @@ class DndScene(res: Resources) : PictureScene(res) {
             val y = 247f - p * 22f
             canvas.drawLine(x, y, x + sin(p * 8f + 1f + k) * 2f, y - 5f, stroke)
         }
-        // The bedside clock tells the real time.
-        val cal = Calendar.getInstance()
-        val hour = if (is24h) cal.get(Calendar.HOUR_OF_DAY) else (cal.get(Calendar.HOUR) .let { if (it == 0) 12 else it })
-        val text = String.format("%02d:%02d", hour, cal.get(Calendar.MINUTE))
+        // The bedside clock tells the real time (worked out once a minute, not every frame).
+        val minute = System.currentTimeMillis() / 60_000L
+        if (minute != clockMinute || is24h != clock24) {
+            clockMinute = minute; clock24 = is24h
+            val cal = Calendar.getInstance()
+            val hour = if (is24h) cal.get(Calendar.HOUR_OF_DAY) else (cal.get(Calendar.HOUR).let { if (it == 0) 12 else it })
+            clockText = String.format(java.util.Locale.US, "%02d:%02d", hour, cal.get(Calendar.MINUTE))
+        }
+        val text = clockText
         clockPaint.alpha = alpha
         clockPaint.textSize = 13f
         val tw = clockPaint.measureText(text)
