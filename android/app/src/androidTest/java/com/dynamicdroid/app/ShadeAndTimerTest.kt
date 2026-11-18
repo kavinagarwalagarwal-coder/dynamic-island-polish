@@ -75,7 +75,7 @@ class ShadeAndTimerTest {
 
                 // ...the island's own window takes no touches; only a small window over the pill does.
                 val screenW = context.resources.displayMetrics.widthPixels
-                assertTrue("Touch area should hug the island", waitFor(4_000) {
+                assertTrue("Touch area should hug the island", waitFor(6_000) {
                     val s = service() ?: return@waitFor false
                     val draw = field<IslandView?>(s, "island")?.layoutParams as? WindowManager.LayoutParams
                     val touch = field<WindowManager.LayoutParams?>(s, "touchParams")

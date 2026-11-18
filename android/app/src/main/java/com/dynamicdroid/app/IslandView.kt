@@ -101,9 +101,22 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val presenceS = Spring(0f, 240f, 0.9f, 0.003f)
     private val bubbleCenterS = Spring(0f, 220f, 0.82f, 0.5f)
     private val dropS = Spring(0f, IslandMotion.DROP_K, IslandMotion.DROP_DAMPING_RATIO, 0.003f)
+    private val dropImpact = Spring(0f, 95f, 0.86f, 0.003f)
+    private var dropImpactArmed = false
     private val dropGeometry = IslandDropGeometry()
+    private val dropLiquidGlass = WallpaperLiquidGlass(context)
     private val dropNeck = Path()
     private val secondaryRect = RectF()
+    private val dropBody = Path()
+    private val dropGlassPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val dropSpecularPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
+    private val dropImpactPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val dropGradientMatrix = Matrix()
+    private val dropGradient = RadialGradient(0f, 0f, 1f,
+        intArrayOf(Color.argb(54, 238, 248, 255), Color.argb(18, 110, 190, 238), Color.TRANSPARENT),
+        floatArrayOf(0f, 0.56f, 1f), Shader.TileMode.CLAMP)
+    private val dropFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = dropGradient }
+    private val dropRefraction = Path()
     private var touchingSecondary = false
     private val secondaryHit = RectF()
     private val bubblePress = Spring(1f, 760f, 0.72f, 0.0008f)
@@ -215,6 +228,16 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private fun compactHeight() = dp(features.compactHeightDp)
     private fun bubbleDiameter() = compactHeight()
 
+    private fun setDropTarget(target: Float) {
+        if (target > 0f && dropS.target <= 0f) dropImpactArmed = !reduceMotion
+        if (target <= 0f) {
+            dropImpactArmed = false
+            dropImpact.snap(0f)
+            dropImpact.target = 0f
+        }
+        dropS.target = target
+    }
+
     fun setSecondary(next: LiveActivity?) {
         secondaryAccent = next?.let { IslandCustomization.customAccent(context, it.packageName) ?: it.accent }
         next?.progress?.let { if (next.key != secondary?.key) bubbleLevelS.snap(it) else bubbleLevelS.target = it }
@@ -222,7 +245,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (next != null) departingSecondary = next
         secondary = next
         if (fresh) bubbleCenterS.snap(compactCluster().bubbleCenter)
-        dropS.target = if (next != null && presentation == Presentation.COMPACT) 1f else 0f
+        setDropTarget(if (next != null && presentation == Presentation.COMPACT) 1f else 0f)
         secondaryA.target = if (next != null && presentation == Presentation.COMPACT) 1f else 0f
         refreshContentDescription()
         settled = false
@@ -363,7 +386,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         override fun onSensorChanged(e: android.hardware.SensorEvent) {
             if (activity == null || reduceMotion) return
             val t = (-e.values[0] / 9.81f).coerceIn(-1f, 1f)
-            if (abs(t - tiltS.target) > 0.03f) { tiltS.target = t; settled = false; kick() }
+            if (abs(t - tiltS.target) > 0.08f) { tiltS.target = t; settled = false; kick() }
         }
         override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) {}
     }
@@ -383,7 +406,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
     private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA, wobbleS, rippleS, tiltS)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, dropImpact, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA, wobbleS, rippleS, tiltS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -522,7 +545,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         updateArtBackdrop(next)
         presentation = p
         secondaryA.target = if (secondary != null && p == Presentation.COMPACT) 1f else 0f
-        dropS.target = secondaryA.target
+        setDropTarget(secondaryA.target)
         val cluster = compactCluster()
         if (secondary != null && p == Presentation.COMPACT) bubbleCenterS.target = cluster.bubbleCenter
         refreshContentDescription()
@@ -615,7 +638,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         introS.snap(0f)
         presenceS.snap(0f)
         secondaryA.snap(0f)
-        dropS.snap(0f)
+        dropS.snap(0f); dropImpact.snap(0f); dropImpact.target = 0f; dropImpactArmed = false
         widthS.snap(dp(10f)); heightS.snap(dp(10f)); radiusS.snap(dp(5f))
         centerS.snap(cameraCenter())
         topS.snap(baseTop + dp(12f))
@@ -763,7 +786,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         concealS.snap(1f) // Home is visible; avoid a full-screen alpha layer left over from fullscreen media.
         introS.snap(1f); presenceS.snap(1f)
         compactA.snap(0f); expandedA.snap(0f); idleA.snap(0f)
-        secondaryA.snap(0f); dropS.snap(0f)
+        secondaryA.snap(0f); dropS.snap(0f); dropImpact.snap(0f); dropImpact.target = 0f; dropImpactArmed = false
         val d = min(spec.h, dp(34f))
         // Start from a small dot in the camera hole, already on screen (never a flash of black).
         widthS.snap(d * 0.45f); heightS.snap(d * 0.45f); radiusS.snap(d * 0.225f)
@@ -789,7 +812,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         topS.target = targetTop(presentation)
         setContentTargets(presentation)
         secondaryA.target = if (secondary != null && presentation == Presentation.COMPACT) 1f else 0f
-        dropS.target = secondaryA.target
+        setDropTarget(secondaryA.target)
         if (secondary != null) bubbleCenterS.target = compactCluster().bubbleCenter
         sheenStart = SystemClock.uptimeMillis() + 300L
         settled = false
@@ -959,6 +982,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             if (reduceMotion) s.snap(s.target) else s.step(dt)
             if (!s.isAtRest) rest = false
         }
+        if (!reduceMotion && dropImpactArmed && dropS.target > 0f && dropS.value >= 0.96f) {
+            dropImpactArmed = false
+            dropImpact.snap(0f)
+            dropImpact.target = 1f
+            rest = false
+        }
         if (!reduceMotion && shapePeak > 0f && shapeSprings.all { it.isAtRest }) {
             val kickV = (shapePeak / dp(900f)).coerceIn(0f, 1f) * 0.9f
             if (kickV > 0.05f && !tracking) { wobbleS.fling(kickV); rest = false }
@@ -1025,6 +1054,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         liquidGlass.invalidateContent()
+        dropLiquidGlass.invalidateContent()
         sensors?.let { m ->
             (m.getDefaultSensor(android.hardware.Sensor.TYPE_GRAVITY) ?: m.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER))
                 ?.let { m.registerListener(tiltListener, it, android.hardware.SensorManager.SENSOR_DELAY_UI) }
@@ -1034,13 +1064,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
-        if (visibility == VISIBLE) { liquidGlass.invalidateContent(); kick() }
+        if (visibility == VISIBLE) { liquidGlass.invalidateContent(); dropLiquidGlass.invalidateContent(); kick() }
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
         // Screen-off and lock hide the overlay window; HWUI may free its display lists meanwhile.
-        if (visibility == VISIBLE) { liquidGlass.invalidateContent(); invalidate() }
+        if (visibility == VISIBLE) { liquidGlass.invalidateContent(); dropLiquidGlass.invalidateContent(); invalidate() }
     }
 
     override fun onDetachedFromWindow() {
@@ -1049,6 +1079,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         Choreographer.getInstance().removeFrameCallback(this)
         running = false
         liquidGlass.release()
+        dropLiquidGlass.release()
         morphCard = null; softMorphCard = null
         fieldCompact.release(); fieldCard.release(); oldCompact.release(); oldCard.release(); fieldVersion = -1
         super.onDetachedFromWindow()
@@ -1187,7 +1218,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         // The edges flow too: they pinch in while the island stretches and bow out as it
         // shrinks, so a morph reads as liquid rather than a rubber rectangle.
         buildBody(body, rect, r, -flowX * dp(2.4f) - wob * dp(10f), -flowY * dp(3f) + wob * dp(8f),
-            sag = if (reduceMotion) 0f else (stretchS.value * 0.35f).coerceIn(0f, dp(14f)))
+            sag = if (reduceMotion) 0f else (stretchS.value * 0.35f + dropGeometry.neck * dp(1.8f)).coerceIn(0f, dp(14f)))
         canvas.drawPath(body, shapePaint)
         if (a == null) { canvas.restore(); if (dimmed) canvas.restore(); if (layered) canvas.restore(); return }
         drawOutline(canvas, a, r, bodyAlpha)
@@ -1308,9 +1339,37 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         secondaryRect.set(center - dropGeometry.radiusX, cy - dropGeometry.radiusY,
             center + dropGeometry.radiusX, cy + dropGeometry.radiusY)
         val surfaceAlpha = (255 * intro * presenceS.value.coerceIn(0f, 1f)).toInt()
+        val impact = dropImpact.value.coerceIn(0f, 1f)
+        if (!reduceMotion && impact < 0.995f) {
+            dropImpactPaint.color = Color.argb((surfaceAlpha * 0.34f * (1f - impact)).toInt(), 205, 235, 255)
+            dropImpactPaint.strokeWidth = dp(1.1f) * (1f - impact) + dp(0.35f)
+            canvas.drawCircle(center, cy, diameter * (0.24f + 0.62f * impact), dropImpactPaint)
+            val secondWave = ((impact - 0.2f) / 0.8f).coerceIn(0f, 1f)
+            if (impact > 0.2f && secondWave < 0.995f) {
+                dropImpactPaint.color = Color.argb((surfaceAlpha * 0.2f * (1f - secondWave)).toInt(), 228, 248, 255)
+                dropImpactPaint.strokeWidth = dp(0.75f) * (1f - secondWave) + dp(0.3f)
+                canvas.drawCircle(center, cy, diameter * (0.12f + 0.72f * secondWave), dropImpactPaint)
+            }
+        }
         fillPaint.color = withAlpha(Color.BLACK, surfaceAlpha)
         drawDropNeck(canvas, surfaceAlpha)
-        canvas.drawOval(secondaryRect, fillPaint)
+        buildDropBody(dropBody, secondaryRect, dropGeometry.teardrop)
+        canvas.drawPath(dropBody, fillPaint)
+        canvas.save()
+        canvas.clipPath(dropBody)
+        if (wallpaperSkin.enabled && !isAbsorbing) {
+            wallpaperStage.set(0f, 0f, width / fit.scale, max(baseTop + dp(WALLPAPER_STAGE_DP), rect.bottom))
+            dropLiquidGlass.draw(canvas, wallpaperStage, secondaryRect, min(dropGeometry.radiusX, dropGeometry.radiusY),
+                surfaceAlpha, wallpaperSkin,
+                resizing = !dropS.isAtRest || !dropImpact.isAtRest || !bubblePress.isAtRest)
+        }
+        dropGradientMatrix.setScale(dropGeometry.radiusX * 1.35f, dropGeometry.radiusY * 1.45f)
+        dropGradientMatrix.postTranslate(center - dropGeometry.radiusX * 0.28f, cy - dropGeometry.radiusY * 0.34f)
+        dropGradient.setLocalMatrix(dropGradientMatrix)
+        dropFillPaint.alpha = surfaceAlpha
+        canvas.drawPath(dropBody, dropFillPaint)
+        dropFillPaint.alpha = 255
+        drawDropGlass(canvas, surfaceAlpha)
         val alpha = (surfaceAlpha * dropGeometry.content).toInt()
         if (features.colouredBubbles && alpha > 2) drawBubbleRing(canvas, a, alpha)
         when (a.mode) {
@@ -1334,6 +1393,60 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             IslandMode.DOWNLOAD -> drawMiniProgress(canvas, center, cy, dp(10f), bubbleLevelS.value, alpha)
             else -> text(canvas, a.appLabel.take(1), center - dp(4f), cy + dp(5f), dp(15f), bodyPaint, Color.WHITE, alpha)
         }
+        canvas.restore()
+    }
+
+    private fun buildDropBody(path: Path, bounds: RectF, pointiness: Float) {
+        path.reset()
+        val cx = bounds.centerX()
+        val cy = bounds.centerY()
+        val rx = bounds.width() * 0.5f
+        val ry = bounds.height() * 0.5f
+        val p = pointiness.coerceIn(0f, 1f)
+        val tipX = cx - rx * (1f + 0.14f * p)
+        val shoulderX = cx - rx * (0.68f - 0.34f * p)
+        path.moveTo(tipX, cy)
+        path.quadTo(shoulderX, cy - ry * 0.92f, cx - rx * 0.05f * p, cy - ry)
+        path.cubicTo(cx + rx * 0.66f, cy - ry, cx + rx, cy - ry * 0.54f, cx + rx, cy)
+        path.cubicTo(cx + rx, cy + ry * 0.54f, cx + rx * 0.66f, cy + ry, cx - rx * 0.05f * p, cy + ry)
+        path.quadTo(shoulderX, cy + ry * 0.92f, tipX, cy)
+        path.close()
+    }
+
+    private fun drawDropGlass(canvas: Canvas, alpha: Int) {
+        val rx = dropGeometry.radiusX
+        val ry = dropGeometry.radiusY
+        if (rx <= 0f || ry <= 0f) return
+        val progress = dropS.value.coerceIn(0f, 1f)
+        val highlightAlpha = (alpha * (0.38f + 0.3f * sin(progress * PI).toFloat())).toInt()
+
+        arcRect.set(secondaryRect)
+        arcRect.inset(dp(1.4f), dp(1.4f))
+        dropGlassPaint.color = Color.argb((alpha * 0.32f).toInt(), 255, 255, 255)
+        dropGlassPaint.strokeWidth = dp(0.7f)
+        canvas.drawOval(arcRect, dropGlassPaint)
+
+        val drift = (progress - 0.5f) * rx * 0.22f
+        dropSpecularPaint.color = Color.argb(highlightAlpha, 255, 255, 255)
+        dropSpecularPaint.strokeWidth = dp(1.25f)
+        dropRefraction.reset()
+        dropRefraction.moveTo(secondaryRect.centerX() - rx * 0.58f + drift, secondaryRect.centerY() - ry * 0.48f)
+        dropRefraction.cubicTo(
+            secondaryRect.centerX() - rx * 0.40f + drift, secondaryRect.centerY() - ry * 0.78f,
+            secondaryRect.centerX() + rx * 0.06f + drift, secondaryRect.centerY() - ry * 0.78f,
+            secondaryRect.centerX() + rx * 0.28f + drift, secondaryRect.centerY() - ry * 0.55f
+        )
+        canvas.drawPath(dropRefraction, dropSpecularPaint)
+
+        dropGlassPaint.color = Color.argb((alpha * 0.16f).toInt(), 190, 225, 255)
+        dropGlassPaint.strokeWidth = dp(1.1f)
+        arcRect.set(secondaryRect)
+        arcRect.inset(rx * 0.12f, ry * 0.12f)
+        canvas.drawArc(arcRect, 32f + progress * 18f, 105f, false, dropGlassPaint)
+        dropSpecularPaint.color = Color.argb((alpha * 0.42f).toInt(), 255, 255, 255)
+        dropSpecularPaint.strokeWidth = dp(0.8f)
+        canvas.drawLine(secondaryRect.centerX() - rx * 0.66f, secondaryRect.centerY() - ry * 0.22f,
+            secondaryRect.centerX() - rx * 0.55f, secondaryRect.centerY() - ry * 0.38f, dropSpecularPaint)
     }
 
     /** Each bubble wears its activity's colour; a timer's ring shows the time left. */
