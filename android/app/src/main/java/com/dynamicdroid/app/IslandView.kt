@@ -104,12 +104,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val dropImpact = Spring(0f, 95f, 0.86f, 0.003f)
     private var dropImpactArmed = false
     private val dropGeometry = IslandDropGeometry()
+    private val dropLiquidGlass = WallpaperLiquidGlass(context)
     private val dropNeck = Path()
     private val secondaryRect = RectF()
     private val dropBody = Path()
     private val dropGlassPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val dropSpecularPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
     private val dropImpactPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val dropGradientMatrix = Matrix()
+    private val dropGradient = RadialGradient(0f, 0f, 1f,
+        intArrayOf(Color.argb(54, 238, 248, 255), Color.argb(18, 110, 190, 238), Color.TRANSPARENT),
+        floatArrayOf(0f, 0.56f, 1f), Shader.TileMode.CLAMP)
+    private val dropFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = dropGradient }
     private val dropRefraction = Path()
     private var touchingSecondary = false
     private val secondaryHit = RectF()
@@ -1048,6 +1054,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         liquidGlass.invalidateContent()
+        dropLiquidGlass.invalidateContent()
         sensors?.let { m ->
             (m.getDefaultSensor(android.hardware.Sensor.TYPE_GRAVITY) ?: m.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER))
                 ?.let { m.registerListener(tiltListener, it, android.hardware.SensorManager.SENSOR_DELAY_UI) }
@@ -1057,13 +1064,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
-        if (visibility == VISIBLE) { liquidGlass.invalidateContent(); kick() }
+        if (visibility == VISIBLE) { liquidGlass.invalidateContent(); dropLiquidGlass.invalidateContent(); kick() }
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
         // Screen-off and lock hide the overlay window; HWUI may free its display lists meanwhile.
-        if (visibility == VISIBLE) { liquidGlass.invalidateContent(); invalidate() }
+        if (visibility == VISIBLE) { liquidGlass.invalidateContent(); dropLiquidGlass.invalidateContent(); invalidate() }
     }
 
     override fun onDetachedFromWindow() {
@@ -1072,6 +1079,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         Choreographer.getInstance().removeFrameCallback(this)
         running = false
         liquidGlass.release()
+        dropLiquidGlass.release()
         morphCard = null; softMorphCard = null
         fieldCompact.release(); fieldCard.release(); oldCompact.release(); oldCard.release(); fieldVersion = -1
         super.onDetachedFromWindow()
@@ -1336,6 +1344,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             dropImpactPaint.color = Color.argb((surfaceAlpha * 0.34f * (1f - impact)).toInt(), 205, 235, 255)
             dropImpactPaint.strokeWidth = dp(1.1f) * (1f - impact) + dp(0.35f)
             canvas.drawCircle(center, cy, diameter * (0.24f + 0.62f * impact), dropImpactPaint)
+            val secondWave = ((impact - 0.2f) / 0.8f).coerceIn(0f, 1f)
+            if (impact > 0.2f && secondWave < 0.995f) {
+                dropImpactPaint.color = Color.argb((surfaceAlpha * 0.2f * (1f - secondWave)).toInt(), 228, 248, 255)
+                dropImpactPaint.strokeWidth = dp(0.75f) * (1f - secondWave) + dp(0.3f)
+                canvas.drawCircle(center, cy, diameter * (0.12f + 0.72f * secondWave), dropImpactPaint)
+            }
         }
         fillPaint.color = withAlpha(Color.BLACK, surfaceAlpha)
         drawDropNeck(canvas, surfaceAlpha)
@@ -1343,6 +1357,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         canvas.drawPath(dropBody, fillPaint)
         canvas.save()
         canvas.clipPath(dropBody)
+        if (wallpaperSkin.enabled && !isAbsorbing) {
+            wallpaperStage.set(0f, 0f, width / fit.scale, max(baseTop + dp(WALLPAPER_STAGE_DP), rect.bottom))
+            dropLiquidGlass.draw(canvas, wallpaperStage, secondaryRect, min(dropGeometry.radiusX, dropGeometry.radiusY),
+                surfaceAlpha, wallpaperSkin,
+                resizing = !dropS.isAtRest || !dropImpact.isAtRest || !bubblePress.isAtRest)
+        }
+        dropGradientMatrix.setScale(dropGeometry.radiusX * 1.35f, dropGeometry.radiusY * 1.45f)
+        dropGradientMatrix.postTranslate(center - dropGeometry.radiusX * 0.28f, cy - dropGeometry.radiusY * 0.34f)
+        dropGradient.setLocalMatrix(dropGradientMatrix)
+        dropFillPaint.alpha = surfaceAlpha
+        canvas.drawPath(dropBody, dropFillPaint)
+        dropFillPaint.alpha = 255
         drawDropGlass(canvas, surfaceAlpha)
         val alpha = (surfaceAlpha * dropGeometry.content).toInt()
         if (features.colouredBubbles && alpha > 2) drawBubbleRing(canvas, a, alpha)
