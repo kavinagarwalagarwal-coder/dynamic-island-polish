@@ -27,6 +27,9 @@ class Spring(
         velocity = 0f
     }
 
+    /** Flick the spring without moving its target (used for liquid settle wobble). */
+    fun fling(v: Float) { velocity += v }
+
     fun step(dtSeconds: Float) {
         if (isAtRest) {
             value = target

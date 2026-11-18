@@ -345,6 +345,28 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val pressS = Spring(1f, 760f, 0.76f, 0.0008f)
     private val stretchS = Spring(0f, 360f, 0.78f, 0.5f)
     private val absorbS = Spring(0f, 78f, 0.94f, 0.003f)
+    // Water-drop extras: a lightly damped jiggle once the shape lands, a tap ripple, and a
+    // tilt-following glint. All are springs so any gesture can interrupt them.
+    private val wobbleS = Spring(0f, 240f, 0.16f, 0.0006f)
+    private val rippleS = Spring(1f, 70f, 1f, 0.003f)
+    private val tiltS = Spring(0f, 60f, 0.9f, 0.004f)
+    private var rippleX = 0f
+    private var rippleY = 0f
+    private var shapePeak = 0f
+    private val ripplePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.WHITE }
+    private val glintMatrix = Matrix()
+    private val glintShader = RadialGradient(0f, 0f, 1f, intArrayOf(0x55FFFFFF, 0x14FFFFFF, 0x00FFFFFF),
+        floatArrayOf(0f, .45f, 1f), Shader.TileMode.CLAMP)
+    private val glintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = glintShader }
+    private val sensors = context.getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+    private val tiltListener = object : android.hardware.SensorEventListener {
+        override fun onSensorChanged(e: android.hardware.SensorEvent) {
+            if (activity == null || reduceMotion) return
+            val t = (-e.values[0] / 9.81f).coerceIn(-1f, 1f)
+            if (abs(t - tiltS.target) > 0.03f) { tiltS.target = t; settled = false; kick() }
+        }
+        override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) {}
+    }
     private val appMorph = AppMorphGeometry()
     private var morphCard: Bitmap? = null
     private var softMorphCard: Bitmap? = null
@@ -361,7 +383,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
     private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA, wobbleS, rippleS, tiltS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -686,11 +708,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
      * The island's outline: a rounded rectangle whose top and bottom edges bow by [bendY] and
      * whose sides bow by [bendX] (positive = outward). Plain rounded rect when both are tiny.
      */
-    private fun buildBody(path: Path, box: RectF, radius: Float, bendY: Float, bendX: Float) {
+    private fun buildBody(path: Path, box: RectF, radius: Float, bendY: Float, bendX: Float, sag: Float = 0f) {
         path.reset()
         if (!(box.width() > 0f && box.height() > 0f)) return
         val rad = min(radius, min(box.width(), box.height()) / 2f).coerceAtLeast(0f)
-        if (abs(bendY) < 0.3f && abs(bendX) < 0.3f) { path.addRoundRect(box, rad, rad, Path.Direction.CW); return }
+        if (abs(bendY) < 0.3f && abs(bendX) < 0.3f && sag < 0.3f) { path.addRoundRect(box, rad, rad, Path.Direction.CW); return }
         val l = box.left; val t = box.top; val rr = box.right; val b = box.bottom
         val cx = box.centerX(); val cy = box.centerY()
         val d = rad * 2f
@@ -702,11 +724,29 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         corner.set(rr - d, t, rr, t + d); path.arcTo(corner, -90f, 90f, false)
         path.quadTo(rr + bx, cy, rr, b - rad)
         corner.set(rr - d, b - d, rr, b); path.arcTo(corner, 0f, 90f, false)
-        path.quadTo(cx, b + by, l + rad, b)
+        // A pulled drop sags into a tear: the bottom bulges more than the top.
+        path.quadTo(cx, b + by + sag * 2f, l + rad, b)
         corner.set(l, b - d, l + d, b); path.arcTo(corner, 90f, 90f, false)
         path.quadTo(l - bx, cy, l, t + rad)
         corner.set(l, t, l + d, t + d); path.arcTo(corner, 180f, 90f, false)
         path.close()
+    }
+
+    /** Tilt-following glint on the dome plus the expanding ring from a tap, both inside the clip. */
+    private fun drawWaterSurface(canvas: Canvas, alpha: Int) {
+        if (alpha <= 0 || rect.isEmpty) return
+        val gx = rect.centerX() + tiltS.value * rect.width() * 0.38f
+        val gy = rect.top + rect.height() * 0.22f
+        glintMatrix.setScale(rect.height() * 0.9f, rect.height() * 0.45f); glintMatrix.postTranslate(gx, gy)
+        glintShader.setLocalMatrix(glintMatrix)
+        glintPaint.alpha = alpha
+        canvas.drawRect(rect, glintPaint)
+        val v = rippleS.value
+        if (v < 0.995f) {
+            ripplePaint.strokeWidth = dp(1.6f) * (1f - v) + dp(0.4f)
+            ripplePaint.alpha = (alpha * 0.4f * (1f - v)).toInt()
+            canvas.drawCircle(rippleX, rippleY, max(rect.width(), rect.height()) * 0.8f * v, ripplePaint)
+        }
     }
 
     /** 0 while the shape is under ~70% of where it's heading, easing to 1 by ~92%. */
@@ -913,9 +953,16 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val dt = if (lastFrame == 0L) 1f / 60f else (frameTimeNanos - lastFrame) / 1_000_000_000f
         lastFrame = frameTimeNanos
         var rest = true
+        // Remember how hard the shape was moving; when it lands, the drop jiggles in proportion.
+        for (s in shapeSprings) if (!s.isAtRest) { shapePeak = max(shapePeak, abs(s.speed)) }
         for (s in springs) {
             if (reduceMotion) s.snap(s.target) else s.step(dt)
             if (!s.isAtRest) rest = false
+        }
+        if (!reduceMotion && shapePeak > 0f && shapeSprings.all { it.isAtRest }) {
+            val kickV = (shapePeak / dp(900f)).coerceIn(0f, 1f) * 0.9f
+            if (kickV > 0.05f && !tracking) { wobbleS.fling(kickV); rest = false }
+            shapePeak = 0f
         }
         invalidate()
         if (rest && !settled && !tracking) {
@@ -978,6 +1025,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         liquidGlass.invalidateContent()
+        sensors?.let { m ->
+            (m.getDefaultSensor(android.hardware.Sensor.TYPE_GRAVITY) ?: m.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER))
+                ?.let { m.registerListener(tiltListener, it, android.hardware.SensorManager.SENSOR_DELAY_UI) }
+        }
         kick()
     }
 
@@ -993,6 +1044,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     override fun onDetachedFromWindow() {
+        sensors?.unregisterListener(tiltListener)
         removeCallbacks(introWiden); introHoldUntil = 0L
         Choreographer.getInstance().removeFrameCallback(this)
         running = false
@@ -1102,6 +1154,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         // Pulling the drop down pinches its waist so its volume stays constant.
         val base = max(dp(1f), heightS.value)
         w *= (1f - 0.4f * (stretchS.value / base)).coerceIn(0.7f, 1.15f)
+        // Settle jiggle: the drop wobbles wide/flat then tall/narrow, keeping its volume.
+        val wob = wobbleS.value.coerceIn(-0.12f, 0.12f)
+        w *= 1f + wob * 0.6f
+        h = max(dp(1f), h * (1f - wob))
         val top = topS.value
         rect.set(cx - w / 2f, top, cx + w / 2f, top + h)
         var r = min(radiusS.value * press, h / 2f)
@@ -1130,7 +1186,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         shapePaint.alpha = if (seeThrough()) (bodyAlpha * LANDSCAPE_BODY).toInt() else bodyAlpha
         // The edges flow too: they pinch in while the island stretches and bow out as it
         // shrinks, so a morph reads as liquid rather than a rubber rectangle.
-        buildBody(body, rect, r, -flowX * dp(2.4f), -flowY * dp(3f))
+        buildBody(body, rect, r, -flowX * dp(2.4f) - wob * dp(10f), -flowY * dp(3f) + wob * dp(8f),
+            sag = if (reduceMotion) 0f else (stretchS.value * 0.35f).coerceIn(0f, dp(14f)))
         canvas.drawPath(body, shapePaint)
         if (a == null) { canvas.restore(); if (dimmed) canvas.restore(); if (layered) canvas.restore(); return }
         drawOutline(canvas, a, r, bodyAlpha)
@@ -1141,10 +1198,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (absorb < .06f) {
             wallpaperStage.set(0f, 0f, width / fit.scale, max(baseTop + dp(WALLPAPER_STAGE_DP), rect.bottom))
             liquidGlass.draw(canvas, wallpaperStage, rect, r, bodyAlpha, wallpaperSkin,
-                resizing = shapeSprings.any { !it.isAtRest } || !pressS.isAtRest || !stretchS.isAtRest)
+                resizing = shapeSprings.any { !it.isAtRest } || !pressS.isAtRest || !stretchS.isAtRest || !wobbleS.isAtRest)
         }
         val backdrop = bodyAlpha * (1f - absorb) * (0.25f + 0.75f * room)
         if (usesDots(a)) drawDotField(canvas, a, backdrop) else drawArtBackdrop(canvas, backdrop)
+        if (!reduceMotion) drawWaterSurface(canvas, bodyAlpha)
 
         val ea = expandedA.value.coerceIn(0f, 1f) * reveal
         val ca = compactA.value.coerceIn(0f, 1f) * reveal
@@ -2835,6 +2893,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 touchingSecondary = secondary != null && presentation == Presentation.COMPACT && secondaryA.value > 0.5f && dropS.value > .92f && secondaryHit.contains(e.x, e.y)
                 if (isConcealed || (!touchingSecondary && !hit.contains(e.x, e.y))) return false
                 tracking = true
+                if (!reduceMotion) { rippleX = e.x; rippleY = e.y; rippleS.snap(0f); rippleS.target = 1f; wobbleS.fling(-0.35f) }
                 dragging = false
                 longFired = false
                 downX = e.x
