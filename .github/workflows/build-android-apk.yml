@@ -135,7 +135,7 @@ jobs:
               from PIL import Image
           except ImportError:
               raise SystemExit(0)
-          for path in sorted(glob.glob("island-screenshots/**/scene-*.png", recursive=True)):
+          for path in sorted(glob.glob("island-screenshots/**/scene-*.png", recursive=True) + glob.glob("island-screenshots/**/design-*.png", recursive=True)):
               im = Image.open(path).convert("RGB")
               im.thumbnail((360, 240))
               buf = io.BytesIO(); im.save(buf, "PNG", optimize=True)
