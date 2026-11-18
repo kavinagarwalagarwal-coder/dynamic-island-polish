@@ -386,7 +386,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         override fun onSensorChanged(e: android.hardware.SensorEvent) {
             if (activity == null || reduceMotion) return
             val t = (-e.values[0] / 9.81f).coerceIn(-1f, 1f)
-            if (abs(t - tiltS.target) > 0.03f) { tiltS.target = t; settled = false; kick() }
+            if (abs(t - tiltS.target) > 0.08f) { tiltS.target = t; settled = false; kick() }
         }
         override fun onAccuracyChanged(s: android.hardware.Sensor?, a: Int) {}
     }

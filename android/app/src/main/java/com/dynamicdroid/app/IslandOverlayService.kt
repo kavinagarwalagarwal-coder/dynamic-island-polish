@@ -290,8 +290,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 (activities.all().isNotEmpty() || transient != null || IslandFeatures.read(this).idlePill)
         }
         IslandAccessibilityService.onForegroundPackage = { pkg ->
-            if (pkg !in keyboardPackages && (pkg in homePackages || activities.all().any { it.packageName == pkg } ||
-                    packageManager.getLaunchIntentForPackage(pkg) != null)) watcher?.hint(pkg)
+            if (pkg !in keyboardPackages) watcher?.hint(pkg)
         }
         status = StatusMonitor(this) { info -> island?.applyStatus(info) }.also { it.start() }
         IslandAccessibilityService.onChanged = { handler.post {
