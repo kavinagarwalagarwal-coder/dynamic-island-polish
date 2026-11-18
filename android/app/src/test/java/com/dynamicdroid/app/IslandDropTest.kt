@@ -9,15 +9,20 @@ class IslandDropTest {
         g.update(0f, 254.88f, 296f, 26f, 36f, 360f, 4f)
         assertTrue(g.centerX + g.radiusX <= 270f)
         assertEquals(0f, g.content, 0f)
+        assertEquals(0f, g.teardrop, 0f)
+        g.update(.5f, 254.88f, 296f, 26f, 36f, 360f, 4f)
+        assertTrue(g.teardrop > 0f)
         g.update(.7f, 254.88f, 296f, 26f, 36f, 360f, 4f)
         assertTrue(g.centerY > 26f)
         assertTrue(g.radiusX > g.radiusY)
         assertTrue(g.neck > 0f)
+        assertTrue(g.teardrop > 0f)
         g.update(1f, 254.88f, 296f, 26f, 36f, 360f, 4f)
         assertEquals(296f, g.centerX, .001f)
         assertEquals(26f, g.centerY, .001f)
         assertEquals(g.radiusX, g.radiusY, .001f)
         assertEquals(0f, g.neck, 0f)
+        assertEquals(0f, g.teardrop, 0f)
         assertEquals(1f, g.content, 0f)
     }
     @Test fun interruptedDropKeepsPositionAndSettlesAtTheNewTarget() {
@@ -37,7 +42,7 @@ class IslandDropTest {
         val g = IslandDropGeometry()
         for (width in listOf(180f, 240f, 360f)) for (i in 0..108) {
             g.update(i / 100f, width - 70, width - 22, 26f, 36f, width, 4f)
-            assertTrue(g.centerX - g.radiusX >= 3.99f)
+            assertTrue(g.centerX - g.radiusX * (1f + 0.14f * g.teardrop) >= 3.99f)
             assertTrue(g.centerX + g.radiusX <= width - 3.99f)
         }
     }

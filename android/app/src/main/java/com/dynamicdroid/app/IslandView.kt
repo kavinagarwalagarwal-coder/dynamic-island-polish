@@ -104,6 +104,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val dropGeometry = IslandDropGeometry()
     private val dropNeck = Path()
     private val secondaryRect = RectF()
+    private val dropBody = Path()
     private val dropGlassPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val dropSpecularPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
     private val dropRefraction = Path()
@@ -1313,7 +1314,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val surfaceAlpha = (255 * intro * presenceS.value.coerceIn(0f, 1f)).toInt()
         fillPaint.color = withAlpha(Color.BLACK, surfaceAlpha)
         drawDropNeck(canvas, surfaceAlpha)
-        canvas.drawOval(secondaryRect, fillPaint)
+        buildDropBody(dropBody, secondaryRect, dropGeometry.teardrop)
+        canvas.drawPath(dropBody, fillPaint)
+        canvas.save()
+        canvas.clipPath(dropBody)
         drawDropGlass(canvas, surfaceAlpha)
         val alpha = (surfaceAlpha * dropGeometry.content).toInt()
         if (features.colouredBubbles && alpha > 2) drawBubbleRing(canvas, a, alpha)
@@ -1338,6 +1342,24 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             IslandMode.DOWNLOAD -> drawMiniProgress(canvas, center, cy, dp(10f), bubbleLevelS.value, alpha)
             else -> text(canvas, a.appLabel.take(1), center - dp(4f), cy + dp(5f), dp(15f), bodyPaint, Color.WHITE, alpha)
         }
+        canvas.restore()
+    }
+
+    private fun buildDropBody(path: Path, bounds: RectF, pointiness: Float) {
+        path.reset()
+        val cx = bounds.centerX()
+        val cy = bounds.centerY()
+        val rx = bounds.width() * 0.5f
+        val ry = bounds.height() * 0.5f
+        val p = pointiness.coerceIn(0f, 1f)
+        val tipX = cx - rx * (1f + 0.14f * p)
+        val shoulderX = cx - rx * (0.68f - 0.34f * p)
+        path.moveTo(tipX, cy)
+        path.quadTo(shoulderX, cy - ry * 0.92f, cx - rx * 0.05f * p, cy - ry)
+        path.cubicTo(cx + rx * 0.66f, cy - ry, cx + rx, cy - ry * 0.54f, cx + rx, cy)
+        path.cubicTo(cx + rx, cy + ry * 0.54f, cx + rx * 0.66f, cy + ry, cx - rx * 0.05f * p, cy + ry)
+        path.quadTo(shoulderX, cy + ry * 0.92f, tipX, cy)
+        path.close()
     }
 
     private fun drawDropGlass(canvas: Canvas, alpha: Int) {

@@ -12,6 +12,7 @@ class IslandDropGeometry {
     var radiusX = 0f; private set
     var radiusY = 0f; private set
     var neck = 0f; private set
+    var teardrop = 0f; private set
     var content = 0f; private set
 
     fun update(progress: Float, origin: Float, destination: Float, baseY: Float,
@@ -23,7 +24,8 @@ class IslandDropGeometry {
         radiusX = size * (1f + .20f * wave)
         radiusY = size * (1f - .12f * wave)
         val travel = 1f - (1f - p).pow(1.5f) + (raw - p) * .6f
-        val low = radiusX + margin
+        teardrop = smooth(.02f, .34f, p) * (1f - smooth(.62f, .98f, p))
+        val low = radiusX * (1f + .14f * teardrop) + margin
         centerX = (origin + (destination - origin) * travel).coerceIn(low, max(low, screenWidth - margin - radiusX))
         centerY = baseY + diameter / 6f * wave
         neck = if (p <= .02f) 0f else 1f - smooth(.55f, .96f, p)
