@@ -1099,6 +1099,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val flowY = if (reduceMotion) 0f else (heightS.speed / dp(1500f)).coerceIn(-1f, 1f) * squash()
         h = max(dp(1f), h * (1f - 0.11f * flowX + 0.03f * flowY))
         w *= 1f - 0.05f * flowY + 0.015f * flowX
+        // Pulling the drop down pinches its waist so its volume stays constant.
+        val base = max(dp(1f), heightS.value)
+        w *= (1f - 0.4f * (stretchS.value / base)).coerceIn(0.7f, 1.15f)
         val top = topS.value
         rect.set(cx - w / 2f, top, cx + w / 2f, top + h)
         var r = min(radiusS.value * press, h / 2f)

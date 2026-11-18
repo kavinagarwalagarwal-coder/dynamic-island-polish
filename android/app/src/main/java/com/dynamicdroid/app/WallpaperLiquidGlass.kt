@@ -131,9 +131,9 @@ class WallpaperLiquidGlass(private val context: Context) {
                 shader.setFloatUniform("offset", -l, -t)
                 shader.setFloatUniform("cornerRadii", r, r, r, r)
                 shader.setFloatUniform("refractionHeight", min(h * .28f, 24f).coerceAtLeast(1f))
-                shader.setFloatUniform("refractionAmount", -min(h * .16f, 16f))
+                shader.setFloatUniform("refractionAmount", min(h * .22f, 20f))
                 shader.setFloatUniform("depthEffect", .35f)
-                shader.setFloatUniform("chromaticAberration", .2f)
+                shader.setFloatUniform("chromaticAberration", .12f)
                 // The effect snapshots uniforms, so it is recreated; the layer size stays fixed.
                 node.setRenderEffect(RenderEffect.createRuntimeShaderEffect(shader, "content"))
                 lensOn = true
@@ -214,8 +214,15 @@ half4 main(float2 coord) {
 
     float sd = sdRoundedRect(centeredCoord, halfSize, radius);
     // Outside the island (clipped by the caller) or in the flat centre: no refraction needed.
-    if (sd > 0.5 || -sd >= refractionHeight) {
-        return content.eval(coord);
+    // Water-drop optics: the dome magnifies the centre like a convex bead.
+    float2 uv = centeredCoord / halfSize;
+    if (sd > 0.5) return content.eval(coord);
+    if (-sd >= refractionHeight) {
+        half4 c = content.eval(coord - centeredCoord * 0.06);
+        float arc = smoothstep(0.55, 0.0, abs(uv.y + 0.62)) * smoothstep(1.0, 0.3, abs(uv.x));
+        c.rgb += half3(arc * 0.22);
+        c.rgb += half3(smoothstep(0.4, 1.0, uv.y) * smoothstep(1.0, 0.2, abs(uv.x)) * 0.06);
+        return c;
     }
     sd = min(sd, 0.0);
 
@@ -231,6 +238,12 @@ half4 main(float2 coord) {
     half4 color = content.eval(refractedCoord);
     color.r = content.eval(refractedCoord + dispersedCoord).r;
     color.b = content.eval(refractedCoord - dispersedCoord).b;
+    // Meniscus: dark contact ring where the drop meets the glass.
+    float edge = 1.0 - clamp(-sd / refractionHeight, 0.0, 1.0);
+    color.rgb *= half(1.0 - 0.45 * smoothstep(0.6, 1.0, edge));
+    // Top specular crescent and bottom caustic pool.
+    float arc = smoothstep(0.55, 0.0, abs(uv.y + 0.62)) * smoothstep(1.0, 0.3, abs(uv.x));
+    color.rgb += half3(arc * 0.22 + smoothstep(0.4, 1.0, uv.y) * 0.06);
 
     return color;
 }"""
