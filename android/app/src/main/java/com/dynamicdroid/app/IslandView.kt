@@ -104,6 +104,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val dropGeometry = IslandDropGeometry()
     private val dropNeck = Path()
     private val secondaryRect = RectF()
+    private val dropGlassPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
+    private val dropSpecularPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { strokeCap = Paint.Cap.ROUND }
+    private val dropRefraction = Path()
     private var touchingSecondary = false
     private val secondaryHit = RectF()
     private val bubblePress = Spring(1f, 760f, 0.72f, 0.0008f)
@@ -1311,6 +1314,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fillPaint.color = withAlpha(Color.BLACK, surfaceAlpha)
         drawDropNeck(canvas, surfaceAlpha)
         canvas.drawOval(secondaryRect, fillPaint)
+        drawDropGlass(canvas, surfaceAlpha)
         val alpha = (surfaceAlpha * dropGeometry.content).toInt()
         if (features.colouredBubbles && alpha > 2) drawBubbleRing(canvas, a, alpha)
         when (a.mode) {
@@ -1334,6 +1338,42 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             IslandMode.DOWNLOAD -> drawMiniProgress(canvas, center, cy, dp(10f), bubbleLevelS.value, alpha)
             else -> text(canvas, a.appLabel.take(1), center - dp(4f), cy + dp(5f), dp(15f), bodyPaint, Color.WHITE, alpha)
         }
+    }
+
+    private fun drawDropGlass(canvas: Canvas, alpha: Int) {
+        val rx = dropGeometry.radiusX
+        val ry = dropGeometry.radiusY
+        if (rx <= 0f || ry <= 0f) return
+        val progress = dropS.value.coerceIn(0f, 1f)
+        val highlightAlpha = (alpha * (0.38f + 0.3f * sin(progress * PI).toFloat())).toInt()
+
+        arcRect.set(secondaryRect)
+        arcRect.inset(dp(1.4f), dp(1.4f))
+        dropGlassPaint.color = Color.argb((alpha * 0.32f).toInt(), 255, 255, 255)
+        dropGlassPaint.strokeWidth = dp(0.7f)
+        canvas.drawOval(arcRect, dropGlassPaint)
+
+        val drift = (progress - 0.5f) * rx * 0.22f
+        dropSpecularPaint.color = Color.argb(highlightAlpha, 255, 255, 255)
+        dropSpecularPaint.strokeWidth = dp(1.25f)
+        dropRefraction.reset()
+        dropRefraction.moveTo(secondaryRect.centerX() - rx * 0.58f + drift, secondaryRect.centerY() - ry * 0.48f)
+        dropRefraction.cubicTo(
+            secondaryRect.centerX() - rx * 0.40f + drift, secondaryRect.centerY() - ry * 0.78f,
+            secondaryRect.centerX() + rx * 0.06f + drift, secondaryRect.centerY() - ry * 0.78f,
+            secondaryRect.centerX() + rx * 0.28f + drift, secondaryRect.centerY() - ry * 0.55f
+        )
+        canvas.drawPath(dropRefraction, dropSpecularPaint)
+
+        dropGlassPaint.color = Color.argb((alpha * 0.16f).toInt(), 190, 225, 255)
+        dropGlassPaint.strokeWidth = dp(1.1f)
+        arcRect.set(secondaryRect)
+        arcRect.inset(rx * 0.12f, ry * 0.12f)
+        canvas.drawArc(arcRect, 32f + progress * 18f, 105f, false, dropGlassPaint)
+        dropSpecularPaint.color = Color.argb((alpha * 0.42f).toInt(), 255, 255, 255)
+        dropSpecularPaint.strokeWidth = dp(0.8f)
+        canvas.drawLine(secondaryRect.centerX() - rx * 0.66f, secondaryRect.centerY() - ry * 0.22f,
+            secondaryRect.centerX() - rx * 0.55f, secondaryRect.centerY() - ry * 0.38f, dropSpecularPaint)
     }
 
     /** Each bubble wears its activity's colour; a timer's ring shows the time left. */
