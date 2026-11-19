@@ -96,7 +96,8 @@ def main():
     # runner: wait for the main screen instead of failing on the first look.
     for attempt in range(12):
         labels = [(n.get("text", "") or n.get("content-desc", "")) for n in hierarchy().iter("node")]
-        if any(l.casefold() == "playground" for l in labels):
+        # The main screen's bottom bar: Home, Islands, Look, More.
+        if any(l.casefold() == "home" for l in labels) and any(l.casefold() == "islands" for l in labels):
             break
         if any(l.casefold() == "skip" for l in labels):
             click_if_present("Skip", wait=1)
@@ -106,11 +107,11 @@ def main():
                 adb("shell", "am", "start", "-W", "-n", PACKAGE + "/" + CODE + ".MainActivity")
         time.sleep(1)
     else:
-        raise AssertionError("Main screen never showed 'Playground'; visible: " + ", ".join(l for l in labels if l)[:600])
-    click("Playground")
+        raise AssertionError("Main screen never showed its Home page; visible: " + ", ".join(l for l in labels if l)[:600])
+    click("Home")
     time.sleep(1.5)
     check_crash()
-    assert adb("shell", "pidof", PACKAGE).strip(), "Optimized app stopped on the Playground"
+    assert adb("shell", "pidof", PACKAGE).strip(), "Optimized app stopped on the Home page"
     adb("shell", "pm", "grant", "com.dynamicdroid.fixture", "android.permission.POST_NOTIFICATIONS")
     adb("shell", "appops", "set", PACKAGE, "SYSTEM_ALERT_WINDOW", "allow")
     adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + CODE + ".IslandNotificationListener")
@@ -131,12 +132,45 @@ def main():
             # Android 17 emulators sometimes drop the first grant: ask again.
             adb("shell", "cmd", "notification", "allow_listener", PACKAGE + "/" + CODE + ".IslandNotificationListener")
     assert bound(), "The notification listener never connected"
+    # In case anything left Settings open (it can hang for 10+ seconds on Android 17 images,
+    # swallowing window events), close it so the run starts from a phone that is not stuck.
+    adb("shell", "am", "force-stop", "com.android.settings")
     time.sleep(1)
     fixture = "com.dynamicdroid.fixture/.FixtureActivity"
     adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "custom")
     time.sleep(1)
     adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "player")
-    time.sleep(1)
+    # A busy emulator can take many seconds to actually show the player (seen: 8.6 s on
+    # Android 17); going home before it is on screen leaves nothing to come back from.
+    end = time.time() + 20
+    while time.time() < end:
+        top = [l for l in adb("shell", "dumpsys", "activity", "activities", timeout=40).splitlines() if "topResumedActivity" in l or "ResumedActivity:" in l]
+        if any("com.dynamicdroid.fixture" in l for l in top):
+            break
+        time.sleep(.5)
+    # The island only flies back for an app that is already playing on it: on a slow emulator the
+    # player's media notification can land after Home, which leaves nothing to fly back. Wait
+    # for the fixture's media session before leaving.
+    end = time.time() + 15
+    while time.time() < end:
+        if "com.dynamicdroid.fixture" in adb("shell", "dumpsys", "media_session", timeout=40):
+            break
+        time.sleep(.5)
+    # The island must have seen the player come to the front: busy Android 17 emulators sometimes
+    # drop that window event, and a phone that never saw the app open has nothing to fly back to.
+    # If it was dropped, bring the player to the front again.
+    def saw_player():
+        return "-> com.dynamicdroid.fixture" in adb("logcat", "-d", "-s", "IslandHandoff:D")
+    for attempt in range(3):
+        end = time.time() + 6
+        while time.time() < end and not saw_player():
+            time.sleep(.5)
+        if saw_player():
+            break
+        adb("shell", "input", "keyevent", "KEYCODE_HOME")
+        time.sleep(1.5)
+        adb("shell", "am", "start", "-W", "-n", fixture, "--es", "kind", "player")
+    time.sleep(2)
     before = adb("shell", "pidof", PACKAGE).strip()
     recording = subprocess.Popen(
         ["adb", "shell", "screenrecord", "--time-limit", "4", "/sdcard/island-return.mp4"],
@@ -151,7 +185,7 @@ def main():
     check_crash()
     assert adb("shell", "pidof", PACKAGE).strip() == before, "App restarted during the live handoff"
     assert returned, "The island did not grow back after leaving the player"
-    print("Optimized standalone APK: Playground and real player-to-Home return passed.")
+    print("Optimized standalone APK: Home page and real player-to-Home return passed.")
 
 try:
     main()
@@ -168,6 +202,9 @@ except Exception as error:
         print("---- app log (last 120 lines) ----")
         print("\n".join(app_log.splitlines()[-120:]))
         a11y = adb("shell", "dumpsys", "accessibility")
+        print("---- activity starts ----")
+        starts = adb("logcat", "-d", "-s", "ActivityTaskManager:I", "ActivityManager:I", "WindowManager:W")
+        print("\n".join(l for l in starts.splitlines() if "START" in l or "Displayed" in l or "fixture" in l or "settings" in l)[-4000:])
         print("---- accessibility ----")
         print("\n".join(l for l in a11y.splitlines() if "dynamicdroid" in l or "Bound services" in l or "Enabled services" in l)[:3000])
         print("---- notification listeners ----")

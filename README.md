@@ -8,9 +8,11 @@
 
 A Dynamic Island for Android that grows out of your punch-hole camera: music, calls, messages, timers, volume and more, with smooth spring animations.
 
-[**⬇ Download the latest APK**](https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases) · Android 8.0+ · No internet permission · 13 languages · [Scanned on VirusTotal](https://www.virustotal.com/gui/file/c50be41732d9fc2e0f18ace848ac84a409a7076c78df656a861284666c909476)
+[**⬇ Download the latest APK**](https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases/latest/download/DynamicDroid.apk) · Android 8.0+ · No internet permission · 13 languages · [Scanned on VirusTotal](https://www.virustotal.com/gui/file/c50be41732d9fc2e0f18ace848ac84a409a7076c78df656a861284666c909476)
 
 </div>
+
+**Install or update:** open the download link on your phone and tap the APK. New versions install over the old one and keep your settings and permissions. Then open the app's **Setup** tab: it walks you through each permission in order, opening the exact switch each time. Using Android 16 or 17? [DynamicDroid-Android17.apk](https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases/latest/download/DynamicDroid-Android17.apk) is built for its newer rules.
 
 ---
 

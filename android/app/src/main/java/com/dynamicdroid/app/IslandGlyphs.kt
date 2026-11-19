@@ -120,6 +120,27 @@ object IslandGlyphs {
                 canvas.drawLine(cx - u * 0.18f, cy - u * 0.75f, cx + u * 0.18f, cy - u * 0.75f, stroke)
                 canvas.drawLine(cx + u * 0.18f, cy - u * 0.75f, cx + u * 0.3f, cy - u * 0.5f, stroke)
             }
+            Glyph.HOTSPOT -> {
+                // A dot sending out two arcs on each side.
+                canvas.drawCircle(cx, cy, u * 0.16f, fill)
+                for (k in 1..2) {
+                    val r = u * (0.36f + 0.32f * k)
+                    oval.set(cx - r, cy - r, cx + r, cy + r)
+                    canvas.drawArc(oval, -40f, 80f, false, stroke)
+                    canvas.drawArc(oval, 140f, 80f, false, stroke)
+                }
+            }
+            Glyph.SCREEN -> {
+                // A phone outline with a recording dot.
+                canvas.drawRoundRect(cx - u * 0.5f, cy - u * 0.85f, cx + u * 0.5f, cy + u * 0.85f, s * 0.12f, s * 0.12f, stroke)
+                canvas.drawCircle(cx, cy, u * 0.24f, fill)
+            }
+            Glyph.MIC -> {
+                canvas.drawRoundRect(cx - u * 0.26f, cy - u * 0.85f, cx + u * 0.26f, cy + u * 0.2f, u * 0.26f, u * 0.26f, fill)
+                oval.set(cx - u * 0.5f, cy - u * 0.45f, cx + u * 0.5f, cy + u * 0.42f)
+                canvas.drawArc(oval, 0f, 180f, false, stroke)
+                canvas.drawLine(cx, cy + u * 0.42f, cx, cy + u * 0.8f, stroke)
+            }
         }
     }
 }

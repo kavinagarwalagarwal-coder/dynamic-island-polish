@@ -136,7 +136,9 @@ class LiveScreenCaptureService : Service() {
             captureThread = HandlerThread("DynamicDroidScreenFrames").apply { start() }
             captureHandler = Handler(captureThread!!.looper)
             val manager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            val mediaProjection = manager.getMediaProjection(resultCode, resultData)
+            val mediaProjection = requireNotNull(manager.getMediaProjection(resultCode, resultData)) {
+                "MediaProjection is unavailable for this consent result"
+            }
             projection = mediaProjection
             mediaProjection.registerCallback(projectionCallback, Handler(mainLooper))
 
