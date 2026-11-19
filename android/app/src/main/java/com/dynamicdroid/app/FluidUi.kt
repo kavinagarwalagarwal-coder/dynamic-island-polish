@@ -78,7 +78,7 @@ object Fluid {
     val mono = FontFamily(NothingStyle.mono)
 
     /** Lively but settled: a press, a selection, a toggle. */
-    fun <T> snappy() = spring<T>(dampingRatio = 0.62f, stiffness = 520f)
+    fun <T> snappy() = spring<T>(dampingRatio = 0.78f, stiffness = 520f)
     /** Soft and liquid: pages, sections and content flowing in. */
     fun <T> liquid() = spring<T>(dampingRatio = 0.8f, stiffness = Spring.StiffnessMediumLow)
 
@@ -181,7 +181,7 @@ fun RowScope.Chip(text: String, selected: Boolean = false, description: String? 
     val ink by animateColorAsState(if (selected) Color(0xFF06212C) else Fluid.foreground, Fluid.liquid(), label = "chipInk")
     val pop = remember { Animatable(1f) }
     LaunchedEffect(selected) {
-        if (selected) { pop.snapTo(0.94f); pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 420f)) }
+        if (selected) { pop.snapTo(0.975f); pop.animateTo(1f, spring(dampingRatio = 0.72f, stiffness = 420f)) }
     }
     Box(
         Modifier.weight(1f).padding(horizontal = 3.dp, vertical = 3.dp)
@@ -408,7 +408,7 @@ fun NavBar(items: List<Pair<String, String>>, selected: String, modifier: Modifi
                 val ink by animateColorAsState(if (i == index) Color.Black else Fluid.muted, Fluid.liquid(), label = "navInk")
                 val source = remember { MutableInteractionSource() }
                 Box(
-                    Modifier.weight(1f).defaultMinSize(minHeight = 50.dp).pressSpring(source, 0.94f)
+                    Modifier.weight(1f).defaultMinSize(minHeight = 50.dp).pressSpring(source, 0.975f)
                         .selectable(i == index, source, null, role = Role.Tab) { onSelect(key) },
                     contentAlignment = Alignment.Center,
                 ) {

@@ -13,6 +13,7 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
@@ -82,10 +83,12 @@ internal fun MainActivity.MainScreen() {
                 transitionSpec = {
                     val forward = PAGE_ORDER.indexOf(targetState) >= PAGE_ORDER.indexOf(initialState)
                     if (reduce) fadeIn(tween(120)) togetherWith fadeOut(tween(80))
-                    else (fadeIn(spring(stiffness = 300f)) +
-                        slideInHorizontally(spring(dampingRatio = 0.82f, stiffness = 340f)) { w -> (if (forward) w else -w) / 6 } +
-                        scaleIn(spring(dampingRatio = 0.75f, stiffness = 340f), initialScale = 0.97f)) togetherWith
-                        (fadeOut(tween(110)) + slideOutHorizontally(tween(160)) { w -> (if (forward) -w else w) / 10 })
+                    else (fadeIn(spring(dampingRatio = 0.9f, stiffness = 360f)) +
+                        slideInHorizontally(spring(dampingRatio = 0.88f, stiffness = 360f)) { w -> (if (forward) w else -w) / 8 } +
+                        scaleIn(spring(dampingRatio = 0.88f, stiffness = 360f), initialScale = 0.985f)) togetherWith
+                        (fadeOut(spring(dampingRatio = 1f, stiffness = 460f)) +
+                            slideOutHorizontally(spring(dampingRatio = 0.9f, stiffness = 400f)) { w -> (if (forward) -w else w) / 8 } +
+                            scaleOut(spring(dampingRatio = 0.9f, stiffness = 400f), targetScale = 0.99f))
                 },
                 label = "page",
                 modifier = Modifier.fillMaxWidth().weight(1f),
