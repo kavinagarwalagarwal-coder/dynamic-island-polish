@@ -45,6 +45,15 @@ class MainActivity : AppCompatActivity() {
         if (!granted) toast(getString(R.string.bluetooth_permission_denied))
         refreshCustomization()
     }
+    private val liveCaptureConsent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val data = result.data
+        if (result.resultCode == RESULT_OK && data != null) {
+            LiveScreenCaptureService.start(this, result.resultCode, data)
+        } else {
+            toast(getString(R.string.live_glass_consent_denied))
+        }
+        tick++
+    }
 
     // ---------------------------------------------------------------- screen state (Compose)
 
@@ -509,6 +518,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---------------------------------------------------------------- actions
+
+    internal fun requestLiveScreenGlass() {
+        if (LiveScreenFrames.isActive) {
+            LiveScreenCaptureService.stop(this)
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            toast(getString(R.string.live_glass_requires_android_14))
+            return
+        }
+        val manager = getSystemService(android.media.projection.MediaProjectionManager::class.java)
+        val config = android.media.projection.MediaProjectionConfig.createConfigForUserChoice()
+        liveCaptureConsent.launch(manager.createScreenCaptureIntent(config))
+    }
 
     internal fun openAccessibility() {
         toast(getString(R.string.setup_a11y_toast))

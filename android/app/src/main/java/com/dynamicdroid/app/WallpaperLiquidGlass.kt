@@ -6,7 +6,8 @@
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, express or implied.
  *
  * Modified for Dynamic Droid: Canvas/RenderNode adapter around AndroidLiquidGlass's
- * refraction shader. The backdrop is our imported wallpaper, never another app's screen.
+ * refraction shader. Its source is either the imported wallpaper or an explicitly approved,
+ * in-memory MediaProjection frame selected by the user.
  * Source: Kyant0/AndroidLiquidGlass, backdrop/internal/Shaders.kt (commit 65ab177e90e5c1d8c62e70cf7755841982da65f6).
  */
 package com.dynamicdroid.app

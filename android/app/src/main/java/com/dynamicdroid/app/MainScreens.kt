@@ -292,6 +292,17 @@ private fun MainActivity.AppearancePage(flow: Flow) {
     }
     ActionButton(stringResource(R.string.glass_choose), flow.next(), enabled = !wallpaperBusy) { pickWallpaper.launch("image/*") }
     Column(flow.next()) {
+        Heading(stringResource(R.string.live_glass_heading))
+        Note(stringResource(R.string.live_glass_note), size = 14)
+    }
+    val captureActive = LiveScreenFrames.isActive
+    ActionButton(
+        stringResource(if (captureActive) R.string.live_glass_stop_button else R.string.live_glass_start),
+        flow.next(),
+        enabled = captureActive || Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE
+    ) { requestLiveScreenGlass() }
+    if (captureActive) Note(stringResource(R.string.live_glass_active), flow.next(), size = 14)
+    Column(flow.next()) {
         val hasImage = remember(tick, wallpaperStyle) { WallpaperSkinStore.image(this@AppearancePage) != null }
         SettingSwitch(stringResource(R.string.glass_inside), wallpaperStyle.enabled && hasImage) { on ->
             if (on && !hasImage) pickWallpaper.launch("image/*")

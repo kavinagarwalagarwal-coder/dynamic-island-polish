@@ -51,6 +51,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private var glassParams: WindowManager.LayoutParams? = null
     private var glassBlurManager: WindowManager? = null
     private var glassBlurListener: Consumer<Boolean>? = null
+    private var crossWindowBlurAvailable = false
     private val glassBounds = RectF()
     private val glassScreenLocation = IntArray(2)
     private val glassAppliedBounds = android.graphics.Rect()
@@ -268,6 +269,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     override fun onCreate() {
         super.onCreate()
+        instance = this
         createChannel()
         MusicCenter.attach(this)
         // Android requires this first for a service started with startForegroundService.
@@ -415,6 +417,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             island = null; params = null
             return false
         }
+        view.setLiveScreenCaptureEnabled(true)
         attachTouchWindow(wm, host, type)
         view.hideForIntro()
         view.post { view.playIntro() }
@@ -424,7 +427,10 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private fun detachWindow() {
         reply?.dismiss(notify = false)
         detachLiveGlassWindow()
-        island?.let { v -> runCatching { windowManager?.removeView(v) } }
+        island?.let { v ->
+            v.setLiveScreenCaptureEnabled(false)
+            runCatching { windowManager?.removeView(v) }
+        }
         touchView?.let { v -> runCatching { windowManager?.removeView(v) } }
         touchView = null; touchParams = null; touchApplied.setEmpty()
         island = null
@@ -1115,10 +1121,11 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     private fun updateLiveGlassAvailability(enabled: Boolean) {
+        crossWindowBlurAvailable = enabled
         val view = island ?: return
         val blur = glassWindow ?: return
         val lp = glassParams ?: return
-        val active = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && enabled
+        val active = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && enabled && !LiveScreenFrames.isActive
         view.nativeGlassEnabled = active
         blur.visibility = if (active) View.VISIBLE else View.INVISIBLE
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -1269,6 +1276,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     override fun onDestroy() {
+        if (instance === this) instance = null
         if (IslandBus.listener === this) IslandBus.listener = null
         IslandAccessibilityService.onChanged = null
         IslandAccessibilityService.onForegroundPackage = null
@@ -1332,6 +1340,14 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     }
 
     companion object {
+        @Volatile private var instance: IslandOverlayService? = null
+
+        fun onLiveCaptureStateChanged() {
+            instance?.let { service ->
+                service.handler.post { service.updateLiveGlassAvailability(service.crossWindowBlurAvailable) }
+            }
+        }
+
         const val ACTION_CUSTOMIZATION = "com.dynamicdroid.app.CUSTOMIZATION"
         const val ACTION_TEST = "com.dynamicdroid.app.TEST_PLACEMENT"
         const val ACTION_FIT = "com.dynamicdroid.app.UPDATE_FIT"

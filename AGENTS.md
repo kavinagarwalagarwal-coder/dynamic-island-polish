@@ -19,5 +19,6 @@
 - NothingStyle owns native UI theme values and DotHeading renders original local dot lettering; never bundle proprietary phone-brand fonts or logos.
 - Wallpaper theming flows WallpaperTheme (extraction) → IslandPreferences (persistence) → IslandView.applyTheme; the island stays monochrome and only accents (timer ring, waves, progress, supporting buttons) take the wallpaper colours.
 - The settled idle overlay window must be FLAG_NOT_TOUCHABLE with minimal height so it never deadens the screen strip it covers; render() restores touchability the moment an activity shows.
+- Screen capture for Live Liquid Glass is strictly opt-in per session through Android MediaProjection; frames stay in process memory and must never be persisted or uploaded.
 - Native settings use wrap-content text controls with minimum touch sizes and labelled platform widgets so system font scaling and accessibility services remain usable.
 - Idle is invisible and contracts to the physical camera cutout; it never renders an extra status bar. Keep its overlay touch-through. Expand out of the cutout only for active content. Fullscreen concealment remains spring-driven. Timers detach beside normal activities by default; a hold can explicitly focus one.

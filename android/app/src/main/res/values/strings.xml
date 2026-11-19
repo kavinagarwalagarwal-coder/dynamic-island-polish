@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="accessibility_label">Dynamic Droid island</string>
-    <string name="accessibility_description">Places the island above the status bar, uses app package names to detect app switches, and lets the volume keys show the volume island. Only the volume keys are checked; every other key passes through untouched. If you turn on hiding the phone\'s pop-ups, it also finds the system\'s pop-up for a notification the island is showing and swipes it into the shade; it looks only at System UI for that and nothing else on screen. If you turn on hiding during videos and photos, it checks the type and size of views in the app on screen (never their text) to tell when a video or photo fills the screen. It never captures screenshots.</string>
+    <string name="accessibility_description">Places the island above the status bar, uses app package names to detect app switches, and lets the volume keys show the volume island. Only the volume keys are checked; every other key passes through untouched. If you turn on hiding the phone\'s pop-ups, it also finds the system\'s pop-up for a notification the island is showing and swipes it into the shade; it looks only at System UI for that and nothing else on screen. If you turn on hiding during videos and photos, it checks the type and size of views in the app on screen (never their text) to tell when a video or photo fills the screen. Screen frames are captured only after you start Live Glass and approve Android\'s screen-sharing prompt; frames stay in memory and are not saved or sent.</string>
     <!-- Island -->
     <string name="island_calling">Calling…</string>
     <string name="island_connected">Connected</string>
@@ -197,6 +197,17 @@
     <string name="glass_x">Wallpaper horizontal position</string>
     <string name="glass_y">Wallpaper vertical position</string>
     <string name="glass_strength">Wallpaper strength</string>
+    <string name="live_glass_heading">LIVE LIQUID GLASS</string>
+    <string name="live_glass_note">On Android 14+, choose an app window in Android\'s picker for live refraction. Sharing the entire screen can include the island in the captured frame. Android asks each time. Frames stay in memory only; protected screens may appear black. It uses extra battery.</string>
+    <string name="live_glass_requires_android_14">App-only live refraction requires Android 14 or newer; wallpaper glass remains available on this phone.</string>
+    <string name="live_glass_start">Enable live refraction</string>
+    <string name="live_glass_stop_button">Stop live refraction</string>
+    <string name="live_glass_active">Live refraction is active. Stop it here or from its ongoing notification.</string>
+    <string name="live_glass_consent_denied">Screen sharing wasn\'t enabled</string>
+    <string name="live_glass_notification_title">Live Liquid Glass is active</string>
+    <string name="live_glass_notification_text">Screen frames stay on this phone and are not saved.</string>
+    <string name="live_glass_stop">Stop</string>
+    <string name="live_glass_channel">Live Liquid Glass</string>
     <string name="glass_remove">Remove wallpaper image</string>
     <string name="glass_status_default">Wallpaper stays still. Glass bends it as the pill changes shape.</string>
     <string name="glass_status_restart">Glass paused after a rapid restart. Your wallpaper still works; turn Liquid Glass on to retry.</string>

@@ -296,6 +296,20 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     private val wallpaperSkin = WallpaperSkinRenderer()
+    private val liveScreenSkin = WallpaperSkinRenderer().apply {
+        style = WallpaperStyle(enabled = true, glass = true, x = .5f, y = 0f, strength = .65f)
+    }
+    private var acceptsLiveScreenFrames = false
+    private val liveFrameUpdatePosted = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val liveFrameListener = LiveScreenFrames.Listener {
+        if (liveFrameUpdatePosted.compareAndSet(false, true)) post {
+            liveFrameUpdatePosted.set(false)
+            if (acceptsLiveScreenFrames) {
+                liveScreenSkin.image = LiveScreenFrames.latest()
+                invalidate()
+            }
+        }
+    }
     private val liquidGlass = WallpaperLiquidGlass(context)
     var nativeGlassEnabled = false
         set(value) {
@@ -310,6 +324,17 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         wallpaperSkin.style = style
         wallpaperSkin.image = image
         liquidGlass.resetFailure()
+        invalidate()
+    }
+
+    fun setLiveScreenCaptureEnabled(enabled: Boolean) {
+        if (acceptsLiveScreenFrames == enabled) return
+        acceptsLiveScreenFrames = enabled
+        if (enabled) LiveScreenFrames.addListener(liveFrameListener)
+        else {
+            LiveScreenFrames.removeListener(liveFrameListener)
+            liveScreenSkin.image = null
+        }
         invalidate()
     }
 
@@ -1239,7 +1264,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         canvas.clipPath(clip)
         if (absorb < .06f && !nativeGlassEnabled) {
             wallpaperStage.set(0f, 0f, width / fit.scale, max(baseTop + dp(WALLPAPER_STAGE_DP), rect.bottom))
-            liquidGlass.draw(canvas, wallpaperStage, rect, r, bodyAlpha, wallpaperSkin,
+            val renderer = if (LiveScreenFrames.isActive && liveScreenSkin.image != null) liveScreenSkin else wallpaperSkin
+            liquidGlass.draw(canvas, wallpaperStage, rect, r, bodyAlpha, renderer,
                 resizing = shapeSprings.any { !it.isAtRest } || !pressS.isAtRest || !stretchS.isAtRest || !wobbleS.isAtRest)
         }
         val backdrop = bodyAlpha * (1f - absorb) * (0.25f + 0.75f * room) *
