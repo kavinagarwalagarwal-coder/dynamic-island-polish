@@ -142,7 +142,7 @@ class MainActivity : AppCompatActivity() {
         // Home shows the next setup step first when something is missing, so it's always the start.
         page = "Home"
         setContent { MainScreen() }
-        showDemo(demoMusic(true), Presentation.EXPANDED)
+        showDemo(demoMusic(!Motion.underTest), Presentation.EXPANDED)
         applyThemeUpdate()
         // Opening flourish, then the tour on first run, then the notification permission prompt,
         // so a system dialog never lands on top of either.
