@@ -312,7 +312,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     internal fun demoMusic(playing: Boolean, position: Long = 107_000L): LiveActivity {
-        val art = gradientArt(NothingStyle.red, NothingStyle.surface)
+        val art = gradientArt(NothingStyle.aqua, NothingStyle.surfaceLight)
         return LiveActivity(
             key = "demo-music", packageName = "com.spotify.music", mode = IslandMode.MUSIC,
             title = "Midnight City", subtitle = "M83", appLabel = "Spotify",

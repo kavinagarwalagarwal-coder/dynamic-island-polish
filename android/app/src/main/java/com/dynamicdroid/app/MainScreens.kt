@@ -63,7 +63,7 @@ private val PAGE_ORDER = listOf("Playground", "Setup", "Appearance", "Rules", "P
 @Composable
 internal fun MainActivity.MainScreen() {
     val reduce = Motion.reduced(this)
-    Box(Modifier.fillMaxSize().background(Fluid.background)) {
+    Box(Modifier.fillMaxSize().background(Fluid.backdrop)) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 20.dp)) {
             Header()
             Tabs()

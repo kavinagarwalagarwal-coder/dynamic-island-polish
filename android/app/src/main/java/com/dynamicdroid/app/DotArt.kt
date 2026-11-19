@@ -122,7 +122,7 @@ object DotArt {
     }
 
     private const val SPINDLE = 0.07f
-    const val SPINDLE_RED = 0xFFFF3B30.toInt()
+    const val SPINDLE_AQUA = 0xFF63DCF4.toInt()
     private const val MIN_DOT = 0.12f
     private const val MAX_DOT = 0.47f
 }

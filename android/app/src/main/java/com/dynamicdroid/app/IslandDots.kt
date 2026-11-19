@@ -330,7 +330,7 @@ class IslandDots(private val n: Int) {
             paint.alpha = (alpha * min(1f, dim + lit)).toInt().coerceIn(0, 255)
             canvas.drawCircle(x, y, r, paint)
         }
-        paint.color = DotArt.SPINDLE_RED
+        paint.color = DotArt.SPINDLE_AQUA
         paint.alpha = alpha
         canvas.drawCircle(cx, cy, cell * (0.6f + 0.25f * beatGlow), paint)
     }

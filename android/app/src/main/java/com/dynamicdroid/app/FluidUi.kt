@@ -42,6 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
@@ -63,8 +64,12 @@ object Fluid {
     val foreground = Color(NothingStyle.foreground)
     val muted = Color(NothingStyle.muted)
     val red = Color(NothingStyle.red)
+    val aqua = Color(NothingStyle.aqua)
+    val sheen = Color(NothingStyle.sheen)
     val line = Color(NothingStyle.line)
     val good = Color(0xFF9BE4BE)
+    val backdrop = Brush.verticalGradient(listOf(Color(0xFF0B2532), background, Color(0xFF08141E)))
+    val glass = Brush.verticalGradient(listOf(Color(0xFF173F50), surface, Color(0xFF0A202D)))
     val body = FontFamily(NothingStyle.body)
     val mono = FontFamily(NothingStyle.mono)
 
@@ -135,7 +140,7 @@ fun SettingSwitch(title: String, checked: Boolean, note: String? = null, enabled
                 style = TextStyle(fontFamily = Fluid.body, fontSize = 16.sp,
                     color = if (enabled) Fluid.foreground else Fluid.muted))
             Switch(checked, null, enabled = enabled, colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White, checkedTrackColor = Fluid.red, checkedBorderColor = Fluid.red,
+                checkedThumbColor = Color(0xFF06212C), checkedTrackColor = Fluid.aqua, checkedBorderColor = Fluid.aqua,
                 uncheckedThumbColor = Fluid.muted, uncheckedTrackColor = Fluid.surface, uncheckedBorderColor = Fluid.line))
         }
         if (note != null) Text(note, Modifier.fillMaxWidth().padding(bottom = 6.dp),
@@ -150,7 +155,7 @@ fun ActionButton(text: String, modifier: Modifier = Modifier, enabled: Boolean =
     Box(
         modifier.fillMaxWidth().padding(top = 10.dp).pressSpring(source, 0.975f)
             .defaultMinSize(minHeight = 56.dp)
-            .background(Fluid.surface, Fluid.pill).border(BorderStroke(1.dp, Fluid.line), Fluid.pill)
+            .background(Fluid.glass, Fluid.pill).border(BorderStroke(1.dp, Fluid.line), Fluid.pill)
             .clickable(source, androidx.compose.material3.ripple(color = Fluid.foreground), enabled, role = Role.Button, onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 16.dp),
         contentAlignment = Alignment.Center,
@@ -167,8 +172,8 @@ fun ActionButton(text: String, modifier: Modifier = Modifier, enabled: Boolean =
 @Composable
 fun RowScope.Chip(text: String, selected: Boolean = false, description: String? = null, onClick: () -> Unit) {
     val source = remember { MutableInteractionSource() }
-    val fill by animateColorAsState(if (selected) Fluid.foreground else Fluid.surface, Fluid.liquid(), label = "chip")
-    val ink by animateColorAsState(if (selected) Color.Black else Fluid.foreground, Fluid.liquid(), label = "chipInk")
+    val fill by animateColorAsState(if (selected) Fluid.aqua else Fluid.surface, Fluid.liquid(), label = "chip")
+    val ink by animateColorAsState(if (selected) Color(0xFF06212C) else Fluid.foreground, Fluid.liquid(), label = "chipInk")
     val pop = remember { Animatable(1f) }
     LaunchedEffect(selected) {
         if (selected) { pop.snapTo(0.94f); pop.animateTo(1f, spring(dampingRatio = 0.45f, stiffness = 420f)) }
@@ -178,7 +183,8 @@ fun RowScope.Chip(text: String, selected: Boolean = false, description: String? 
             .graphicsLayer { scaleX = pop.value; scaleY = pop.value }
             .pressSpring(source)
             .defaultMinSize(minHeight = 52.dp)
-            .background(fill, Fluid.pill).border(BorderStroke(1.dp, if (selected) fill else Fluid.line), Fluid.pill)
+            .background(Brush.verticalGradient(listOf(fill.copy(alpha = 0.96f), fill.copy(alpha = 0.78f))), Fluid.pill)
+            .border(BorderStroke(1.dp, if (selected) Fluid.sheen.copy(alpha = 0.72f) else Fluid.line), Fluid.pill)
             .selectable(selected, source, androidx.compose.material3.ripple(color = ink), role = Role.Tab, onClick = onClick)
             .semantics { description?.let { contentDescription = it } }
             .padding(horizontal = 10.dp, vertical = 14.dp),

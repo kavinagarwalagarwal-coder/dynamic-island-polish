@@ -480,7 +480,7 @@ class DotStage(private val context: Context, unit: Float? = null) {
             canvas.drawCircle(x[i], y[i], r, dot)
         }
         // Spindle.
-        dot.color = DotArt.SPINDLE_RED
+        dot.color = DotArt.SPINDLE_AQUA
         canvas.drawCircle(cx, cy, cell * (0.62f + 0.25f * beatGlow), dot)
     }
 
