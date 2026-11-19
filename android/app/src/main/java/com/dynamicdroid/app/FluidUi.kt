@@ -225,7 +225,7 @@ fun SliderSetting(
             valueRange = range.first.toFloat()..range.last.toFloat(),
             modifier = Modifier.fillMaxWidth().defaultMinSize(minHeight = 48.dp)
                 .semantics { stateDescription = said },
-            colors = SliderDefaults.colors(thumbColor = Fluid.foreground, activeTrackColor = Fluid.red,
+            colors = SliderDefaults.colors(thumbColor = Fluid.foreground, activeTrackColor = Fluid.aqua,
                 inactiveTrackColor = Fluid.surface),
         )
     }

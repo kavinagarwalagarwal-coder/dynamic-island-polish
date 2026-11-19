@@ -241,12 +241,12 @@ class DotStage(private val context: Context, unit: Float? = null) {
     private fun currentColor(i: Int) = blend(colFrom[i], colTo[i], ease(mix))
     private fun currentLum(i: Int) = lumFrom[i] + (lumTo[i] - lumFrom[i]) * ease(mix)
 
-    /** When nothing plays: a soft red-to-white gradient record, so the player still looks alive. */
+    /** When nothing plays: a soft aqua-to-white gradient record, so the player still looks alive. */
     private fun demoCover(): Bitmap {
         val b = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
         val c = Canvas(b)
         val p = Paint().apply {
-            shader = LinearGradient(0f, 0f, 64f, 64f, intArrayOf(0xFFFF3B30.toInt(), 0xFF2A2A2A.toInt(), 0xFFFFFFFF.toInt()), null, Shader.TileMode.CLAMP)
+            shader = LinearGradient(0f, 0f, 64f, 64f, intArrayOf(NothingStyle.aqua, 0xFF102B37.toInt(), 0xFFFFFFFF.toInt()), null, Shader.TileMode.CLAMP)
         }
         c.drawRect(0f, 0f, 64f, 64f, p)
         return b

@@ -208,7 +208,7 @@ private fun MainActivity.PlaygroundPage(flow: Flow) {
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
             shape = Fluid.pill,
             colors = OutlinedTextFieldDefaults.colors(focusedTextColor = Fluid.foreground, unfocusedTextColor = Fluid.foreground,
-                focusedBorderColor = Fluid.foreground, unfocusedBorderColor = Fluid.line, cursorColor = Fluid.red,
+                focusedBorderColor = Fluid.foreground, unfocusedBorderColor = Fluid.line, cursorColor = Fluid.aqua,
                 focusedContainerColor = Fluid.surface, unfocusedContainerColor = Fluid.surface),
         )
         Note(stringResource(R.string.timer_presets))

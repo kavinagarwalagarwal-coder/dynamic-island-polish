@@ -14,7 +14,7 @@ import kotlin.math.min
 import kotlin.math.sin
 
 /**
- * The Dynamic Droid mark: a red camera dot, a white island pill that grows out of it, and a
+ * The Dynamic Droid mark: an aqua camera dot, a white island pill that grows out of it, and a
  * droplet that pinches off the right end, the same story the island tells on the phone.
  * Original artwork drawn in code; [progress] 0..1 scrubs the build-up animation.
  */
@@ -23,7 +23,7 @@ class LogoMarkView(context: Context) : View(context) {
         set(value) { field = value.coerceIn(0f, 1f); invalidate() }
 
     var pillColor = NothingStyle.foreground
-    var dotColor = NothingStyle.red
+    var dotColor = NothingStyle.aqua
 
     private val fill = Paint(Paint.ANTI_ALIAS_FLAG)
     private val neck = Path()

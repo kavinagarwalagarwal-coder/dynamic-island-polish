@@ -66,7 +66,7 @@ object DotArt {
             canvas.drawCircle((x + .5f) * cell, (y + .5f) * cell, halftoneRadius(lum, cell), paint)
         }
         if (disc) {
-            paint.color = SPINDLE_RED
+            paint.color = SPINDLE_AQUA
             canvas.drawCircle(size / 2f, size / 2f, cell * 0.55f, paint)
         }
         return out
