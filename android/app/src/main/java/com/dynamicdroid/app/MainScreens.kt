@@ -238,7 +238,6 @@ private fun MainActivity.HomePage(flow: Flow) {
             listOf(5, 10, 15, 25).forEach { mins -> PillChip(stringResource(R.string.timer_preset_minutes, mins)) { startTimerPreset(mins) } }
             PillChip(stringResource(R.string.demo_app_to_island)) { appToIsland() }
         }
-        }
     }
     ActionButton(stringResource(R.string.play_tour), flow.next().padding(top = 8.dp)) { showOnboarding() }
 }
@@ -477,15 +476,15 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
     SettingsCard(stringResource(R.string.group_timers), count(f.timers, f.alarms), flow.next(),
         checked = f.timers, onChecked = { setFeature("show_timers", it) }) {
         toggle(R.string.feature_alarms, "alarms", f.alarms)
-        SettingSwitch(stringResource(R.string.rules_timer_bubble), IslandCustomization.timerAsBubble(this@IslandsPage)) {
-            IslandCustomization.setTimerAsBubble(this@IslandsPage, it); refreshCustomization()
+        SettingSwitch(stringResource(R.string.rules_timer_bubble), IslandCustomization.timerAsBubble(this@FeaturesPage)) {
+            IslandCustomization.setTimerAsBubble(this@FeaturesPage, it); refreshCustomization()
         }
     }
     SettingsCard(stringResource(R.string.group_live), stringResource(R.string.feature_live_note), flow.next(),
         checked = f.liveUpdates, onChecked = { setFeature("show_live", it) }) {
         toggle(R.string.feature_show_navigation, "show_navigation", f.navigation)
         toggle(R.string.feature_recording, "show_recording", f.recording, R.string.feature_recording_note)
-        Note(stringResource(R.string.live_last_seen) + " " + remember { LiveDiagnostics.read(this@IslandsPage) }, size = 13)
+        Note(stringResource(R.string.live_last_seen) + " " + remember { LiveDiagnostics.read(this@FeaturesPage) }, size = 13)
     }
     SettingsCard(stringResource(R.string.group_sound), count(f.volume, f.ringer, f.ringerControls), flow.next(),
         checked = f.volume, onChecked = { setFeature("volume", it) }) {
@@ -518,9 +517,9 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
     SettingsCard(stringResource(R.string.group_rules), stringResource(R.string.rules_priority_hint), flow.next()) {
         IslandMode.values().filter { it != IslandMode.VOLUME && it != IslandMode.DEVICE && it != IslandMode.RINGER }.forEach { mode ->
             val name = modeName(mode)
-            SliderSetting({ stringResource(R.string.priority_label, name, it) }, IslandCustomization.priority(this@IslandsPage, mode), 0..100,
+            SliderSetting({ stringResource(R.string.priority_label, name, it) }, IslandCustomization.priority(this@FeaturesPage, mode), 0..100,
                 { stringResource(R.string.priority_description, name) },
-                onDone = { IslandCustomization.setPriority(this@IslandsPage, mode, it); refreshCustomization() })
+                onDone = { IslandCustomization.setPriority(this@FeaturesPage, mode, it); refreshCustomization() })
         }
         Note(allowedAppsText(), Modifier.padding(top = 10.dp), size = 14)
         ActionButton(stringResource(R.string.rules_choose_allowed)) { chooseApps(allowed = true) }
@@ -529,10 +528,10 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         ActionButton(stringResource(R.string.rules_quick_actions)) { chooseQuickActions() }
     }
     SettingsCard(stringResource(R.string.group_quiet), stringResource(R.string.rules_quiet_note), flow.next(),
-        checked = IslandCustomization.quietEnabled(this@IslandsPage), onChecked = { saveQuiet(it); tick++ }) {
+        checked = IslandCustomization.quietEnabled(this@FeaturesPage), onChecked = { saveQuiet(it); tick++ }) {
         ChipRow {
-            Chip(stringResource(R.string.rules_quiet_from, minuteLabel(IslandCustomization.quietStart(this@IslandsPage)))) { chooseTime(true) }
-            Chip(stringResource(R.string.rules_quiet_until, minuteLabel(IslandCustomization.quietEnd(this@IslandsPage)))) { chooseTime(false) }
+            Chip(stringResource(R.string.rules_quiet_from, minuteLabel(IslandCustomization.quietStart(this@FeaturesPage)))) { chooseTime(true) }
+            Chip(stringResource(R.string.rules_quiet_until, minuteLabel(IslandCustomization.quietEnd(this@FeaturesPage)))) { chooseTime(false) }
         }
     }
 }
