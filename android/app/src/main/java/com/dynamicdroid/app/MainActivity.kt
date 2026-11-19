@@ -903,8 +903,11 @@ class MainActivity : AppCompatActivity() {
         this.text = text; textSize = size; setTextColor(color); typeface = NothingStyle.body
     }
     private fun controlBackground(color: Int = NothingStyle.surface): android.graphics.drawable.Drawable {
-        val shape = android.graphics.drawable.GradientDrawable().apply {
-            cornerRadius = dp(18).toFloat(); setColor(color)
+        val shape = android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(NothingStyle.surfaceLight, color, NothingStyle.background),
+        ).apply {
+            cornerRadius = dp(18).toFloat()
             setStroke(dp(1), NothingStyle.line)
         }
         return android.graphics.drawable.RippleDrawable(

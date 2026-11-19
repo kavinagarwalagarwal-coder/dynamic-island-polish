@@ -17,6 +17,8 @@ import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -159,7 +161,9 @@ private fun MainActivity.PlaygroundPage(flow: Flow) {
     ActionButton(stringResource(R.string.play_tour), flow.next()) { showOnboarding() }
     Box(
         flow.next().fillMaxWidth().padding(top = 16.dp).height(280.dp)
-            .background(Fluid.surface, RoundedCornerShape(24.dp)).padding(start = 6.dp, end = 6.dp, top = 16.dp, bottom = 8.dp),
+            .background(Fluid.glass, RoundedCornerShape(24.dp))
+            .border(1.dp, Fluid.line, RoundedCornerShape(24.dp))
+            .padding(start = 6.dp, end = 6.dp, top = 16.dp, bottom = 8.dp),
     ) { HostedIsland(preview, Modifier.fillMaxSize()) }
     Column(flow.next().padding(top = 8.dp)) {
         ChipRow {

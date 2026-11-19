@@ -166,7 +166,7 @@ fun ActionButton(text: String, modifier: Modifier = Modifier, enabled: Boolean =
 }
 
 /**
- * A pill chip that fills its share of a row. Selected chips fill white; the colour change flows
+ * A pill chip that fills its share of a row. Selected chips fill with aqua; the colour change flows
  * on a spring and the chip gives a small bounce when it becomes selected.
  */
 @Composable
