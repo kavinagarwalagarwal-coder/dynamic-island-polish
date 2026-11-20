@@ -24,9 +24,9 @@ class AppMorphGeometry {
     var width = 0f; private set
     var height = 0f; private set
     var radius = 0f; private set
-    /** How much of the island's own content shows (it fades in as the card lands). */
+    /** How much of the island's own content shows during the shared icon-to-content crossfade. */
     var reveal = 0f; private set
-    /** How much of the app's face (its icon) still shows on the card. */
+    /** How much of the app's face (its icon) still shows during the shared crossfade. */
     var face = 1f; private set
 
     /**
@@ -62,8 +62,9 @@ class AppMorphGeometry {
         val x = cx.coerceIn(half, max(half, screenWidth - half))
         left = x - half
         top = (cy - height / 2f).coerceIn(0f, max(0f, screenHeight - height))
-        face = 1f - smoother(((p - .38f) / .40f).coerceIn(0f, 1f))
-        reveal = smoother(((p - .80f) / .20f).coerceIn(0f, 1f))
+        val handoff = smoother(((p - CONTENT_HANDOFF_START) / (CONTENT_HANDOFF_END - CONTENT_HANDOFF_START)).coerceIn(0f, 1f))
+        face = 1f - handoff
+        reveal = handoff
     }
 
     private fun mix(a: Float, b: Float, t: Float) = a + (b - a) * t
@@ -74,6 +75,9 @@ class AppMorphGeometry {
         const val ICON_DP = 60f
         /** Home-screen icons are rounded squares (or circles) about this round. */
         const val ICON_CORNER = .3f
+        /** The app face and island content exchange in one continuous handoff. */
+        const val CONTENT_HANDOFF_START = .64f
+        const val CONTENT_HANDOFF_END = .94f
         /** How much the icon swells as it lifts off. */
         const val LIFT_SWELL = .12f
     }

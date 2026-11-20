@@ -19,6 +19,18 @@ class AppMorphTest {
         assertEquals(1f, g.reveal, 1e-4f); assertEquals(0f, g.face, 1e-4f)
     }
 
+    @Test fun iconAndIslandContentCrossfadeWithoutABlankHandoff() {
+        val g = AppMorphGeometry()
+        for (progress in listOf(0f, .5f, .64f, .7f, .79f, .9f, .94f, 1f)) {
+            g.update(progress, 360f, 800f, 180f, 8f, 232f, 36f, 1f, icon)
+            assertEquals("handoff at $progress", 1f, g.face + g.reveal, .001f)
+            assertTrue(g.face in 0f..1f)
+            assertTrue(g.reveal in 0f..1f)
+        }
+        g.update(.79f, 360f, 800f, 180f, 8f, 232f, 36f, 1f, icon)
+        assertTrue("island content should appear while the icon remains visible", g.reveal > 0f && g.face > 0f)
+    }
+
     @Test fun withoutAnIconItStartsIconSizedWhereTheHomeGestureEnds() {
         val g = AppMorphGeometry()
         g.update(0f, 360f, 800f, 180f, 8f, 232f, 36f, 2f, null)
