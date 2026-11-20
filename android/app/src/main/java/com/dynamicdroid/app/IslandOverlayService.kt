@@ -7,7 +7,12 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.app.Dialog
 import android.graphics.Color
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.RectF
+import android.graphics.drawable.GradientDrawable
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -29,6 +34,7 @@ import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import kotlin.math.max
+import java.util.function.Consumer
 
 /**
  * Hosts the island window and decides what it shows.
@@ -43,6 +49,15 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private var windowManager: WindowManager? = null
     private var island: IslandView? = null
     private var params: WindowManager.LayoutParams? = null
+    private var glassWindow: LiveGlassWindow? = null
+    private var glassDialog: Dialog? = null
+    private var glassBackground: GradientDrawable? = null
+    private var glassBlurManager: WindowManager? = null
+    private var glassBlurListener: Consumer<Boolean>? = null
+    private var crossWindowBlurAvailable = false
+    private val glassBounds = RectF()
+    private val glassScreenLocation = IntArray(2)
+    private val glassAppliedBounds = android.graphics.Rect()
     private val handler = Handler(Looper.getMainLooper())
     private val restoreTouchAfterReturn = Runnable { render() }
 
@@ -436,7 +451,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             }
         }
         params = lp
+        attachLiveGlassWindow(wm, host, type)
         if (runCatching { wm.addView(view, drawParams(lp)) }.isFailure) {
+            detachLiveGlassWindow()
             island = null; params = null
             return false
         }
@@ -449,6 +466,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     private fun detachWindow() {
         reply?.dismiss(notify = false)
+        detachLiveGlassWindow()
         island?.let { v ->
             v.setLiveScreenCaptureEnabled(false)
             runCatching { windowManager?.removeView(v) }
@@ -1202,6 +1220,125 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         runCatching { windowManager?.updateViewLayout(tv, tp) }
     }
 
+    private fun attachLiveGlassWindow(wm: WindowManager, host: Context, type: Int) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return
+        // Background blur is window-bounded; FLAG_BLUR_BEHIND intentionally blurs the whole screen.
+        val view = LiveGlassWindow(host).apply { visibility = View.INVISIBLE }
+        val dialog = Dialog(host, R.style.IslandGlassDialog).apply {
+            setCancelable(false)
+            setContentView(view)
+        }
+        val window = dialog.window ?: return
+        val background = GradientDrawable().apply {
+            setColor(Color.argb(18, 255, 255, 255))
+            cornerRadius = 26f * resources.displayMetrics.density
+        }
+        val lp = window.attributes.apply {
+            this.type = type
+            width = 1
+            height = 1
+            format = PixelFormat.TRANSLUCENT
+            flags = (flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED) and
+                WindowManager.LayoutParams.FLAG_DIM_BEHIND.inv()
+            dimAmount = 0f
+            gravity = Gravity.TOP or Gravity.LEFT
+            if (Build.VERSION.SDK_INT >= 30) {
+                setFitInsetsTypes(0)
+                setFitInsetsSides(0)
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+            }
+        }
+        window.setBackgroundDrawable(background)
+        window.attributes = lp
+        if (runCatching { dialog.show() }.isFailure) return
+        glassWindow = view
+        glassDialog = dialog
+        glassBackground = background
+        glassBlurManager = wm
+        val listener = Consumer<Boolean> { enabled -> handler.post { updateLiveGlassAvailability(enabled) } }
+        glassBlurListener = listener
+        runCatching { wm.addCrossWindowBlurEnabledListener(ContextCompat.getMainExecutor(this), listener) }
+        updateLiveGlassAvailability(runCatching { wm.isCrossWindowBlurEnabled }.getOrDefault(false))
+    }
+
+    private fun updateLiveGlassAvailability(enabled: Boolean) {
+        crossWindowBlurAvailable = enabled
+        val active = Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && enabled && !LiveScreenFrames.isActive
+        island?.nativeGlassEnabled = active
+        val blur = glassWindow ?: return
+        val window = glassDialog?.window ?: return
+        if (active) {
+            window.setBackgroundBlurRadius((24f * resources.displayMetrics.density).toInt())
+            updateLiveGlassWindow()
+        } else {
+            window.setBackgroundBlurRadius(0)
+            blur.visibility = View.INVISIBLE
+            glassAppliedBounds.setEmpty()
+        }
+    }
+
+    private fun detachLiveGlassWindow() {
+        val wm = glassBlurManager
+        val listener = glassBlurListener
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && wm != null && listener != null) {
+            runCatching { wm.removeCrossWindowBlurEnabledListener(listener) }
+        }
+        runCatching { glassDialog?.window?.setBackgroundBlurRadius(0) }
+        runCatching { glassDialog?.dismiss() }
+        glassWindow = null
+        glassDialog = null
+        glassBackground = null
+        glassBlurManager = null
+        glassBlurListener = null
+        glassAppliedBounds.setEmpty()
+    }
+
+    override fun onGlassFrame() = updateLiveGlassWindow()
+
+    private fun updateLiveGlassWindow() {
+        val view = island ?: return
+        val blur = glassWindow ?: return
+        val window = glassDialog?.window ?: return
+        if (!view.nativeGlassEnabled || view.isConcealed || view.activity == null) {
+            if (blur.visibility != View.INVISIBLE) blur.visibility = View.INVISIBLE
+            window.setBackgroundBlurRadius(0)
+            glassAppliedBounds.setEmpty()
+            return
+        }
+        view.islandBounds(glassBounds)
+        view.getLocationOnScreen(glassScreenLocation)
+        glassBounds.offset(glassScreenLocation[0].toFloat(), glassScreenLocation[1].toFloat())
+        val next = android.graphics.Rect()
+        glassBounds.roundOut(next)
+        next.left = next.left.coerceAtLeast(0)
+        next.top = next.top.coerceAtLeast(0)
+        next.right = next.right.coerceAtMost(resources.displayMetrics.widthPixels)
+        next.bottom = next.bottom.coerceAtMost(resources.displayMetrics.heightPixels)
+        if (next.isEmpty) {
+            blur.visibility = View.INVISIBLE
+            window.setBackgroundBlurRadius(0)
+            glassAppliedBounds.setEmpty()
+            return
+        }
+        if (next != glassAppliedBounds || blur.visibility != View.VISIBLE) {
+            val lp = window.attributes
+            lp.x = next.left
+            lp.y = next.top
+            lp.width = next.width().coerceAtLeast(1)
+            lp.height = next.height().coerceAtLeast(1)
+            lp.gravity = Gravity.TOP or Gravity.LEFT
+            glassBackground?.cornerRadius = minOf(lp.height / 2f, 26f * resources.displayMetrics.density)
+            window.attributes = lp
+            window.setBackgroundBlurRadius((24f * resources.displayMetrics.density).toInt())
+            glassAppliedBounds.set(next)
+            blur.visibility = View.VISIBLE
+        }
+    }
+
     private fun growWindow(target: Pair<Int, Int>, absorb: Boolean) {
         val view = island ?: return
         val lp = params ?: return
@@ -1297,8 +1434,43 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         }
     }
 
+    private class LiveGlassWindow(context: Context) : View(context) {
+        private val density = resources.displayMetrics.density
+        private val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.argb(26, 255, 255, 255) }
+        init {
+            clipToOutline = true
+            outlineProvider = object : android.view.ViewOutlineProvider() {
+                override fun getOutline(view: View, outline: android.graphics.Outline) {
+                    val radius = minOf(view.height / 2f, 26f * density)
+                    outline.setRoundRect(0, 0, view.width, view.height, radius)
+                }
+            }
+        }
+        private val rim = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.argb(72, 255, 255, 255)
+            style = Paint.Style.STROKE
+            strokeWidth = density
+        }
+        private val bounds = RectF()
+
+        override fun onDraw(canvas: Canvas) {
+            super.onDraw(canvas)
+            val inset = rim.strokeWidth / 2f
+            bounds.set(inset, inset, width - inset, height - inset)
+            val radius = minOf(height / 2f, 26f * density)
+            canvas.drawRoundRect(bounds, radius, radius, fill)
+            canvas.drawRoundRect(bounds, radius, radius, rim)
+        }
+    }
+
     companion object {
         @Volatile private var instance: IslandOverlayService? = null
+
+        fun onLiveCaptureStateChanged() {
+            instance?.let { service ->
+                service.handler.post { service.updateLiveGlassAvailability(service.crossWindowBlurAvailable) }
+            }
+        }
 
         const val ACTION_CUSTOMIZATION = "com.dynamicdroid.app.CUSTOMIZATION"
         const val ACTION_TEST = "com.dynamicdroid.app.TEST_PLACEMENT"

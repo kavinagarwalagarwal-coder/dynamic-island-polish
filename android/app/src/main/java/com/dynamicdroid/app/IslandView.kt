@@ -65,6 +65,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fun onInteraction() {}
         fun onSettled() {}
         fun onAnchorChanged() {}
+        fun onGlassFrame() {}
         /** Another app went fullscreen (video, photos, games) or came back out of it. */
         fun onFullscreenChanged(fullscreen: Boolean) {}
         /** The message's Reply pill was tapped. */
@@ -547,6 +548,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
     }
     private val liquidGlass = WallpaperLiquidGlass(context)
+    var nativeGlassEnabled = false
         set(value) {
             if (field == value) return
             field = value
@@ -1665,6 +1667,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             CrashLog.caught(context, "draw ${activity?.mode} ${presentation}", t)
         } finally {
             canvas.restoreToCount(saves)
+            callbacks?.onGlassFrame()
         }
     }
 
