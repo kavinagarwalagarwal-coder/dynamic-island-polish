@@ -11,9 +11,11 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { SiteHeader } from "@/components/site-header";
 
 const releaseUrl =
-  "https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases/tag/Dynamic-island-v2";
-const downloadUrl =
-  "https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases/download/Dynamic-island-v2/dynamic-droid-optimized-apk.2.zip";
+  "https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases/tag/DynamicIslandV3";
+const standardDownloadUrl =
+  "https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases/download/DynamicIslandV3/dynamic-droid-optimized-apk.5.zip";
+const android17DownloadUrl =
+  "https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases/download/DynamicIslandV3/dynamic-droid-android17-optimized-apk.1.zip";
 
 export const Route = createFileRoute("/releases")({
   head: () => ({
@@ -48,8 +50,8 @@ function ReleasesPage() {
             <em>the island.</em>
           </h1>
           <p className="release-lede">
-            Every new motion, polish pass, and tiny detail — right here. Pick up the latest build
-            and make your camera cutout come alive.
+            Every new motion, polish pass, and tiny detail — right here. Get the latest Android
+            build and keep your camera cutout alive.
           </p>
         </div>
         <div className="release-mark" aria-hidden="true">
@@ -72,13 +74,13 @@ function ReleasesPage() {
               <i /> AVAILABLE NOW
             </span>
           </div>
-          <span className="release-index">01 / 01</span>
+          <span className="release-index">V3 / LATEST</span>
         </div>
         <article className="release-card">
           <div className="release-card-top">
             <div className="release-version">
-              <span className="version-chip">V2</span>
-              <span className="release-date">NOVEMBER 02, 2026</span>
+              <span className="version-chip">V3</span>
+              <span className="release-date">NOVEMBER 20, 2026</span>
             </div>
             <a
               href={releaseUrl}
@@ -93,22 +95,24 @@ function ReleasesPage() {
           <div className="release-main">
             <div className="release-title-block">
               <h2 id="latest-release-title">
-                Dynamic Droid <em>v2</em>
+                Dynamic Droid <em>v3</em>
               </h2>
-              <p>More life, right where your camera lives.</p>
+              <p>Your music moves with you.</p>
             </div>
             <div className="release-whats-new">
-              <span className="release-kicker">FEATURES IN THE APP</span>
+              <span className="release-kicker">WHAT&apos;S NEW IN V3</span>
               <p>
-                <Check aria-hidden="true" /> A more expressive island experience for Android
+                <Check aria-hidden="true" /> Music hands off from the app into the island
               </p>
               <p>
-                <Check aria-hidden="true" /> Native animations for live activities and everyday
-                moments
+                <Check aria-hidden="true" /> Live playback stays visible as you move around
               </p>
               <p>
-                <Check aria-hidden="true" /> A polished, privacy-first build with no internet
-                permission
+                <Check aria-hidden="true" /> Seven interactive modes: music, timer, message, call,
+                volume, two live, and app handoff
+              </p>
+              <p>
+                <Check aria-hidden="true" /> Dedicated Android 17 build; no internet permission
               </p>
             </div>
           </div>
@@ -121,19 +125,36 @@ function ReleasesPage() {
                 <ShieldCheck aria-hidden="true" /> Private by design
               </span>
               <span>
-                <Download aria-hidden="true" /> Optimized APK package
+                <Download aria-hidden="true" /> Standard + Android 17 APKs
               </span>
             </div>
-            <a className="download-button" href={downloadUrl} target="_blank" rel="noreferrer">
-              <Download aria-hidden="true" /> Download latest
-            </a>
+            <div className="download-actions">
+              <a
+                className="download-button"
+                href={standardDownloadUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Download the standard Dynamic Droid V3 APK for Android 8 and newer"
+              >
+                <Download aria-hidden="true" /> Standard APK
+              </a>
+              <a
+                className="download-button download-button-secondary"
+                href={android17DownloadUrl}
+                target="_blank"
+                rel="noreferrer"
+                aria-label="Download the dedicated Dynamic Droid V3 Android 17 APK"
+              >
+                <Download aria-hidden="true" /> Android 17 build
+              </a>
+            </div>
           </div>
         </article>
         <div className="release-note">
           <span className="release-note-bullet">01</span>
           <p>
-            Installs over your current build and keeps your settings. On Android 16 or 17, check the
-            release page for the dedicated compatibility build.
+            Choose the standard APK for Android 8+ or the dedicated Android 17 compatibility build.
+            Both packages are attached to the V3 GitHub release.
           </p>
           <a href={releaseUrl} target="_blank" rel="noreferrer">
             See every release <ArrowUpRight aria-hidden="true" />
@@ -150,7 +171,7 @@ function ReleasesPage() {
             Next up: <em>your phone.</em>
           </h2>
         </div>
-        <a href={downloadUrl} target="_blank" rel="noreferrer" className="button-primary">
+        <a href={standardDownloadUrl} target="_blank" rel="noreferrer" className="button-primary">
           Get Dynamic Droid <ArrowUpRight aria-hidden="true" />
         </a>
       </section>
