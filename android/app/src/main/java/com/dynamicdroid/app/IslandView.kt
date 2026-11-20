@@ -65,7 +65,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fun onInteraction() {}
         fun onSettled() {}
         fun onAnchorChanged() {}
-        fun onGlassFrame() {}
         /** Another app went fullscreen (video, photos, games) or came back out of it. */
         fun onFullscreenChanged(fullscreen: Boolean) {}
         /** The message's Reply pill was tapped. */
@@ -548,7 +547,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
     }
     private val liquidGlass = WallpaperLiquidGlass(context)
-    var nativeGlassEnabled = false
         set(value) {
             if (field == value) return
             field = value
@@ -1667,7 +1665,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             CrashLog.caught(context, "draw ${activity?.mode} ${presentation}", t)
         } finally {
             canvas.restoreToCount(saves)
-            callbacks?.onGlassFrame()
         }
     }
 
@@ -1752,10 +1749,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             drawGlow(canvas, a, r, glowAlpha)
         }
         shapePaint.color = Color.BLACK
-        // Native cross-window blur supplies the live backdrop; keep the body translucent so it reads through.
         // In landscape there's no camera to cover, so the body lets the game or video show through.
-        shapePaint.alpha = if (seeThrough()) (bodyAlpha * LANDSCAPE_BODY).toInt()
-            else if (nativeGlassEnabled) (bodyAlpha * 0.62f).toInt() else bodyAlpha
+        shapePaint.alpha = if (seeThrough()) (bodyAlpha * LANDSCAPE_BODY).toInt() else bodyAlpha
         // The edges flow too: they pinch in while the island stretches and bow out as it
         // shrinks, so a morph reads as liquid rather than a rubber rectangle.
         buildBody(body, rect, r, -flowX * dp(2.4f) - wob * dp(10f), -flowY * dp(3f) + wob * dp(8f),
@@ -1767,14 +1762,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         clip.set(body)
         canvas.save()
         canvas.clipPath(clip)
-        if (absorb < .06f && !nativeGlassEnabled) {
+        // System blur-behind is not reliably clipped on overlay windows, so keep glass inside the island.
+        if (absorb < .06f) {
             wallpaperStage.set(0f, 0f, width / fit.scale, max(baseTop + dp(WALLPAPER_STAGE_DP), rect.bottom))
             val renderer = if (LiveScreenFrames.isActive && liveScreenSkin.image != null) liveScreenSkin else wallpaperSkin
             liquidGlass.draw(canvas, wallpaperStage, rect, r, bodyAlpha, renderer,
                 resizing = shapeSprings.any { !it.isAtRest } || !pressS.isAtRest || !stretchS.isAtRest || !wobbleS.isAtRest)
         }
-        val backdrop = bodyAlpha * (1f - absorb) * (0.25f + 0.75f * room) *
-            if (nativeGlassEnabled) 0.38f else 1f
+        val backdrop = bodyAlpha * (1f - absorb) * (0.25f + 0.75f * room)
         if (usesDots(a)) drawDotField(canvas, a, backdrop) else if (!showsDrive(a)) drawArtBackdrop(canvas, backdrop)
         if (!reduceMotion) drawWaterSurface(canvas, bodyAlpha)
         driveHits.clear()

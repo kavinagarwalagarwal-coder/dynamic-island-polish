@@ -48,7 +48,6 @@ object LiveScreenFrames {
 
     internal fun start() {
         isActive = true
-        IslandOverlayService.onLiveCaptureStateChanged()
         listeners.forEach { listener -> runCatching { listener.onFrame(frame) } }
     }
 
@@ -64,7 +63,6 @@ object LiveScreenFrames {
     internal fun stop() {
         isActive = false
         frame = null
-        IslandOverlayService.onLiveCaptureStateChanged()
         listeners.forEach { listener -> runCatching { listener.onFrame(null) } }
     }
 }
