@@ -16,6 +16,7 @@ import android.annotation.TargetApi
 import android.content.Context
 import android.graphics.*
 import android.os.Build
+import android.os.SystemClock
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.max
@@ -40,7 +41,8 @@ class WallpaperLiquidGlass(private val context: Context) {
      * [stage] is the fixed area the wallpaper is laid out in; [rect] is the island shape inside it.
      * The caller has already clipped [canvas] to the island shape. Keeping the wallpaper anchored
      * to the stage means it stays still while the island morphs, and the GPU layer never resizes.
-     * While [resizing], the lens is left off (plain still wallpaper) and rebuilt once at rest.
+     * During [resizing], keep the lens active and refresh its shape at a bounded rate; the final
+     * settled shape is applied immediately.
      */
     fun draw(canvas: Canvas, stage: RectF, rect: RectF, radius: Float, alpha: Int, renderer: WallpaperSkinRenderer,
              resizing: Boolean = false) {
@@ -87,6 +89,7 @@ class WallpaperLiquidGlass(private val context: Context) {
         private var lastStyle: WallpaperStyle? = null
         private var stale = true
         private var lensOn = false
+        private var lastEffectUpdateMs = 0L
         var effectBuilds = 0
             private set
         var recordings = 0
@@ -124,12 +127,12 @@ class WallpaperLiquidGlass(private val context: Context) {
             val l = q(rect.left - stage.left); val t = q(rect.top - stage.top)
             val w = q(rect.width()).coerceAtLeast(1f); val h = q(rect.height()).coerceAtLeast(1f)
             val r = q(radius).coerceIn(0f, min(w, h) / 2f)
-            if (resizing) {
-                // A lens built for one frame's shape is wrong on the next; rebuilding it every
-                // frame churned GPU layers. Show the still wallpaper and restore the lens at rest.
-                if (lensOn) { node.setRenderEffect(null); lensOn = false; shape.fill(-1f) }
-            } else if (resized || !lensOn || abs(shape[0] - l) > 1f || abs(shape[1] - t) > 1f ||
-                abs(shape[2] - w) > 1f || abs(shape[3] - h) > 1f || abs(shape[4] - r) > 1f) {
+            val shapeChanged = resized || !lensOn || abs(shape[0] - l) > 1f || abs(shape[1] - t) > 1f ||
+                abs(shape[2] - w) > 1f || abs(shape[3] - h) > 1f || abs(shape[4] - r) > 1f
+            val now = SystemClock.uptimeMillis()
+            val updateLens = shapeChanged &&
+                (resized || !lensOn || !resizing || now - lastEffectUpdateMs >= LENS_UPDATE_INTERVAL_MS)
+            if (updateLens) {
                 shader.setFloatUniform("size", w, h)
                 shader.setFloatUniform("offset", -l, -t)
                 shader.setFloatUniform("cornerRadii", r, r, r, r)
@@ -140,6 +143,7 @@ class WallpaperLiquidGlass(private val context: Context) {
                 // The effect snapshots uniforms, so it is recreated; the layer size stays fixed.
                 node.setRenderEffect(RenderEffect.createRuntimeShaderEffect(shader, "content"))
                 lensOn = true
+                lastEffectUpdateMs = now
                 effectBuilds++
                 shape[0] = l; shape[1] = t; shape[2] = w; shape[3] = h; shape[4] = r
             }
@@ -162,6 +166,7 @@ class WallpaperLiquidGlass(private val context: Context) {
     }
 
     private companion object {
+        const val LENS_UPDATE_INTERVAL_MS = 32L
         const val SHADER = """
 uniform shader content;
 

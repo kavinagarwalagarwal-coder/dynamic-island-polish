@@ -22,14 +22,11 @@ object IslandMotion {
     const val FLUID_HEIGHT_DAMPING = 0.79f
     const val FLUID_CENTER_DAMPING = 0.84f
     const val FLUID_RADIUS_DAMPING = 0.86f
-    // Apple's numbers, as duration and bounce: standard moves around half a second with little
-    // bounce, opening an alert a little livelier. The axis that leads (width when opening,
-    // height when closing) is a touch quicker, so the pill stretches out before it blooms down
-    // and folds up before it narrows.
-    const val APPLE_DURATION = 0.5f
-    const val APPLE_OPEN_BOUNCE = 0.2f
-    const val APPLE_CLOSE_BOUNCE = 0.08f
-    const val AXIS_LAG = 1.14f
+    // Calm, liquid morph timing: width leads the opening bloom; height leads the closing fold.
+    const val APPLE_DURATION = 0.56f
+    const val APPLE_OPEN_BOUNCE = 0.14f
+    const val APPLE_CLOSE_BOUNCE = 0.06f
+    const val AXIS_LAG = 1.18f
     const val CONTENT_IN_K = 140f
     const val CONTENT_OUT_K = 380f
     const val IDLE_SIDE_MARGIN_DP = 2f
