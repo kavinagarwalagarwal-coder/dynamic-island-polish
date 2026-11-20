@@ -256,6 +256,15 @@ a:focus-visible {
 .site-footer a:hover {
   color: var(--dd-ink);
 }
+.nav-github {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.nav-github svg {
+  width: 15px;
+  height: 15px;
+}
 .site-nav .nav-download {
   display: inline-flex;
   align-items: center;
@@ -306,6 +315,21 @@ a:focus-visible {
   position: relative;
   z-index: 2;
   padding: 0 0 12px 2px;
+}
+.hero-copy > * {
+  animation: hero-copy-enter 750ms cubic-bezier(0.2, 0.75, 0.25, 1) both;
+}
+.hero-copy > *:nth-child(2) {
+  animation-delay: 90ms;
+}
+.hero-copy > *:nth-child(3) {
+  animation-delay: 170ms;
+}
+.hero-copy > *:nth-child(4) {
+  animation-delay: 250ms;
+}
+.hero-copy > *:nth-child(5) {
+  animation-delay: 330ms;
 }
 .hero-copy h1,
 .release-hero h1 {
@@ -461,7 +485,9 @@ a:focus-visible {
     0 36px 80px rgba(0, 0, 0, 0.6),
     inset 0 0 0 5px rgba(255, 255, 255, 0.025);
   transform: rotate(3deg);
-  animation: phone-float 7s ease-in-out infinite;
+  animation:
+    phone-arrive 950ms cubic-bezier(0.18, 0.82, 0.24, 1) both,
+    phone-float 7s ease-in-out 950ms infinite;
 }
 .hero-phone::before {
   content: "";
@@ -2255,6 +2281,26 @@ a:focus-visible {
   margin-top: 0;
 }
 
+@keyframes hero-copy-enter {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 18px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+@keyframes phone-arrive {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 34px, 0) rotate(0deg) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(3deg) scale(1);
+  }
+}
 @keyframes phone-float {
   0%,
   100% {

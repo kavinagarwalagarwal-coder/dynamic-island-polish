@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowUpRight, Menu, X } from "lucide-react";
+import { ArrowUpRight, Github, Menu, X } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 
 export function SiteHeader() {
@@ -40,6 +40,15 @@ export function SiteHeader() {
           <Link to="/releases" onClick={() => setMenuOpen(false)}>
             Releases
           </Link>
+          <a
+            className="nav-github"
+            href="https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish"
+            target="_blank"
+            rel="noreferrer"
+            onClick={() => setMenuOpen(false)}
+          >
+            <Github aria-hidden="true" /> GitHub repo
+          </a>
           <Link className="nav-download" to="/releases" onClick={() => setMenuOpen(false)}>
             Get the app <ArrowUpRight aria-hidden="true" />
           </Link>
