@@ -1419,7 +1419,9 @@ a:focus-visible {
     radial-gradient(circle, #050605 59%, transparent 62%),
     conic-gradient(from -90deg, var(--dd-lime) 0 70%, rgba(199, 244, 105, 0.18) 70% 100%);
   color: var(--dd-lime);
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.025), 0 8px 20px rgba(0, 0, 0, 0.34);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.025),
+    0 8px 20px rgba(0, 0, 0, 0.34);
   animation: split-drop-arrive 0.78s cubic-bezier(0.2, 0.8, 0.25, 1.05) both;
 }
 .floating-bubble::before {
@@ -1488,7 +1490,9 @@ a:focus-visible {
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: 15px;
   background: rgba(15, 18, 15, 0.92);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  box-shadow:
+    0 14px 30px rgba(0, 0, 0, 0.36),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
   color: white;
   transform: translate(-50%, -50%);
   animation: handoff-card 3.2s cubic-bezier(0.3, 0.7, 0.25, 1) infinite;
@@ -2241,9 +2245,15 @@ a:focus-visible {
   height: 13px;
   color: #aeb7aa;
 }
+.download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
 .download-button {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 9px;
   min-height: 39px;
   padding: 0 15px;
@@ -2257,11 +2267,21 @@ a:focus-visible {
   white-space: nowrap;
   transition:
     transform 0.2s,
-    background 0.2s;
+    background 0.2s,
+    border-color 0.2s;
 }
 .download-button:hover {
   transform: translateY(-2px);
   background: #d4ff83;
+}
+.download-button-secondary {
+  border-color: rgba(199, 244, 105, 0.4);
+  background: rgba(199, 244, 105, 0.08);
+  color: #e3e9dc;
+}
+.download-button-secondary:hover {
+  border-color: var(--dd-lime);
+  background: rgba(199, 244, 105, 0.16);
 }
 .download-button svg {
   width: 14px;
@@ -2562,9 +2582,9 @@ a:focus-visible {
     width: min(100% - 52px, 900px);
     min-height: 620px;
   }
-.hero-copy h1 {
-  font-size: clamp(52px, 6.1vw, 68px);
-}
+  .hero-copy h1 {
+    font-size: clamp(52px, 6.1vw, 68px);
+  }
   .hero-art {
     transform: scale(0.9);
   }
@@ -2762,8 +2782,8 @@ a:focus-visible {
     transform-origin: top center;
   }
   .floating-bubble {
-  top: calc(50% - 165.5px);
-  left: calc(50% + 70px);
+    top: calc(50% - 165.5px);
+    left: calc(50% + 70px);
   }
 
   .stage-note {
@@ -2891,6 +2911,10 @@ a:focus-visible {
     align-items: start;
     flex-direction: column;
     padding: 15px 0;
+  }
+  .download-actions {
+    width: 100%;
+    flex-direction: column;
   }
   .release-requirement {
     gap: 11px;
