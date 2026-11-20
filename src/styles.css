@@ -1178,6 +1178,7 @@ a:focus-visible {
 }
 .demo-island.mode-handoff {
   min-width: 214px;
+  animation: handoff-receive 3.2s ease-in-out infinite;
 }
 .demo-island.mode-music {
   min-width: 222px;
@@ -1450,54 +1451,90 @@ a:focus-visible {
   place-items: center;
   border-radius: 8px;
   background: linear-gradient(140deg, #b5e879, #3c6b44);
-}
-.app-glyph {
   color: #182619;
-  font-size: 12px;
-  font-weight: 800;
 }
-.handoff-arrow {
+.handoff-app svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 2.4;
+}
+.handoff-live {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
   color: var(--dd-lime);
-  font-size: 15px;
-  animation: arrow-fly 1.4s ease-in-out infinite;
+  font-family: var(--dd-mono);
+  font-size: 6px;
+  letter-spacing: 0.04em;
+}
+.handoff-live i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--dd-lime);
+  box-shadow: 0 0 8px rgba(199, 244, 105, 0.7);
 }
 .handoff-card {
   position: absolute;
   z-index: 3;
-  top: 53%;
+  top: 60%;
   left: 50%;
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 182px;
+  width: 190px;
   padding: 9px;
-  border: 1px solid rgba(255, 255, 255, 0.17);
-  border-radius: 13px;
-  background: rgba(15, 18, 15, 0.82);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 15px;
+  background: rgba(15, 18, 15, 0.92);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   color: white;
   transform: translate(-50%, -50%);
-  animation: handoff-card 3.2s ease-in-out infinite;
+  animation: handoff-card 3.2s cubic-bezier(0.3, 0.7, 0.25, 1) infinite;
   backdrop-filter: blur(12px);
 }
 .handoff-card-art {
-  width: 35px;
-  height: 35px;
-  flex: 0 0 35px;
-  border-radius: 7px;
+  display: grid;
+  width: 38px;
+  height: 38px;
+  flex: 0 0 38px;
+  place-items: center;
+  border-radius: 9px;
   background: linear-gradient(140deg, #e8b172, #a24547 55%, #263b4a);
 }
-.handoff-card span:last-child {
+.handoff-card-art svg {
+  width: 16px;
+  height: 16px;
+  color: rgba(255, 255, 255, 0.86);
+}
+.handoff-card-copy {
   display: flex;
+  min-width: 0;
   flex-direction: column;
   gap: 3px;
 }
+.handoff-card b,
+.handoff-card small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .handoff-card b {
-  font-size: 8px;
+  font-size: 9px;
 }
 .handoff-card small {
   color: #a7ada4;
   font-size: 7px;
+}
+.handoff-card .handoff-source {
+  color: var(--dd-lime);
+  font-family: var(--dd-mono);
+  font-size: 6px;
+  letter-spacing: 0.1em;
+}
+.motion-paused .handoff-card {
+  animation-play-state: paused;
 }
 .mock-home-row {
   position: absolute;
@@ -2424,26 +2461,45 @@ a:focus-visible {
   }
 }
 @keyframes handoff-card {
-  0%,
-  100% {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -35%) scale(0.72);
+  }
+  8% {
     opacity: 1;
     transform: translate(-50%, -50%) scale(1);
   }
-  55% {
-    opacity: 0.15;
-    transform: translate(-50%, -110%) scale(0.55);
+  58% {
+    opacity: 1;
+    transform: translate(-50%, calc(-50% - 176px)) scale(0.8);
   }
-  70% {
+  72% {
     opacity: 0;
+    transform: translate(-50%, calc(-50% - 204px)) scale(0.18);
+  }
+  92% {
+    opacity: 0;
+    transform: translate(-50%, calc(-50% - 204px)) scale(0.18);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -35%) scale(0.72);
   }
 }
-@keyframes arrow-fly {
+@keyframes handoff-receive {
   0%,
+  54%,
   100% {
-    transform: translate(0, 0);
+    filter: brightness(1);
   }
-  50% {
-    transform: translate(3px, -3px);
+  66% {
+    filter: brightness(1.18);
+  }
+  76% {
+    filter: brightness(1.42);
+  }
+  86% {
+    filter: brightness(1.06);
   }
 }
 @keyframes note-float {
