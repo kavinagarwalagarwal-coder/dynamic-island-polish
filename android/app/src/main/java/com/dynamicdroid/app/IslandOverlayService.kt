@@ -1189,7 +1189,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
             WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
             WindowManager.LayoutParams.FLAG_HARDWARE_ACCELERATED or
             WindowManager.LayoutParams.FLAG_BLUR_BEHIND
         val lp = WindowManager.LayoutParams(1, 1, type, flags, PixelFormat.TRANSLUCENT).apply {
@@ -1259,6 +1258,10 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         glassBounds.offset(glassScreenLocation[0].toFloat(), glassScreenLocation[1].toFloat())
         val next = android.graphics.Rect()
         glassBounds.roundOut(next)
+        next.left = next.left.coerceAtLeast(0)
+        next.top = next.top.coerceAtLeast(0)
+        next.right = next.right.coerceAtMost(resources.displayMetrics.widthPixels)
+        next.bottom = next.bottom.coerceAtMost(resources.displayMetrics.heightPixels)
         if (next.isEmpty) {
             blur.visibility = View.INVISIBLE
             glassAppliedBounds.setEmpty()
