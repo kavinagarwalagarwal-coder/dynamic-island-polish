@@ -49,7 +49,7 @@ export function IslandPlayground() {
           </h2>
         </div>
         <p className="section-intro">
-          Tap a moment. Watch it bloom from your camera, then settle back like it was always there.
+          We&apos;re shaping a liquid-spring feel: activities stretch, connect, and settle as they move.
         </p>
       </div>
 
@@ -183,12 +183,8 @@ export function IslandPlayground() {
                       </div>
                       <div className="island-copy">
                         <strong>Midnight City</strong>
-                        <small>Music playing</small>
+                        <small>M83 · Music playing</small>
                       </div>
-                      <span className="split-pill">
-                        <Timer aria-hidden="true" />
-                        <b>4:32</b>
-                      </span>
                     </>
                   )}
                   {mode === "handoff" && (
@@ -230,13 +226,17 @@ export function IslandPlayground() {
             <div className="mock-home-indicator" />
           </div>
           {mode === "split" && (
-            <div className="floating-bubble">
-              <Timer aria-hidden="true" />
+            <div
+              className="floating-bubble"
+              key={motionKey}
+              role="img"
+              aria-label="Attached timer activity, 4 minutes 32 seconds"
+            >
               <span>4:32</span>
             </div>
           )}
           <div className="stage-note">
-            <span className="stage-note-dot" /> Springs you can interrupt mid-flight
+            <span className="stage-note-dot" /> Liquid springs · fluid morphs, still in motion
           </div>
         </div>
 
@@ -260,7 +260,7 @@ export function IslandPlayground() {
             {isPlaying ? <Pause aria-hidden="true" /> : <Play aria-hidden="true" />}
             <span>{isPlaying ? "Pause motion" : "Replay motion"}</span>
           </button>
-          <p className="playground-footnote">A real, touchable demo lives inside the app.</p>
+          <p className="playground-footnote">An in-progress look at our liquid-spring motion.</p>
         </div>
       </div>
     </section>
