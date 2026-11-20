@@ -55,7 +55,7 @@ data class IslandFeatureSet(
     val edgeGlow: Boolean = false,
     val burnInCare: Boolean = false,
     /** Playful pixel scenes for levels: a car driving for volume, a rocket for downloads, a pixel battery. */
-    val pixelScenes: Boolean = true,
+    val pixelScenes: Boolean = false,
     val lockScreen: Boolean = false,
     val hapticTap: Boolean = true,
     val hapticHold: Boolean = true,
@@ -146,6 +146,8 @@ object IslandFeatures {
     fun read(context: Context): IslandFeatureSet {
         val p = p(context)
         val d = IslandFeatureSet()
+        val look = runCatching { IslandLook.valueOf(p.getString("look", d.look.name) ?: d.look.name) }
+            .getOrDefault(d.look)
         return IslandFeatureSet(
             volume = p.getBoolean("volume", d.volume),
             headphones = p.getBoolean("headphones", d.headphones),
@@ -170,7 +172,7 @@ object IslandFeatures {
                 .getOrDefault(d.outline),
             edgeGlow = p.getBoolean("edge_glow", d.edgeGlow),
             burnInCare = p.getBoolean("burn_in", d.burnInCare),
-            pixelScenes = p.getBoolean("pixel_scenes", d.pixelScenes),
+            pixelScenes = p.getBoolean("pixel_scenes", look == IslandLook.NOTHING),
             lockScreen = p.getBoolean("lock_screen", d.lockScreen),
             hapticTap = p.getBoolean("haptic_tap", d.hapticTap),
             hapticHold = p.getBoolean("haptic_hold", d.hapticHold),
@@ -191,8 +193,7 @@ object IslandFeatures {
             cameraFade = p.getBoolean("camera_fade", d.cameraFade),
             motion = runCatching { MotionStyle.valueOf(p.getString("motion", d.motion.name) ?: d.motion.name) }
                 .getOrDefault(d.motion),
-            look = runCatching { IslandLook.valueOf(p.getString("look", d.look.name) ?: d.look.name) }
-                .getOrDefault(d.look),
+            look = look,
             eventUnplugged = p.getBoolean("event_unplugged", d.eventUnplugged),
             eventLowBattery = p.getBoolean("event_low_battery", d.eventLowBattery),
             eventWifi = p.getBoolean("event_wifi", d.eventWifi),
@@ -218,8 +219,8 @@ object IslandFeatures {
 
     /**
      * Switching the look also sets the switches that belong to it; each can still be changed
-     * afterwards. Apple: plain black body with the album art in its corner, a resting pill and
-     * Apple's spring. Nothing: dot-matrix music, blurred art behind it, liquid motion.
+     * afterwards. Apple: plain black body with the album art in its corner, a resting pill, Apple's
+     * spring and smooth scenes. Nothing: dot-matrix music, blurred art, pixel scenes and liquid motion.
      */
     fun setLook(context: Context, look: IslandLook) {
         val apple = look == IslandLook.APPLE
@@ -229,6 +230,7 @@ object IslandFeatures {
             .putBoolean("artwork_backdrop", !apple)
             .putBoolean("idle_pill", apple)
             .putBoolean("edge_glow", false)
+            .putBoolean("pixel_scenes", !apple)
             .putString("motion", (if (apple) MotionStyle.APPLE else MotionStyle.LIQUID).name)
             .apply()
     }
