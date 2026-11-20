@@ -17,10 +17,18 @@ enum class IslandMode {
     SLEEP,
     /** Tapping the resting pill: the time, date and battery, with quick buttons. */
     HOME,
+    /**
+     * An app's live trip, order, score or flight (Android 16 Live Updates and similar ongoing
+     * notifications), and the hotspot: the Android side of the iPhone's Live Activities.
+     */
+    LIVE,
+    /** Screen or voice recording in progress. */
+    RECORDING,
 }
 
 /** The little picture an event island shows. */
-enum class Glyph { WIFI, WIFI_OFF, BATTERY_LOW, UNPLUGGED, PLANE, USB, UNLOCK, BRIGHTNESS, ALARM, PAY, TORCH, MOON, STOPWATCH, CAMERA }
+enum class Glyph { WIFI, WIFI_OFF, BATTERY_LOW, UNPLUGGED, PLANE, USB, UNLOCK, BRIGHTNESS, ALARM, PAY, TORCH, MOON, STOPWATCH, CAMERA,
+    HOTSPOT, SCREEN, MIC }
 
 /** What the ringer switch or Do Not Disturb just changed to. */
 enum class RingerState { RING, VIBRATE, SILENT, DND_ON, DND_OFF }
@@ -75,6 +83,10 @@ data class LiveActivity(
     val glyph: Glyph? = null,
     /** Sleep island: when the alarm rings (wall clock, ms). */
     val alarmAt: Long? = null,
+    /** A third line: a navigation step's ETA and distance, a live update's sub text. */
+    val detail: String = "",
+    /** The few characters the small island shows for a live update ("5 min", "2–1"). */
+    val shortText: String? = null,
 ) {
     val isTransient: Boolean get() = mode == IslandMode.MESSAGE || mode == IslandMode.CHARGING ||
         mode == IslandMode.VOLUME || mode == IslandMode.DEVICE || mode == IslandMode.RINGER ||

@@ -28,7 +28,7 @@ class BeatListener(private val context: Context, private val onBands: (FloatArra
                 setDataCaptureListener(object : Visualizer.OnDataCaptureListener {
                     override fun onWaveFormDataCapture(v: Visualizer?, waveform: ByteArray?, rate: Int) = Unit
                     override fun onFftDataCapture(v: Visualizer?, fft: ByteArray?, rate: Int) { fft?.let(::analyse) }
-                }, Visualizer.getMaxCaptureRate(), false, true)
+                }, Visualizer.getMaxCaptureRate() / 2, false, true) // ~10 beats a second is plenty, at half the cost
                 enabled = true
             }
         }.getOrNull()

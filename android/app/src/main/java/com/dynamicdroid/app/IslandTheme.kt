@@ -6,10 +6,10 @@ package com.dynamicdroid.app
  */
 data class IslandTheme(
     val enabled: Boolean = false,
-    val accent: Int = 0xFFEB3030.toInt(),
-    val secondary: Int = 0xFF9D9D9D.toInt(),
-    /** Pill body: a very dark take on the wallpaper colour (near-black when disabled). */
-    val base: Int = 0xFF0D0D0D.toInt(),
+    val accent: Int = 0xFF63DCF4.toInt(),
+    val secondary: Int = 0xFF228AA3.toInt(),
+    /** Deep-water glass body, overridden by wallpaper sampling when theme matching is enabled. */
+    val base: Int = 0xFF05111A.toInt(),
 ) {
     /** Colours must be opaque; a translucent accent would wash out on the dark pill. */
     fun safe() = copy(

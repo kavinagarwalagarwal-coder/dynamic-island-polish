@@ -22,6 +22,11 @@ object IslandMotion {
     const val FLUID_HEIGHT_DAMPING = 0.79f
     const val FLUID_CENTER_DAMPING = 0.84f
     const val FLUID_RADIUS_DAMPING = 0.86f
+    // Calm, liquid morph timing: width leads the opening bloom; height leads the closing fold.
+    const val APPLE_DURATION = 0.56f
+    const val APPLE_OPEN_BOUNCE = 0.14f
+    const val APPLE_CLOSE_BOUNCE = 0.06f
+    const val AXIS_LAG = 1.18f
     const val CONTENT_IN_K = 140f
     const val CONTENT_OUT_K = 380f
     const val IDLE_SIDE_MARGIN_DP = 2f

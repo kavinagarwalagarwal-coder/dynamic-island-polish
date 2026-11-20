@@ -33,7 +33,7 @@ class DeviceCompatibilityTest {
         if (android.os.Build.VERSION.SDK_INT >= 33) shell("pm grant ${APP_ID} android.permission.POST_NOTIFICATIONS")
         try {
             ActivityScenario.launch(MainActivity::class.java).use { scenario ->
-                for (page in listOf("Playground", "Setup", "Appearance", "Phone fit")) {
+                for (page in listOf("Home", "Islands", "Look", "More")) {
                     scenario.onActivity { activity ->
                         activity.openPage(page)
                         assertTrue("Page $page did not open", activity.page == page)

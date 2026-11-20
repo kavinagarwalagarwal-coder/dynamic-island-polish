@@ -24,9 +24,9 @@ object IslandPreferences {
         val p = prefs(context)
         return IslandTheme(
             p.getBoolean("theme_on", false),
-            p.getInt("theme_accent", 0xFFEB3030.toInt()),
-            p.getInt("theme_secondary", 0xFF9D9D9D.toInt()),
-            p.getInt("theme_base", 0xFF0D0D0D.toInt()),
+            p.getInt("theme_accent", 0xFF63DCF4.toInt()),
+            p.getInt("theme_secondary", 0xFF228AA3.toInt()),
+            p.getInt("theme_base", 0xFF05111A.toInt()),
         ).safe()
     }
 

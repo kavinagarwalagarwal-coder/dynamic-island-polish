@@ -9,7 +9,6 @@ import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Bundle
 import android.os.SystemClock
-import android.provider.Settings
 import android.view.View
 import android.widget.RemoteViews
 
@@ -92,7 +91,11 @@ class FixtureReceiver : BroadcastReceiver() {
     }
 }
 
-/** Foreground variant: "player" stays open as the music app; other kinds hand over to Settings. */
+/**
+ * Foreground variant: "player" stays open as the music app; other kinds hand over to the home
+ * screen, standing in for "some other app in front". (It used to be Settings, which can take 6+
+ * seconds to open on Android 17 emulator images and hold on to focus, throwing off the tests.)
+ */
 class FixtureActivity : Activity() {
     override fun onCreate(state: Bundle?) {
         super.onCreate(state)
@@ -114,7 +117,8 @@ class FixtureActivity : Activity() {
             })
             return
         }
-        if (kind != "clear") startActivity(Intent(Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+        if (kind != "clear") startActivity(Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME)
+            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         finish()
     }
 }

@@ -69,9 +69,11 @@ class ShadeAndTimerTest {
                 shell("input keyevent KEYCODE_HOME")
                 Thread.sleep(800)
 
-                // A recording-style count-up timer shows...
+                // A recorder's count-up shows as a recording (not a stopwatch)...
                 shell("am broadcast -f 32 -n com.dynamicdroid.fixture/.FixtureReceiver --es kind recording")
-                assertTrue("Count-up timer did not show: " + liveModes(), waitFor(6_000) { liveModes().any { it.startsWith("TIMER") } })
+                assertTrue("Recording did not show: " + liveModes() + " bus=" + IslandBus.allOngoing().map { "${it.mode}:${it.title}" } +
+                    " shown=" + shell("dumpsys notification --noredact").lineSequence().filter { "fixture" in it }.take(6).joinToString(" | "),
+                    waitFor(6_000) { liveModes().any { it.startsWith("RECORDING") } })
 
                 // ...the island's own window takes no touches; only a small window over the pill does.
                 val screenW = context.resources.displayMetrics.widthPixels
@@ -100,10 +102,10 @@ class ShadeAndTimerTest {
                 assertTrue("Swiping down beside the island did not open the shade", opened)
                 Thread.sleep(600)
 
-                // When the notification stops counting (recording saved), the timer ends.
+                // When the notification stops counting (recording saved), the recording ends.
                 shell("am broadcast -f 32 -n com.dynamicdroid.fixture/.FixtureReceiver --es kind recording-done")
-                assertTrue("Finished count-up timer kept running: " + liveModes(), waitFor(6_000) {
-                    liveModes().none { it.startsWith("TIMER") }
+                assertTrue("Finished recording kept running: " + liveModes(), waitFor(6_000) {
+                    liveModes().none { it.startsWith("RECORDING") || it.startsWith("TIMER") }
                 })
             } finally {
                 shell("cmd statusbar collapse")

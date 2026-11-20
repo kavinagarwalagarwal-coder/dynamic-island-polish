@@ -66,7 +66,7 @@ object DotArt {
             canvas.drawCircle((x + .5f) * cell, (y + .5f) * cell, halftoneRadius(lum, cell), paint)
         }
         if (disc) {
-            paint.color = SPINDLE_RED
+            paint.color = SPINDLE_AQUA
             canvas.drawCircle(size / 2f, size / 2f, cell * 0.55f, paint)
         }
         return out
@@ -122,7 +122,7 @@ object DotArt {
     }
 
     private const val SPINDLE = 0.07f
-    const val SPINDLE_RED = 0xFFFF3B30.toInt()
+    const val SPINDLE_AQUA = 0xFF63DCF4.toInt()
     private const val MIN_DOT = 0.12f
     private const val MAX_DOT = 0.47f
 }

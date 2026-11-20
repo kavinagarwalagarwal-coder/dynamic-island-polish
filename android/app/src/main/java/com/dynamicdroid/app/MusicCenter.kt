@@ -16,7 +16,7 @@ object MusicCenter {
 
     enum class Command { TOGGLE, NEXT, PREVIOUS }
 
-    const val DEFAULT_ACCENT = 0xFFFF3B30.toInt()
+    const val DEFAULT_ACCENT = 0xFF63DCF4.toInt()
 
     private val main = Handler(Looper.getMainLooper())
     private val observers = LinkedHashSet<Observer>()

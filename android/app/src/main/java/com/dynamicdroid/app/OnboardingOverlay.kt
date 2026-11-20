@@ -115,7 +115,7 @@ class OnboardingOverlay(
             return false
         }
     }.apply {
-        background = GradientDrawable().apply { setColor(NothingStyle.surface); cornerRadius = dp(28f) }
+        background = NothingStyle.panel().apply { cornerRadius = dp(28f) }
         clipToOutline = true
         addView(island, LayoutParams(-1, -1))
         addView(bigLogo, LayoutParams(dpi(150f), dpi(150f), Gravity.CENTER))
@@ -140,7 +140,10 @@ class OnboardingOverlay(
     private val next = Button(host).apply {
         isAllCaps = false; textSize = 16f; typeface = NothingStyle.body
         setTextColor(NothingStyle.background); minHeight = dpi(52f); minWidth = dpi(132f)
-        background = GradientDrawable().apply { setColor(NothingStyle.foreground); cornerRadius = dp(26f) }
+        background = GradientDrawable(
+            GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(NothingStyle.sheen, NothingStyle.aqua),
+        ).apply { cornerRadius = dp(26f) }
         setOnClickListener { advance() }
         Motion.springPress(this)
     }

@@ -124,8 +124,26 @@ jobs:
             gradle --no-daemon -p android :notification-fixture:assembleDebug
             adb install -r android/notification-fixture/build/outputs/apk/debug/notification-fixture-debug.apk
             adb shell pm grant com.dynamicdroid.fixture android.permission.POST_NOTIFICATIONS
-            gradle --no-daemon -p android :app:connectedStandardDebugAndroidTest ${{ inputs.tests && format('-Pandroid.testInstrumentationRunnerArguments.class={0} -Pandroid.testInstrumentationRunnerArguments.report=1', inputs.tests) || '' }}
-            adb pull /sdcard/Pictures/IslandSmoke island-screenshots
+            gradle --no-daemon -p android :app:connectedStandardDebugAndroidTest ${{ inputs.tests && format('-Pandroid.testInstrumentationRunnerArguments.class={0} -Pandroid.testInstrumentationRunnerArguments.report=1', inputs.tests) || '' }}; s=$?; adb pull /sdcard/Pictures/IslandSmoke island-screenshots || true; exit $s
+      - name: Print scene thumbnails
+        if: always()
+        run: |
+          pip install --quiet pillow || true
+          python3 - <<'PY'
+          import base64, glob, io
+          try:
+              from PIL import Image
+          except ImportError:
+              raise SystemExit(0)
+          for path in sorted(glob.glob("island-screenshots/**/scene-*.png", recursive=True) + glob.glob("island-screenshots/**/design-*.png", recursive=True)):
+              im = Image.open(path).convert("RGB")
+              im.thumbnail((360, 240))
+              buf = io.BytesIO(); im.save(buf, "PNG", optimize=True)
+              data = base64.b64encode(buf.getvalue()).decode()
+              print(f"SCENE-BEGIN {path.split('/')[-1]}")
+              for i in range(0, len(data), 3000): print("SCENE-DATA " + data[i:i+3000])
+              print("SCENE-END")
+          PY
       - name: Report failed instrumentation tests
         if: failure()
         run: |
@@ -246,3 +264,47 @@ jobs:
         with:
           name: optimized-app-smoke-api-${{ matrix.api }}-${{ matrix.file }}
           path: island-screenshots/optimized*
+
+  # Every merge to main publishes the APKs as a GitHub release, so the newest build is always one
+  # link away (no sign-in, no zip):
+  #   .../releases/latest/download/DynamicDroid.apk            (standard)
+  #   .../releases/latest/download/DynamicDroid-Android17.apk  (Android 17)
+  # Only builds signed with the permanent key are published, so each one installs as an update.
+  # The 10 newest stay, to go back a version if one misbehaves.
+  release:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          name: dynamic-droid-optimized-apk
+          path: out/standard
+      - uses: actions/download-artifact@v7
+        with:
+          name: dynamic-droid-android17-optimized-apk
+          path: out/android17
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNED: ${{ secrets.DD_KEYSTORE_BASE64 != '' && secrets.DD_KEYSTORE_PASSWORD != '' }}
+        run: |
+          if [ "$SIGNED" != "true" ]; then
+            echo "::warning title=Not released::Add the DD_KEYSTORE secrets so builds can be released as updates."
+            exit 0
+          fi
+          cp out/standard/*.apk DynamicDroid.apk
+          cp out/android17/*.apk DynamicDroid-Android17.apk
+          tag="build-${GITHUB_RUN_NUMBER}"
+          printf '%s\n' \
+            "Tap **DynamicDroid.apk** on your phone to install or update (settings and permissions stay)." \
+            "On Android 16 or 17 you can pick **DynamicDroid-Android17.apk** instead." \
+            "" "Built from ${GITHUB_SHA::7}." > notes.md
+          gh release create "$tag" DynamicDroid.apk DynamicDroid-Android17.apk \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Dynamic Droid 1.7.0.${GITHUB_RUN_NUMBER}" --notes-file notes.md --latest
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 100 --json tagName,createdAt \
+            -q '[.[] | select(.tagName | startswith("build-"))] | sort_by(.createdAt) | reverse | .[10:] | .[].tagName' |
+            while read -r old; do gh release delete "$old" --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag; done

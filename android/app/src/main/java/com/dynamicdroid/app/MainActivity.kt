@@ -45,10 +45,19 @@ class MainActivity : AppCompatActivity() {
         if (!granted) toast(getString(R.string.bluetooth_permission_denied))
         refreshCustomization()
     }
+    private val liveCaptureConsent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val data = result.data
+        if (result.resultCode == RESULT_OK && data != null) {
+            LiveScreenCaptureService.start(this, result.resultCode, data)
+        } else {
+            toast(getString(R.string.live_glass_consent_denied))
+        }
+        tick++
+    }
 
     // ---------------------------------------------------------------- screen state (Compose)
 
-    internal var page by mutableStateOf("Playground")
+    internal var page by mutableStateOf("Home")
     internal var features by mutableStateOf(IslandFeatureSet())
     internal var fit by mutableStateOf(IslandFit())
     internal var theme by mutableStateOf(IslandTheme())
@@ -130,10 +139,10 @@ class MainActivity : AppCompatActivity() {
         window.statusBarColor = NothingStyle.background
         androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
         buildPreviews()
-        val connected = androidx.core.app.NotificationManagerCompat.getEnabledListenerPackages(this).contains(packageName)
-        page = if (connected) "Playground" else "Setup"
+        // Home shows the next setup step first when something is missing, so it's always the start.
+        page = "Home"
         setContent { MainScreen() }
-        showDemo(demoMusic(true), Presentation.EXPANDED)
+        showDemo(demoMusic(!Motion.underTest), Presentation.EXPANDED)
         applyThemeUpdate()
         // Opening flourish, then the tour on first run, then the notification permission prompt,
         // so a system dialog never lands on top of either.
@@ -201,19 +210,19 @@ class MainActivity : AppCompatActivity() {
             }, FrameLayout.LayoutParams(-2, -2, Gravity.CENTER))
         }
         root.addView(sheet, FrameLayout.LayoutParams(-1, -1))
-        logo.play(80L, 1_050L)
-        word.play(520L, 620L)
-        tagline.animate().alpha(1f).setStartDelay(980L).setDuration(300L).start()
+        logo.play(60L, 800L)
+        word.play(380L, 520L)
+        tagline.animate().alpha(1f).setStartDelay(700L).setDuration(260L).start()
         sheet.postDelayed({
-            logo.animate().scaleX(1.18f).scaleY(1.18f).setDuration(380L).start()
-            sheet.animate().alpha(0f).setDuration(380L).withEndAction {
+            logo.animate().scaleX(1.18f).scaleY(1.18f).setDuration(320L).start()
+            sheet.animate().alpha(0f).setDuration(320L).withEndAction {
                 root.removeView(sheet)
                 then()
             }.start()
             entered = true
             visit++
             headerLogo?.play(220L, 900L)
-        }, 1_650L)
+        }, 1_200L)
     }
 
     internal fun showOnboarding() {
@@ -224,7 +233,7 @@ class MainActivity : AppCompatActivity() {
             onboarding = null
             tourBack.isEnabled = false
             getSharedPreferences("onboarding", MODE_PRIVATE).edit().putBoolean("seen", true).apply()
-            if (openSetup) selectPage("Setup") else headerLogo?.play(0L, 800L)
+            selectPage("Home"); headerLogo?.play(0L, 800L)
             askNotificationPermission()
         }
         onboarding = tour
@@ -246,8 +255,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     /** Switches page; the logo rebuilds and the new page's parts flow in. */
-    internal fun selectPage(name: String) {
-        if (name == "Rules") refreshCustomization()
+    internal fun selectPage(requested: String) {
+        // Older page names (from before the four-page layout) still land somewhere sensible.
+        val name = when (requested) {
+            "Playground" -> "Home"
+            "Setup" -> "More"
+            "Appearance", "Phone fit" -> "Look"
+            "Rules", "Features" -> "Islands"
+            else -> requested
+        }
+        if (name == "Islands") refreshCustomization()
         if (name == page) return
         page = name
         visit++
@@ -283,7 +300,12 @@ class MainActivity : AppCompatActivity() {
             val a = demo ?: return
             if (command == IslandBus.MEDIA_TOGGLE) showDemo(demoMusic(!a.isPlaying, a.livePositionMs()), demoPresentation)
             if (command == IslandBus.MEDIA_SEEK && positionMs != null) showDemo(demoMusic(a.isPlaying, positionMs), demoPresentation)
-            if (command == IslandBus.MEDIA_NEXT || command == IslandBus.MEDIA_PREVIOUS) showDemo(demoMusic(a.isPlaying, 0L), demoPresentation)
+            // The preview has a short playlist, so skipping visibly changes the song.
+            if (command == IslandBus.MEDIA_NEXT) { demoTrack = (demoTrack + 1) % DEMO_TRACKS.size; showDemo(demoMusic(a.isPlaying, 0L), demoPresentation) }
+            if (command == IslandBus.MEDIA_PREVIOUS) {
+                if (a.livePositionMs() < 3_000L) demoTrack = (demoTrack + DEMO_TRACKS.size - 1) % DEMO_TRACKS.size
+                showDemo(demoMusic(a.isPlaying, 0L), demoPresentation)
+            }
         }
         override fun onSecondaryExpand(activity: LiveActivity) {
             val previous = demo
@@ -311,11 +333,14 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private var demoTrack = 0
+
     internal fun demoMusic(playing: Boolean, position: Long = 107_000L): LiveActivity {
-        val art = gradientArt(NothingStyle.red, NothingStyle.surface)
+        val track = DEMO_TRACKS[demoTrack % DEMO_TRACKS.size]
+        val art = gradientArt(track.third, NothingStyle.surface)
         return LiveActivity(
             key = "demo-music", packageName = "com.spotify.music", mode = IslandMode.MUSIC,
-            title = "Midnight City", subtitle = "M83", appLabel = "Spotify",
+            title = track.first, subtitle = track.second, appLabel = "Spotify",
             appIcon = AppStyle.icon(this, "com.spotify.music"), artwork = art,
             accent = NothingStyle.foreground,
             isPlaying = playing, positionMs = position, positionUpdatedAt = SystemClock.elapsedRealtime(), durationMs = 243_000L,
@@ -423,6 +448,40 @@ class MainActivity : AppCompatActivity() {
         actions = listOf(IslandAction("Decline", selfIntent()), IslandAction("Answer", selfIntent())),
     )
 
+    /** A ride on its way: the Android side of an iPhone Live Activity. */
+    internal fun demoLive() = LiveActivity(
+        key = "demo-live", packageName = "com.ubercab", mode = IslandMode.LIVE,
+        title = getString(R.string.demo_live_title), subtitle = getString(R.string.demo_live_text),
+        appLabel = "Uber", appIcon = null, artwork = null, accent = AppStyle.GREEN,
+        progress = .62f, shortText = getString(R.string.demo_live_short),
+        actions = listOf(IslandAction(getString(R.string.demo_live_call), selfIntent()), IslandAction(getString(R.string.demo_live_message), selfIntent())),
+    )
+
+    internal fun demoScore() = LiveActivity(
+        key = "demo-score", packageName = "com.cricbuzz.android", mode = IslandMode.LIVE,
+        title = "IND 245/3 (42.1 ov)  ·  AUS 274/8", subtitle = getString(R.string.demo_score_text),
+        appLabel = "Cricbuzz", appIcon = null, artwork = null, accent = AppStyle.GREEN,
+        shortText = LiveSignals.cricketScore(listOf("IND 245/3 (42.1 ov)")),
+    )
+
+    internal fun demoNavigation() = LiveActivity(
+        key = "demo-nav", packageName = "com.google.android.apps.maps", mode = IslandMode.NAVIGATION,
+        title = getString(R.string.demo_nav_title), subtitle = getString(R.string.demo_nav_text),
+        appLabel = "Maps", appIcon = AppStyle.icon(this, "com.google.android.apps.maps"), artwork = null,
+        accent = AppStyle.BLUE, detail = getString(R.string.demo_nav_detail),
+    )
+
+    internal fun demoRecording() = System.currentTimeMillis().let { now ->
+        LiveActivity(
+            key = "demo-rec", packageName = "com.android.systemui", mode = IslandMode.RECORDING,
+            title = getString(R.string.demo_rec_title), subtitle = "", appLabel = getString(R.string.mode_recording),
+            appIcon = null, artwork = null, accent = Color.RED, glyph = Glyph.SCREEN,
+            actions = listOf(IslandAction(getString(R.string.stopwatch_stop), selfIntent())),
+            chronometerBase = now - 83_000L,
+            clockBaseElapsed = android.os.SystemClock.elapsedRealtime() - 83_000L,
+        )
+    }
+
     internal fun demoTimer(minutes: Int = 9) = LiveActivity(
         key = "demo-timer", packageName = "com.google.android.deskclock", mode = IslandMode.TIMER,
         title = if (minutes == 9) "Pasta" else getString(R.string.demo_minutes, minutes), subtitle = "Timer", appLabel = "Clock",
@@ -509,6 +568,20 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---------------------------------------------------------------- actions
+
+    internal fun requestLiveScreenGlass() {
+        if (LiveScreenFrames.isActive) {
+            LiveScreenCaptureService.stop(this)
+            return
+        }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            toast(getString(R.string.live_glass_requires_android_14))
+            return
+        }
+        val manager = getSystemService(android.media.projection.MediaProjectionManager::class.java)
+        val config = android.media.projection.MediaProjectionConfig.createConfigForUserChoice()
+        liveCaptureConsent.launch(manager.createScreenCaptureIntent(config))
+    }
 
     internal fun openAccessibility() {
         toast(getString(R.string.setup_a11y_toast))
@@ -795,12 +868,10 @@ class MainActivity : AppCompatActivity() {
         }.setNegativeButton(getString(R.string.common_done), null).show()
     }
     internal fun navLabel(key: String) = getString(when (key) {
-        "Playground" -> R.string.nav_playground
-        "Setup" -> R.string.nav_setup
-        "Appearance" -> R.string.nav_appearance
-        "Rules" -> R.string.nav_rules
-        "Phone fit" -> R.string.nav_phone_fit
-        else -> R.string.nav_features
+        "Home" -> R.string.nav_home
+        "Islands" -> R.string.nav_islands
+        "Look" -> R.string.nav_look
+        else -> R.string.nav_more
     })
 
     internal fun modeName(mode: IslandMode) = getString(when (mode) {
@@ -819,6 +890,8 @@ class MainActivity : AppCompatActivity() {
         IslandMode.TORCH -> R.string.mode_torch
         IslandMode.SLEEP -> R.string.mode_sleep
         IslandMode.HOME -> R.string.mode_home
+        IslandMode.LIVE -> R.string.mode_live
+        IslandMode.RECORDING -> R.string.mode_recording
     })
 
     private fun accentName(index: Int) = getString(when (index) {
@@ -903,8 +976,11 @@ class MainActivity : AppCompatActivity() {
         this.text = text; textSize = size; setTextColor(color); typeface = NothingStyle.body
     }
     private fun controlBackground(color: Int = NothingStyle.surface): android.graphics.drawable.Drawable {
-        val shape = android.graphics.drawable.GradientDrawable().apply {
-            cornerRadius = dp(18).toFloat(); setColor(color)
+        val shape = android.graphics.drawable.GradientDrawable(
+            android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,
+            intArrayOf(NothingStyle.surfaceLight, color, NothingStyle.background),
+        ).apply {
+            cornerRadius = dp(18).toFloat()
             setStroke(dp(1), NothingStyle.line)
         }
         return android.graphics.drawable.RippleDrawable(
@@ -915,3 +991,9 @@ class MainActivity : AppCompatActivity() {
         startService(Intent(this, IslandOverlayService::class.java))
     }
 }
+
+private val DEMO_TRACKS = listOf(
+    Triple("Midnight City", "M83", NothingStyle.red),
+    Triple("Nightcall", "Kavinsky", android.graphics.Color.rgb(150, 70, 220)),
+    Triple("Resonance", "HOME", android.graphics.Color.rgb(60, 150, 230)),
+)

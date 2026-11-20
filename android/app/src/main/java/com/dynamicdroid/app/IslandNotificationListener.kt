@@ -30,6 +30,10 @@ class IslandNotificationListener : NotificationListenerService() {
     private var controller: MediaController? = null
     private val timers = HashMap<String, LiveActivity>()
     private val systemPackages = setOf("com.android.systemui", "android")
+    /** Notifications currently shown as recordings, so the "saved" update can end them. */
+    private val recordings = HashSet<String>()
+    /** Notifications shown as live scores, so the result ("India won") keeps updating the card. */
+    private val scores = HashSet<String>()
     private val lastMessageText = HashMap<String, String>()
     private val lastProgress = HashMap<String, Float>()
 
@@ -87,9 +91,14 @@ class IslandNotificationListener : NotificationListenerService() {
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         if (sbn.packageName == packageName || !IslandCustomization.allowed(this, sbn.packageName)) return
-        // System UI's own notifications (screen recording, casting, battery...) already have their
-        // own status-bar chips; the recording one would read as a stopwatch and never stop.
-        if (sbn.packageName in systemPackages) return
+        // System UI's own notifications (casting, battery...) already have their own status-bar
+        // chips; only its screen recorder gets an island (as a recording, never as a stopwatch).
+        if (sbn.packageName in systemPackages && !(sbn.isOngoing && LiveSignals.isRecording(sbn.packageName,
+                if (Build.VERSION.SDK_INT >= 26) sbn.notification.channelId else null,
+                sbn.notification.extras.getCharSequence(Notification.EXTRA_TITLE)?.toString().orEmpty(), "", true, true))) {
+            if (sbn.key in recordings) { recordings.remove(sbn.key); IslandBus.remove(sbn.key) }
+            return
+        }
         val n = sbn.notification
         if (n.flags and Notification.FLAG_GROUP_SUMMARY != 0) return
         val extras = n.extras
@@ -146,11 +155,47 @@ class IslandNotificationListener : NotificationListenerService() {
         val actionLabels = n.actions.orEmpty().map { it.title?.toString().orEmpty() }
         val progress = IslandSignals.progressFraction(extras.getInt(Notification.EXTRA_PROGRESS),
             extras.getInt(Notification.EXTRA_PROGRESS_MAX), extras.getBoolean(Notification.EXTRA_PROGRESS_INDETERMINATE))
+        val channel = if (Build.VERSION.SDK_INT >= 26) n.channelId else null
+        val shortCritical = extras.getCharSequence(LiveSignals.EXTRA_SHORT_CRITICAL_TEXT)
+        // Recordings first: a recorder's Pause/Stop stopwatch would otherwise pass for a timer.
+        val recording = features.recording && LiveSignals.isRecording(sbn.packageName, channel, title, text, sbn.isOngoing, chronometer)
+        val hotspot = features.liveUpdates && LiveSignals.isHotspot(sbn.packageName, channel, sbn.isOngoing)
+        // Live scores: the notification's text, or for a scoreboard drawn as a custom layout, its words.
+        val alertOnce = n.flags and Notification.FLAG_ONLY_ALERT_ONCE != 0
+        var scoreLines = listOfNotNull(title, text, extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString(),
+            extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString(), shortCritical?.toString()).filter { it.isNotBlank() }
+        val quiet = !sbn.isOngoing && !isAlerting(sbn)
+        val scoreCandidate = features.liveUpdates && (sbn.isOngoing || alertOnce || quiet) &&
+            (sbn.packageName in LiveSignals.scoreApps || sbn.key in scores)
+        var readCustom = false
+        if (scoreCandidate && !LiveSignals.looksLikeScore(scoreLines) && (n.contentView != null || n.bigContentView != null)) {
+            val custom = runCatching { NotificationText.read(this, n) }.getOrDefault(emptyList())
+            if (custom.isNotEmpty()) { scoreLines = custom; readCustom = true }
+        }
+        val liveScore = features.liveUpdates && n.category != Notification.CATEGORY_CALL &&
+            (LiveSignals.isLiveScore(sbn.packageName, sbn.isOngoing, alertOnce, scoreLines, quiet) ||
+                sbn.key in scores && (sbn.isOngoing || alertOnce || quiet))
+        if (sbn.packageName in LiveSignals.scoreApps || liveScore) LiveDiagnostics.record(this, sbn.packageName, sbn.isOngoing,
+            alertOnce, quiet, readCustom, LiveSignals.looksLikeScore(scoreLines, sbn.packageName in LiveSignals.scoreApps),
+            liveScore && IslandFeatures.read(this).shows(IslandMode.LIVE))
+        val live = features.liveUpdates && n.category != Notification.CATEGORY_CALL && sbn.packageName != LiveSignals.GOOGLE_APP && LiveSignals.isLiveUpdate(
+            extras.getString(Notification.EXTRA_TEMPLATE), n.flags, extras.getBoolean(LiveSignals.EXTRA_REQUEST_PROMOTED),
+            sbn.packageName, sbn.isOngoing, !shortCritical.isNullOrBlank())
+        // A recording whose notification stops recording ("Recording saved") ends here.
+        if (sbn.key in recordings && !recording) {
+            recordings.remove(sbn.key)
+            IslandBus.remove(sbn.key)
+            return
+        }
         val mode = when {
             n.category == Notification.CATEGORY_CALL -> IslandMode.CALL
             features.alarms && IslandSignals.isRingingAlarm(n.category, clockApp, actionLabels) -> IslandMode.ALARM
             n.category == Notification.CATEGORY_NAVIGATION && sbn.isOngoing -> IslandMode.NAVIGATION
+            recording -> IslandMode.RECORDING
+            hotspot -> IslandMode.LIVE
+            liveScore -> IslandMode.LIVE
             recognizedTimer -> IslandMode.TIMER
+            live && !(features.downloads && n.category == Notification.CATEGORY_PROGRESS) -> IslandMode.LIVE
             features.downloads && progress != null && progress < 1f &&
                 (sbn.isOngoing || n.category == Notification.CATEGORY_PROGRESS) -> IslandMode.DOWNLOAD
             sbn.key in lastProgress -> { finishProgress(sbn.key); if (sbn.isOngoing) return else IslandMode.MESSAGE }
@@ -204,8 +249,10 @@ class IslandNotificationListener : NotificationListenerService() {
             key = sbn.key,
             packageName = sbn.packageName,
             mode = mode,
-            title = title,
-            subtitle = text,
+            // A scoreboard drawn as a custom layout: its words become the card's text.
+            title = if (liveScore && title == appLabel && scoreLines.firstOrNull() != title)
+                scoreLines.first().take(80) else title,
+            subtitle = if (liveScore && text.isBlank()) scoreLines.drop(1).joinToString("  ").take(120) else text,
             appLabel = AppStyle.label(this, sbn.packageName),
             appIcon = AppStyle.icon(this, sbn.packageName),
             artwork = largeIcon(n),
@@ -218,16 +265,28 @@ class IslandNotificationListener : NotificationListenerService() {
                 SystemClock.elapsedRealtime() + (it - System.currentTimeMillis())
             },
             pausedTimerMs = if (paused) remaining else null,
-            progress = if (mode == IslandMode.DOWNLOAD) progress else null,
+            progress = if (mode == IslandMode.DOWNLOAD || mode == IslandMode.LIVE) progress else null,
             callState = callState,
             reply = reply,
+            glyph = when {
+                hotspot -> Glyph.HOTSPOT
+                mode == IslandMode.RECORDING -> if (LiveSignals.isScreenRecording(sbn.packageName, channel, title)) Glyph.SCREEN else Glyph.MIC
+                else -> null
+            },
+            detail = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString().orEmpty(),
+            shortText = if (mode == IslandMode.LIVE && !hotspot) (if (liveScore) LiveSignals.cricketScore(scoreLines) else null)
+                ?: LiveSignals.shortText(shortCritical, title, text) else null,
         )
         if (mode == IslandMode.TIMER) timers[sbn.key] = activity
+        if (mode == IslandMode.RECORDING) recordings += sbn.key
+        if (liveScore && mode == IslandMode.LIVE) scores += sbn.key
         IslandBus.post(activity)
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         timers.remove(sbn.key)
+        recordings.remove(sbn.key)
+        scores.remove(sbn.key)
         lastProgress.remove(sbn.key)
         lastMessageText.remove(sbn.key)
         IslandBus.remove(sbn.key)
