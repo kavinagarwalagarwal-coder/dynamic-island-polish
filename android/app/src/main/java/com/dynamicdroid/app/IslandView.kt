@@ -82,7 +82,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         fun onRingerMode(state: RingerState) {}
         /** The resting pill was tapped (home card). */
         fun onIdleTap() {}
-        /** The flashlight card's brightness bar was dragged to [fraction]. */
+        /** The flashlight card's brightness slider was dragged to [fraction]. */
         fun onTorchLevel(fraction: Float) {}
         fun onTorchOff() {}
     }
@@ -1399,7 +1399,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 Spec(openWidth(dp(MEDIUM_WIDTH_DP)), h, min(h / 2f, cardRadius(dp(MEDIUM_HEIGHT_DP) / 2f)), openCenter())
             }
             IslandMode.TORCH -> {
-                val h = mediumRowHeight() + if (a.progress != null) dp(32f) else 0f
+                val h = if (a.progress != null) max(dp(128f), mediumRowHeight() + dp(68f)) else mediumRowHeight()
                 Spec(openWidth(dp(MEDIUM_WIDTH_DP)), h, if (a.progress != null) cardRadius(dp(40f)) else min(h / 2f, cardRadius(h / 2f)), openCenter())
             }
             IslandMode.SLEEP -> Spec(w, dp(150f), cardRadius(dp(44f)), screenCenter())
@@ -2841,40 +2841,63 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     private val torchBar = RectF()
+    private val torchTouch = RectF()
     private val torchOffHit = RectF()
+    private val torchBeam = Path()
     private var torchDragging = false
     private var torchLive: Float? = null
 
-    /** The flashlight: a lit glyph that turns it off, and (where supported) a brightness bar. */
+    /** iOS-inspired flashlight intensity card: a live beam and a vertical, touch-friendly slider. */
     private fun drawTorchExpanded(canvas: Canvas, a: LiveActivity, alpha: Int) {
         val hasLevels = a.progress != null
-        val rowH = mediumRowHeight()
-        val cy = rect.top + rowH / 2f
-        val icon = min(rowH, dp(MEDIUM_HEIGHT_DP)) - dp(20f)
-        val l = rect.left + dp(10f)
-        // A soft beam behind the glyph, brighter with the level.
-        val level = torchLive ?: a.progress ?: 1f
-        fillPaint.color = withAlpha(a.accent, (alpha * (0.25f + 0.35f * level)).toInt())
-        canvas.drawCircle(l + icon / 2, cy, icon / 2, fillPaint)
-        IslandGlyphs.draw(canvas, Glyph.TORCH, l + icon / 2, cy, icon * 0.56f, withAlpha(Color.BLACK, alpha))
+        val level = (torchLive ?: a.progress ?: 1f).coerceIn(0f, 1f)
+        val cy = rect.centerY()
+        val icon = dp(38f)
+        val l = rect.left + dp(18f)
+        val cx = l + icon / 2f
+
+        // The beam grows brighter as the slider rises, so the light itself reflects its intensity.
+        torchBeam.reset()
+        torchBeam.moveTo(cx - icon * 0.34f, cy - icon * 0.34f)
+        torchBeam.lineTo(cx, cy - icon * (0.7f + 0.9f * level))
+        torchBeam.lineTo(cx + icon * 0.34f, cy - icon * 0.34f)
+        torchBeam.close()
+        fillPaint.color = withAlpha(a.accent, (alpha * (0.04f + 0.16f * level)).toInt())
+        canvas.drawPath(torchBeam, fillPaint)
+        fillPaint.color = withAlpha(a.accent, (alpha * (0.18f + 0.34f * level)).toInt())
+        canvas.drawCircle(cx, cy, icon * 0.56f, fillPaint)
+        IslandGlyphs.draw(canvas, Glyph.TORCH, cx, cy, icon * 0.56f, withAlpha(Color.BLACK, alpha))
         torchOffHit.set(l - dp(6f), cy - icon / 2 - dp(6f), l + icon + dp(6f), cy + icon / 2 + dp(6f))
-        val tx = l + icon + dp(10f)
-        val right = rect.right - dp(18f)
-        val (titleY, detailY) = mediumBaselines(rect.top, rowH)
-        fadeText(canvas, a, 0, a.title, tx, titleY, right - tx, titlePaint, Color.WHITE, alpha)
-        fadeText(canvas, a, 1, a.subtitle, tx, detailY, right - tx, smallPaint, GREY, alpha)
-        if (!hasLevels) { torchBar.setEmpty(); return }
-        val barTop = rect.top + rowH + dp(2f)
-        val bh = dp(14f)
-        torchBar.set(rect.left + dp(18f), barTop, rect.right - dp(18f), barTop + bh)
-        fillPaint.color = withAlpha(Color.WHITE, alpha * 40 / 255)
-        canvas.drawRoundRect(torchBar, bh / 2, bh / 2, fillPaint)
+
+        val tx = l + icon + dp(12f)
+        val sliderX = rect.right - dp(38f)
+        val textRight = if (hasLevels) sliderX - dp(18f) else rect.right - dp(18f)
+        val titleY = cy - dp(3f)
+        val detailY = cy + dp(19f)
+        fadeText(canvas, a, 0, a.title, tx, titleY, textRight - tx, titlePaint, Color.WHITE, alpha)
+        fadeText(canvas, a, 1, a.subtitle, tx, detailY, textRight - tx, smallPaint, GREY, alpha)
+
+        if (!hasLevels) { torchBar.setEmpty(); torchTouch.setEmpty(); return }
+
+        val trackWidth = dp(28f)
+        torchBar.set(sliderX - trackWidth / 2f, rect.top + dp(18f), sliderX + trackWidth / 2f, rect.bottom - dp(18f))
+        torchTouch.set(torchBar.left - dp(12f), torchBar.top - dp(10f), torchBar.right + dp(12f), torchBar.bottom + dp(10f))
+        val radius = trackWidth / 2f
+        fillPaint.color = withAlpha(Color.WHITE, alpha * 34 / 255)
+        canvas.drawRoundRect(torchBar, radius, radius, fillPaint)
+
+        val fillTop = torchBar.bottom - torchBar.height() * level
+        fillPaint.color = withAlpha(a.accent, (alpha * (0.68f + 0.32f * level)).toInt())
+        canvas.drawRoundRect(torchBar.left, fillTop, torchBar.right, torchBar.bottom, radius, radius, fillPaint)
+
+        val thumbY = fillTop
+        fillPaint.color = withAlpha(Color.WHITE, alpha)
+        canvas.drawCircle(sliderX, thumbY, dp(11f), fillPaint)
         fillPaint.color = withAlpha(a.accent, alpha)
-        canvas.drawRoundRect(torchBar.left, torchBar.top, torchBar.left + max(bh, torchBar.width() * level), torchBar.bottom,
-            bh / 2, bh / 2, fillPaint)
+        canvas.drawCircle(sliderX, thumbY, dp(5f), fillPaint)
     }
 
-    private fun torchFraction(x: Float) = ((x - torchBar.left) / max(1f, torchBar.width())).coerceIn(0.05f, 1f)
+    private fun torchFraction(y: Float) = ((torchBar.bottom - y) / max(1f, torchBar.height())).coerceIn(0.05f, 1f)
 
     /**
      * Sleep before an alarm: a dial where the arc runs from now to the alarm (a 12-hour face),
@@ -3949,9 +3972,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 volumeDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.VOLUME &&
                     e.y < (if (showsWizard(a)) volumeDragBottom else rect.top + volumeHeight() + dp(2f))
                 if (volumeDragging) setVolumeFromTouch(e.x)
-                torchDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.TORCH && !torchBar.isEmpty &&
-                    e.y > torchBar.top - dp(14f)
-                if (torchDragging) { torchLive = torchFraction(e.x); invalidate() }
+                torchDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.TORCH && !torchTouch.isEmpty &&
+                    torchTouch.contains(e.x, e.y)
+                if (torchDragging) { torchLive = torchFraction(e.y); invalidate() }
                 if (touchingSecondary) bubblePress.target = if (reduceMotion) 1f else 0.94f
                 else pressS.target = if (reduceMotion) 1f else if (presentation == Presentation.EXPANDED) 0.985f else 0.96f
                 if (presentation == Presentation.COMPACT) postDelayed(longPress, LONG_PRESS_MS)
@@ -3971,7 +3994,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 if (volumeDragging) {
                     setVolumeFromTouch(e.x)
                 } else if (torchDragging) {
-                    torchLive = torchFraction(e.x)
+                    torchLive = torchFraction(e.y)
                     invalidate()
                 } else if (seeking) {
                     seekFraction = fractionAt(e.x)
