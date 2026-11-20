@@ -49,7 +49,8 @@ export function IslandPlayground() {
           </h2>
         </div>
         <p className="section-intro">
-          We&apos;re shaping a liquid-spring feel: activities stretch, connect, and settle as they move.
+          We&apos;re shaping a liquid-spring feel: activities stretch, connect, and settle as they
+          move.
         </p>
       </div>
 
@@ -190,23 +191,28 @@ export function IslandPlayground() {
                   {mode === "handoff" && (
                     <>
                       <span className="handoff-app">
-                        <span className="app-glyph">M</span>
+                        <Music2 aria-hidden="true" />
                       </span>
                       <div className="island-copy">
-                        <strong>Coming back to life</strong>
-                        <small>App → island handoff</small>
+                        <strong>Now playing</strong>
+                        <small>Falling into Place</small>
                       </div>
-                      <span className="handoff-arrow">↗</span>
+                      <span className="handoff-live">
+                        <i /> LIVE
+                      </span>
                     </>
                   )}
                 </div>
               </div>
               {mode === "handoff" && (
-                <div className="handoff-card">
-                  <span className="handoff-card-art" />
-                  <span>
-                    <b>Now playing</b>
-                    <small>Falling into Place</small>
+                <div className="handoff-card" key={motionKey}>
+                  <span className="handoff-card-art">
+                    <Music2 aria-hidden="true" />
+                  </span>
+                  <span className="handoff-card-copy">
+                    <small className="handoff-source">MUSIC APP</small>
+                    <b>Falling into Place</b>
+                    <small>Chromatics · Now playing</small>
                   </span>
                 </div>
               )}
@@ -236,7 +242,10 @@ export function IslandPlayground() {
             </div>
           )}
           <div className="stage-note">
-            <span className="stage-note-dot" /> Liquid springs · fluid morphs, still in motion
+            <span className="stage-note-dot" />
+            {mode === "handoff"
+              ? "The track lifts from the app into the island"
+              : "Liquid springs · fluid morphs, still in motion"}
           </div>
         </div>
 
