@@ -729,6 +729,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val hit = RectF()
     private val clip = Path()
     private val iconPath = Path()
+    private val arrowHead = Path()
     private val matrix = Matrix()
     private val shaders = WeakHashMap<Bitmap, BitmapShader>()
     private val phoneIcon = context.getDrawable(android.R.drawable.ic_menu_call)?.mutate()
@@ -2216,6 +2217,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     val img = a.appIcon ?: a.artwork
                     if (img != null) drawImage(canvas, img, l, cy - s / 2, s, s / 2, leadAlpha) else drawLetterTile(canvas, a, l, cy - s / 2, s, s / 2, leadAlpha)
                 }
+            IslandMode.NAVIGATION -> {
+                val turn = NavigationStep.turnOf("${a.title} ${a.subtitle}")
+                val img = a.appIcon
+                if (turn != null || img == null) drawTurnArrow(canvas, turn ?: Turn.STRAIGHT, l + s / 2, cy, dp(20f), withAlpha(navTint(a), leadAlpha))
+                else drawImage(canvas, img, l, cy - s / 2, s, s / 2, leadAlpha)
+            }
             IslandMode.EVENT, IslandMode.TORCH, IslandMode.SLEEP -> {
                 val glyph = when (a.mode) { IslandMode.TORCH -> Glyph.TORCH; IslandMode.SLEEP -> Glyph.MOON; else -> a.glyph ?: Glyph.ALARM }
                 IslandGlyphs.draw(canvas, glyph, l + s / 2, cy, dp(17f), withAlpha(a.accent, leadAlpha))
@@ -2267,6 +2274,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                         smallPaint, cFg, alpha, alignRight = true)
             }
             IslandMode.ALARM -> fadeText(canvas, a, 0, a.title, right, cy + dp(4.5f), roomRight, smallPaint, ALARM, alpha, alignRight = true)
+            IslandMode.NAVIGATION -> {
+                // Distance to the turn, as iOS Maps shows beside the camera.
+                val step = NavigationStep.parse(a.title, a.subtitle)
+                val label = a.shortText ?: step.distance ?: step.instruction
+                if (smallPaint.measureText(label) <= roomRight) rolling(canvas, "nav", label, right, cy + dp(4.5f), smallPaint, cFg, alpha, alignRight = true)
+                else text(canvas, label, right, cy + dp(4.5f), roomRight, smallPaint, cFg, alpha, alignRight = true)
+            }
             IslandMode.RECORDING -> a.chronometerText()?.let {
                 rolling(canvas, "rec", it, right, cy + dp(4.5f), smallPaint, REC_RED, alpha, alignRight = true)
             }
@@ -2427,21 +2441,112 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     /**
      * Turn-by-turn directions: the next turn's arrow, how far it is, the street, and the ETA.
      */
+    /**
+     * iOS Maps' Live Activity: the turn arrow on the left, the distance to it big, the instruction
+     * under it, and the trip (ETA, distance left) along the bottom.
+     */
     private fun drawNavigationExpanded(canvas: Canvas, a: LiveActivity, alpha: Int, late: Int) {
         val pad = dp(22f)
         val l = rect.left + pad
         val rr = rect.right - pad
         val top = rect.top + dp(20f)
         val arrow = dp(56f)
-        val img = a.artwork ?: a.appIcon
-        if (img != null) drawImage(canvas, img, l, top, arrow, concentric(l - rect.left, arrow), alpha)
-        else IslandGlyphs.draw(canvas, Glyph.PLANE, l + arrow / 2, top + arrow / 2, arrow * .6f, withAlpha(Color.WHITE, alpha))
+        val step = NavigationStep.parse(a.title, a.subtitle)
+        val img = a.artwork
+        when {
+            img != null -> drawImage(canvas, img, l, top, arrow, concentric(l - rect.left, arrow), alpha)
+            step.turn != null || a.appIcon == null ->
+                drawTurnArrow(canvas, step.turn ?: Turn.STRAIGHT, l + arrow / 2, top + arrow / 2, arrow * .82f, withAlpha(navTint(a), alpha))
+            else -> drawImage(canvas, a.appIcon, l, top, arrow, concentric(l - rect.left, arrow), alpha)
+        }
         val tx = l + arrow + dp(16f)
-        fadeText(canvas, a, 0, a.title, tx, top + dp(26f), rr - tx, bigPaint, Color.WHITE, alpha)
-        fadeText(canvas, a, 1, a.subtitle, tx, top + dp(48f), rr - tx, bodyPaint, GREY, alpha)
+        fadeText(canvas, a, 0, step.distance ?: step.instruction, tx, top + dp(26f), rr - tx, bigPaint, Color.WHITE, alpha)
+        if (step.distance != null) fadeText(canvas, a, 1, step.instruction, tx, top + dp(48f), rr - tx, bodyPaint, GREY, alpha)
         val bottom = rect.bottom - dp(20f)
-        text(canvas, a.detail.ifBlank { a.appLabel }, l, bottom, rr - l - dp(70f), smallPaint, cFg, late)
+        if (a.detail.isNotBlank()) text(canvas, a.detail, l, bottom, rr - l - dp(70f), smallPaint, cFg, late)
         text(canvas, a.appLabel, rr, bottom, dp(70f), smallPaint, GREY, late, alignRight = true)
+    }
+
+    /** Maps arrows are white on iOS; the Nothing look keeps its monochrome foreground. */
+    private fun navTint(a: LiveActivity) = if (apple) Color.WHITE else cFg
+
+    /** A rounded Maps-style manoeuvre arrow: the stem comes up from below and bends the way you turn. */
+    private fun drawTurnArrow(canvas: Canvas, turn: Turn, cx: Float, cy: Float, size: Float, color: Int) {
+        val w = size * .13f
+        ringPaint.strokeWidth = w
+        ringPaint.color = color
+        ringPaint.strokeJoin = Paint.Join.ROUND
+        fillPaint.color = color
+        val bottom = cy + size * .46f
+        val head = size * .2f
+        iconPath.reset()
+        fun headAt(x: Float, y: Float, angle: Double) {
+            val c = kotlin.math.cos(angle).toFloat(); val sn = kotlin.math.sin(angle).toFloat()
+            // Tip at (x, y) pointing along angle; base sits back by the head length.
+            val bx = x - c * head; val by = y - sn * head
+            arrowHead.reset()
+            arrowHead.moveTo(x + c * w * .3f, y + sn * w * .3f)
+            arrowHead.lineTo(bx - sn * head * .85f, by + c * head * .85f)
+            arrowHead.lineTo(bx + sn * head * .85f, by - c * head * .85f)
+            arrowHead.close()
+            canvas.drawPath(arrowHead, fillPaint)
+        }
+        val up = -Math.PI / 2
+        when (turn) {
+            Turn.STRAIGHT -> {
+                iconPath.moveTo(cx, bottom); iconPath.lineTo(cx, cy - size * .26f)
+                canvas.drawPath(iconPath, ringPaint); headAt(cx, cy - size * .46f, up)
+            }
+            Turn.LEFT, Turn.RIGHT -> {
+                val d = if (turn == Turn.RIGHT) 1f else -1f
+                val sx = cx - d * size * .16f
+                iconPath.moveTo(sx, bottom); iconPath.lineTo(sx, cy)
+                iconPath.quadTo(sx, cy - size * .2f, sx + d * size * .2f, cy - size * .2f)
+                iconPath.lineTo(cx + d * size * .2f, cy - size * .2f)
+                canvas.drawPath(iconPath, ringPaint); headAt(cx + d * size * .44f, cy - size * .2f, if (d > 0) 0.0 else Math.PI)
+            }
+            Turn.SLIGHT_LEFT, Turn.SLIGHT_RIGHT, Turn.SHARP_LEFT, Turn.SHARP_RIGHT -> {
+                val d = if (turn == Turn.SLIGHT_RIGHT || turn == Turn.SHARP_RIGHT) 1f else -1f
+                val sharp = turn == Turn.SHARP_LEFT || turn == Turn.SHARP_RIGHT
+                val sx = cx - d * size * .1f
+                val ang = if (sharp) (if (d > 0) Math.PI / 4 else Math.PI * 3 / 4) else (if (d > 0) -Math.PI / 4 else -Math.PI * 3 / 4)
+                val len = size * .3f
+                val ex = sx + kotlin.math.cos(ang).toFloat() * len; val ey = cy - size * .02f + kotlin.math.sin(ang).toFloat() * len
+                iconPath.moveTo(sx, bottom); iconPath.lineTo(sx, cy - size * .02f); iconPath.lineTo(ex, ey)
+                canvas.drawPath(iconPath, ringPaint)
+                headAt(ex + kotlin.math.cos(ang).toFloat() * head * .9f, ey + kotlin.math.sin(ang).toFloat() * head * .9f, ang)
+            }
+            Turn.U_TURN -> {
+                val r = size * .17f
+                val rx = cx + size * .17f; val lx = rx - 2 * r
+                iconPath.moveTo(rx, bottom); iconPath.lineTo(rx, cy - size * .1f)
+                arcRect.set(lx, cy - size * .1f - r, rx, cy - size * .1f + r)
+                iconPath.arcTo(arcRect, 0f, -180f)
+                iconPath.lineTo(lx, cy + size * .14f)
+                canvas.drawPath(iconPath, ringPaint); headAt(lx, cy + size * .36f, Math.PI / 2)
+            }
+            Turn.ROUNDABOUT -> {
+                // The ring, entered from below and left by the exit you take (straight on).
+                val r = size * .16f
+                val ry = cy + size * .04f
+                canvas.drawCircle(cx, ry, r, ringPaint)
+                iconPath.moveTo(cx, bottom); iconPath.lineTo(cx, ry + r)
+                iconPath.moveTo(cx, ry - r); iconPath.lineTo(cx, cy - size * .26f)
+                canvas.drawPath(iconPath, ringPaint); headAt(cx, cy - size * .46f, up)
+            }
+            Turn.ARRIVE -> {
+                // A destination flag on its pole.
+                iconPath.moveTo(cx - size * .16f, bottom); iconPath.lineTo(cx - size * .16f, cy - size * .42f)
+                canvas.drawPath(iconPath, ringPaint)
+                arrowHead.reset()
+                arrowHead.moveTo(cx - size * .16f, cy - size * .44f)
+                arrowHead.lineTo(cx + size * .3f, cy - size * .28f)
+                arrowHead.lineTo(cx - size * .16f, cy - size * .1f)
+                arrowHead.close()
+                canvas.drawPath(arrowHead, fillPaint)
+            }
+        }
+        ringPaint.strokeJoin = Paint.Join.MITER
     }
 
     /**
@@ -2723,16 +2828,12 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val accept = findAction(a, "answer", "accept")
         val btn = dp(44f)
         var buttonsLeft = rr
-        if (decline != null) {
+        // iOS order: red decline on the left, green answer on the far right.
+        for ((action, isDecline) in listOf(accept to false, decline to true)) {
+            if (action == null) continue
             val x = buttonsLeft - btn
-            drawCallButton(canvas, x, cy - btn / 2, btn, cRed, true, alpha)
-            actionHits.add(RectF(x, cy - btn / 2, x + btn, cy + btn / 2) to decline)
-            buttonsLeft = x - dp(12f)
-        }
-        if (accept != null) {
-            val x = buttonsLeft - btn
-            drawCallButton(canvas, x, cy - btn / 2, btn, cGreen, false, alpha)
-            actionHits.add(RectF(x, cy - btn / 2, x + btn, cy + btn / 2) to accept)
+            drawCallButton(canvas, x, cy - btn / 2, btn, if (isDecline) cRed else cGreen, isDecline, alpha)
+            actionHits.add(RectF(x, cy - btn / 2, x + btn, cy + btn / 2) to action)
             buttonsLeft = x - dp(12f)
         }
         val tx = l + av + dp(12f)
@@ -2746,7 +2847,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         } else {
             val sub = if (a.callState == CallState.CALLING) "${a.appLabel} · ${callingLabel()}" else a.subtitle.ifBlank { a.appLabel }
             val subAlpha = if (a.callState == CallState.CALLING) pulse(alpha) else alpha
-            text(canvas, sub, tx, cy - dp(6f), buttonsLeft - tx, smallPaint, cFg, subAlpha)
+            // Incoming: the number's label ("mobile") is a quiet caption above the name.
+            val subColor = if (a.callState == CallState.INCOMING) GREY else cFg
+            text(canvas, sub, tx, cy - dp(6f), buttonsLeft - tx, smallPaint, subColor, subAlpha)
         }
         fadeText(canvas, a, 0, a.title, tx, cy + dp(14f), buttonsLeft - tx, titlePaint, Color.WHITE, alpha)
     }
@@ -3646,7 +3749,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             if (action == toggle) {
                 val paused = a.pausedTimerMs != null || action.label.contains("resume", true) || action.label.contains("start", true)
                 // drawPlayPause takes a playing flag.
-                drawPlayPause(canvas, cx, cy, !paused, alpha)
+                drawPlayPause(canvas, cx, cy, !paused, alpha, if (apple) timerColor else Color.WHITE)
             } else {
                 ringPaint.color = withAlpha(Color.WHITE, alpha)
                 ringPaint.strokeWidth = dp(2f)
@@ -3889,8 +3992,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
     }
 
-    private fun drawPlayPause(canvas: Canvas, cx: Float, cy: Float, playing: Boolean, alpha: Int) {
-        fillPaint.color = withAlpha(Color.WHITE, alpha)
+    private fun drawPlayPause(canvas: Canvas, cx: Float, cy: Float, playing: Boolean, alpha: Int, color: Int = Color.WHITE) {
+        fillPaint.color = withAlpha(color, alpha)
         val s = dp(15f)
         if (playing) {
             val bw = dp(6f)
