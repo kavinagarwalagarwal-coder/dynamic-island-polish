@@ -47,6 +47,9 @@ import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.LocalContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -487,7 +490,45 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         checked = f.liveUpdates, onChecked = { setFeature("show_live", it) }) {
         toggle(R.string.feature_show_navigation, "show_navigation", f.navigation)
         toggle(R.string.feature_recording, "show_recording", f.recording, R.string.feature_recording_note)
+        toggle(R.string.camera_activity, "camera_activity", f.cameraActivity, R.string.camera_activity_note)
         Note(stringResource(R.string.live_last_seen) + " " + remember { LiveDiagnostics.read(this@FeaturesPage) }, size = 13)
+    }
+    val cricketContext = LocalContext.current
+    var cricketRefresh by remember { mutableStateOf(0) }
+    var cricketLoading by remember { mutableStateOf(false) }
+    var cricketFailed by remember { mutableStateOf(false) }
+    var cricketError by remember { mutableStateOf("") }
+    var cricketMatches by remember { mutableStateOf(emptyList<CricketScore>()) }
+    var preferredTeams by remember { mutableStateOf(CricketTeamPreferences.favorites(cricketContext)) }
+    LaunchedEffect(cricketRefresh, f.cricketScores) {
+        if (f.cricketScores) {
+            cricketLoading = true
+            cricketFailed = false
+            runCatching { withContext(Dispatchers.IO) { CricketScoreClient.fetch() } }
+                .onSuccess { cricketMatches = it }
+                .onFailure { cricketFailed = true; cricketError = it.message.orEmpty() }
+            cricketLoading = false
+        }
+    }
+    SettingsCard(stringResource(R.string.cricket_scores), stringResource(R.string.cricket_scores_note), flow.next(),
+        checked = f.cricketScores, onChecked = { setFeature("cricket_scores", it) }) {
+        if (f.cricketScores) {
+            ActionButton(stringResource(R.string.cricket_refresh), enabled = !cricketLoading) { cricketRefresh++ }
+            if (cricketLoading) Note(stringResource(R.string.cricket_loading), size = 13)
+            if (cricketFailed) Note(cricketError.ifBlank { stringResource(R.string.cricket_load_failed) }, size = 13)
+            CricketTeamPreferences.prioritized(cricketMatches, preferredTeams).take(4).forEach { match ->
+                Note("${match.title}\n${match.scoreLine}", size = 13)
+            }
+            val teams = cricketMatches.flatMap { it.teams }.distinct().sorted()
+            if (teams.isEmpty() && !cricketLoading && !cricketFailed) Note(stringResource(R.string.cricket_no_matches), size = 13)
+            teams.forEach { team ->
+                val selected = normalizeCricketTeam(team) in preferredTeams
+                SettingSwitch(stringResource(R.string.cricket_follow_team, team), selected) {
+                    preferredTeams = CricketTeamPreferences.setFavorite(cricketContext, team, it)
+                    refreshCustomization()
+                }
+            }
+        }
     }
     SettingsCard(stringResource(R.string.group_sound), count(f.volume, f.ringer, f.ringerControls), flow.next(),
         checked = f.volume, onChecked = { setFeature("volume", it) }) {

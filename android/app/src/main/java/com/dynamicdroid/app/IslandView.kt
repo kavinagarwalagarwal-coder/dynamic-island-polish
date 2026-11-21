@@ -438,6 +438,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val waveS = Spring(0f, 160f, 1f, 0.003f)
     private val burnInTick = Runnable { invalidate() }
     private val outlineTick = Runnable { invalidate() }
+    private var cameraScanStartedAt = 0L
+    private val cameraScanPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
 
     fun applyFeatures(next: IslandFeatureSet) {
         features = next.safe()
@@ -791,6 +793,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         // Nothing showing: the next scene appears fresh rather than fading from an old one.
         if (next == null) { sceneKindNow = null; sceneNow = null; scenePrev = null }
         val old = activity
+        if (next?.glyph == Glyph.CAMERA && next.key != old?.key) cameraScanStartedAt = SystemClock.uptimeMillis()
         if (old != null && next != null && old.key == next.key && next.mode == IslandMode.TIMER &&
             ((old.pausedTimerMs == null) != (next.pausedTimerMs == null) ||
                 (old.clockMs() ?: 0L) > 0L && next.clockMs() == 0L)) {
@@ -1668,6 +1671,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         } finally {
             canvas.restoreToCount(saves)
             callbacks?.onGlassFrame()
+            if (activity?.glyph == Glyph.CAMERA && SystemClock.uptimeMillis() - cameraScanStartedAt < 1_600L) {
+                postInvalidateOnAnimation()
+            }
         }
     }
 
@@ -1752,10 +1758,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             drawGlow(canvas, a, r, glowAlpha)
         }
         shapePaint.color = Color.BLACK
-        // Native cross-window blur supplies the live backdrop; keep the body translucent so it reads through.
         // In landscape there's no camera to cover, so the body lets the game or video show through.
-        shapePaint.alpha = if (seeThrough()) (bodyAlpha * LANDSCAPE_BODY).toInt()
-            else if (nativeGlassEnabled) (bodyAlpha * 0.62f).toInt() else bodyAlpha
+        shapePaint.alpha = if (seeThrough()) (bodyAlpha * LANDSCAPE_BODY).toInt() else bodyAlpha
         // The edges flow too: they pinch in while the island stretches and bow out as it
         // shrinks, so a morph reads as liquid rather than a rubber rectangle.
         buildBody(body, rect, r, -flowX * dp(2.4f) - wob * dp(10f), -flowY * dp(3f) + wob * dp(8f),
@@ -1767,14 +1771,14 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         clip.set(body)
         canvas.save()
         canvas.clipPath(clip)
-        if (absorb < .06f && !nativeGlassEnabled) {
+        // System blur-behind is not reliably clipped on overlay windows, so keep glass inside the island.
+        if (absorb < .06f) {
             wallpaperStage.set(0f, 0f, width / fit.scale, max(baseTop + dp(WALLPAPER_STAGE_DP), rect.bottom))
             val renderer = if (LiveScreenFrames.isActive && liveScreenSkin.image != null) liveScreenSkin else wallpaperSkin
             liquidGlass.draw(canvas, wallpaperStage, rect, r, bodyAlpha, renderer,
                 resizing = shapeSprings.any { !it.isAtRest } || !pressS.isAtRest || !stretchS.isAtRest || !wobbleS.isAtRest)
         }
-        val backdrop = bodyAlpha * (1f - absorb) * (0.25f + 0.75f * room) *
-            if (nativeGlassEnabled) 0.38f else 1f
+        val backdrop = bodyAlpha * (1f - absorb) * (0.25f + 0.75f * room)
         if (usesDots(a)) drawDotField(canvas, a, backdrop) else if (!showsDrive(a)) drawArtBackdrop(canvas, backdrop)
         if (!reduceMotion) drawWaterSurface(canvas, bodyAlpha)
         driveHits.clear()
@@ -2826,9 +2830,21 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val cy = rect.centerY()
         val icon = min(rect.height(), dp(MEDIUM_HEIGHT_DP)) - dp(20f)
         val l = rect.left + dp(10f)
+        val cx = l + icon / 2
         fillPaint.color = withAlpha(a.accent, alpha * 45 / 255)
-        canvas.drawCircle(l + icon / 2, cy, icon / 2, fillPaint)
-        IslandGlyphs.draw(canvas, a.glyph ?: Glyph.ALARM, l + icon / 2, cy, icon * 0.56f, withAlpha(a.accent, alpha))
+        canvas.drawCircle(cx, cy, icon / 2, fillPaint)
+        if (a.glyph == Glyph.CAMERA) {
+            val progress = ((SystemClock.uptimeMillis() - cameraScanStartedAt) / 1_600f).coerceIn(0f, 1f)
+            cameraScanPaint.color = withAlpha(a.accent, (alpha * (1f - progress) * 0.8f).toInt())
+            cameraScanPaint.strokeWidth = dp(1.5f)
+            for (ring in 0..1) {
+                val phase = (progress + ring * 0.5f) % 1f
+                canvas.drawCircle(cx, cy, dp(8f) + dp(19f) * phase, cameraScanPaint)
+            }
+            val scanY = cy - icon * 0.38f + icon * 0.76f * progress
+            canvas.drawLine(cx - icon * 0.27f, scanY, cx + icon * 0.27f, scanY, cameraScanPaint)
+        }
+        IslandGlyphs.draw(canvas, a.glyph ?: Glyph.ALARM, cx, cy, icon * 0.56f, withAlpha(a.accent, alpha))
         val tx = l + icon + dp(10f)
         var right = rect.right - dp(18f)
         a.progress?.let { level ->

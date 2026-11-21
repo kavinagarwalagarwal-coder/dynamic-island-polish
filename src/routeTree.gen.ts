@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ReleasesRouteImport } from './routes/releases'
+import { Route as ApiCricketCurrentRouteImport } from './routes/api/cricket/current'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const ReleasesRoute = ReleasesRouteImport.update({
   path: '/releases',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiCricketCurrentRoute = ApiCricketCurrentRouteImport.update({
+  id: '/api/cricket/current',
+  path: '/api/cricket/current',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/releases': typeof ReleasesRoute
+  '/api/cricket/current': typeof ApiCricketCurrentRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/releases': typeof ReleasesRoute
+  '/api/cricket/current': typeof ApiCricketCurrentRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/releases': typeof ReleasesRoute
+  '/api/cricket/current': typeof ApiCricketCurrentRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/releases'
+  fullPaths: '/' | '/releases' | '/api/cricket/current'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/releases'
-  id: '__root__' | '/' | '/releases'
+  to: '/' | '/releases' | '/api/cricket/current'
+  id: '__root__' | '/' | '/releases' | '/api/cricket/current'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ReleasesRoute: typeof ReleasesRoute
+  ApiCricketCurrentRoute: typeof ApiCricketCurrentRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ReleasesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/cricket/current': {
+      id: '/api/cricket/current'
+      path: '/api/cricket/current'
+      fullPath: '/api/cricket/current'
+      preLoaderRoute: typeof ApiCricketCurrentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ReleasesRoute: ReleasesRoute,
+  ApiCricketCurrentRoute: ApiCricketCurrentRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
