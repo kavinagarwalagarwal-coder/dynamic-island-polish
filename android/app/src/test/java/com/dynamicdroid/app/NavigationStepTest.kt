@@ -46,6 +46,14 @@ class NavigationStepTest {
         assertNull(NavigationStep.turnOf("Rechts abbiegen"))
     }
 
+    @Test fun streetNamesDoNotChangeTheTurn() {
+        assertEquals(Turn.RIGHT, NavigationStep.turnOf("Turn right onto Left Bank Road"))
+        assertEquals(Turn.LEFT, NavigationStep.turnOf("Turn left to stay on Right St"))
+        assertEquals(Turn.STRAIGHT, NavigationStep.turnOf("Continue on Leftwich Ave"))
+        assertEquals(Turn.RIGHT, NavigationStep.parse("Left Bank Road", "Turn right").turn)
+        assertEquals(Turn.ARRIVE, NavigationStep.turnOf("Destination will be on the left"))
+    }
+
     @Test fun ignoresNumbersThatAreNotDistances() {
         assertNull(NavigationStep.parse("Take exit 12", "A4 motorway").distance)
         assertNull(NavigationStep.parse("12 min", "Arrive 11:04").distance)

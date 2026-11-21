@@ -2218,7 +2218,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     if (img != null) drawImage(canvas, img, l, cy - s / 2, s, s / 2, leadAlpha) else drawLetterTile(canvas, a, l, cy - s / 2, s, s / 2, leadAlpha)
                 }
             IslandMode.NAVIGATION -> {
-                val turn = NavigationStep.turnOf("${a.title} ${a.subtitle}")
+                val turn = NavigationStep.turnOf(a.title, a.subtitle)
                 val img = a.appIcon
                 if (turn != null || img == null) drawTurnArrow(canvas, turn ?: Turn.STRAIGHT, l + s / 2, cy, dp(20f), withAlpha(navTint(a), leadAlpha))
                 else drawImage(canvas, img, l, cy - s / 2, s, s / 2, leadAlpha)

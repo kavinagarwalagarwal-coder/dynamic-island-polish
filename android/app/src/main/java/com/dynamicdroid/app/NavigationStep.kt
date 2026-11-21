@@ -21,13 +21,23 @@ data class NavigationStep(val distance: String?, val instruction: String, val tu
                 inSub != null -> inSub.value to listOf(t, strip(s, inSub)).filter { it.isNotBlank() }.joinToString(" · ")
                 else -> null to listOf(t, s).filter { it.isNotBlank() }.joinToString(" · ")
             }
-            return NavigationStep(distance, rest.ifBlank { t }.replaceFirstChar { it.uppercaseChar() }, turnOf("$t $s"))
+            return NavigationStep(distance, rest.ifBlank { t }.replaceFirstChar { it.uppercaseChar() }, turnOf(t, s))
         }
 
         private fun strip(text: String, m: MatchResult) =
             text.removeRange(m.range).trim().removePrefix("in ").removePrefix("In ").trim(' ', ',', '·', '-')
 
-        fun turnOf(text: String): Turn? {
+        // Road names follow these words ("onto Left Bank Road"), so only the words before them say which way to go.
+        private val ROAD = Regex("""(?i)\b(?:onto|on|into|toward|towards|via|to)\b(?!\s+(?:your|the)\s+(?:left|right))""")
+        private val MANOEUVRE = Regex("""(?i)\b(?:turn|keep|bear|exit|merge|continue|head|make|take|slight|sharp|arriv|u-turn|roundabout|fork|stay|destination)""")
+
+        /** The turn named in the line that holds the manoeuvre, ignoring street names after it. */
+        fun turnOf(vararg lines: String): Turn? =
+            lines.sortedByDescending { MANOEUVRE.containsMatchIn(it) }.firstNotNullOfOrNull { line ->
+                classify(ROAD.find(line)?.let { line.substring(0, it.range.first) } ?: line)
+            }
+
+        private fun classify(text: String): Turn? {
             val x = text.lowercase()
             fun has(vararg w: String) = w.any { x.contains(it) }
             return when {
@@ -40,7 +50,7 @@ data class NavigationStep(val distance: String?, val instruction: String, val tu
                 has("slight right", "keep right", "bear right", "exit right", "fork right") -> Turn.SLIGHT_RIGHT
                 has("left") -> Turn.LEFT
                 has("right") -> Turn.RIGHT
-                has("straight", "continue", "head ", "merge", "stay on") -> Turn.STRAIGHT
+                has("straight", "continue", "head ", "merge", "stay") -> Turn.STRAIGHT
                 else -> null
             }
         }
