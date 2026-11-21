@@ -120,7 +120,7 @@ object LiveSignals {
         if (resultText.containsMatchIn(summary))
             return Scoreboard(home.copy(batting = false), away.copy(batting = false), "Result", summary.take(80), league, live = false)
         // Who bats: the side the chase line names, else the one mid-over, else the one whose score shows wickets.
-        val chaser = summary.substringBefore(' ').uppercase().takeIf { chase.containsMatchIn(summary) }
+        val chaser = chaserLine.find(summary)?.groupValues?.get(1)?.uppercase()
         fun pick(test: (Scoreboard.Team) -> Boolean): Scoreboard.Team? = listOf(home, away).filter(test).singleOrNull()
         val bat = listOf(home, away).firstOrNull { it.abbr == chaser }
             ?: pick { it.batting }
@@ -129,6 +129,8 @@ object LiveSignals {
         return Scoreboard(home.copy(batting = home === bat), away.copy(batting = away === bat), "", summary.take(80), league)
     }
 
+    // "IND need 30 runs": only a team that needs runs is batting; "AUS lead by 241" says nothing.
+    private val chaserLine = Regex("^(\\S+)\\s+(?:needs?|requires?)\\b", RegexOption.IGNORE_CASE)
     private val resultText = Regex("\\b(won by|won the match|match (?:drawn|tied)|no result|abandoned)\\b", RegexOption.IGNORE_CASE)
 
     /** Text that reads as a live cricket score (or a chase: "need 30 runs in 18 balls"). */

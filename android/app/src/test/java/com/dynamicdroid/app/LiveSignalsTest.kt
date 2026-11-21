@@ -83,6 +83,8 @@ class LiveSignalsTest {
         assertTrue(both.home.batting); assertFalse(both.away.batting)
         val named = LiveSignals.cricketBoard(listOf("AUS 274/8 (50 ov) vs IND 245/3 (42 ov)", "IND need 30 runs from 48 balls"))!!
         assertFalse(named.home.batting); assertTrue(named.away.batting)
+        val lead = LiveSignals.cricketBoard(listOf("AUS 486 vs IND 245/3 (62.1 ov)", "AUS lead by 241 runs"))!!
+        assertFalse(lead.home.batting); assertTrue(lead.away.batting)
         val done = LiveSignals.cricketBoard(listOf("IND 275/4 (48.2 ov) vs AUS 274/8 (50 ov)", "IND won by 6 wickets"))!!
         assertFalse(done.live); assertFalse(done.inPlay); assertEquals("Result", done.status)
         assertFalse(done.home.batting || done.away.batting)
