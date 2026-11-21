@@ -74,4 +74,19 @@ class LiveSignalsTest {
         assertNull(LiveSignals.cricketBoard(listOf("IND 245/3 (42.1 ov)")))
         assertNull(LiveSignals.cricketBoard(listOf("ETA 5 min", "PNR 1234")))
     }
+
+    @Test fun scoreboardNotificationsKeepTheCurrentInningsAndOneBatter() {
+        val multi = LiveSignals.cricketBoard(listOf("NZ 368 & 75/1 (22 ov) vs IND 486/4"))!!
+        assertEquals("75/1", multi.home.score); assertEquals("368", multi.home.previous); assertTrue(multi.home.batting)
+        assertFalse(multi.away.batting)
+        val both = LiveSignals.cricketBoard(listOf("IND 245/3 (42.1 ov) vs AUS 274/8 (50 ov)"))!!
+        assertTrue(both.home.batting); assertFalse(both.away.batting)
+        val named = LiveSignals.cricketBoard(listOf("AUS 274/8 (50 ov) vs IND 245/3 (42 ov)", "IND need 30 runs from 48 balls"))!!
+        assertFalse(named.home.batting); assertTrue(named.away.batting)
+        val done = LiveSignals.cricketBoard(listOf("IND 275/4 (48.2 ov) vs AUS 274/8 (50 ov)", "IND won by 6 wickets"))!!
+        assertFalse(done.live); assertFalse(done.inPlay); assertEquals("Result", done.status)
+        assertFalse(done.home.batting || done.away.batting)
+        val split = LiveSignals.cricketBoard(listOf("AUS 245/3", "(42.1 ov)", "ENG", "Yet to bat"))!!
+        assertEquals("42.1 ov", split.home.overs); assertTrue(split.home.batting)
+    }
 }

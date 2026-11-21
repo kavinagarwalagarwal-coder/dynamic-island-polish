@@ -80,7 +80,8 @@ object LiveSignals {
     }
 
     // "IND 245/3 (42.1 ov)", "AUS: 274/8", "NZ 368": a team code, its runs, and overs when batting.
-    private val teamInnings = Regex("\\b([A-Z]{2,5}(?:-[AW])?)\\s*:?\\s+(\\d{1,3}(?:[/-]\\d{1,2})?d?)(?![\\d.:])" +
+    // "NZ 368 & 75/1 (22 ov)": an earlier innings may come before the current one.
+    private val teamInnings = Regex("\\b([A-Z]{2,5}(?:-[AW])?)\\s*:?\\s+(?:(\\d{1,3}(?:[/-]\\d{1,2})?d?)\\s*&\\s*)?(\\d{1,3}(?:[/-]\\d{1,2})?d?)(?![\\d.:])" +
         "(?:\\s*\\(\\s*(\\d{1,3}(?:\\.[0-5])?)\\s*(?:/\\s*\\d{1,3}\\s*)?(?:ov|ovs|overs?)?\\s*\\))?")
     private val yetToBat = Regex("\\b([A-Z]{2,5}(?:-[AW])?)\\s*:?\\s+(?i:yet to bat)\\b")
     private val notTeams = setOf("LIVE", "ODI", "TEST", "OVER", "OVERS", "RUNS", "NEED", "NEEDS", "ETA", "AM", "PM", "WON", "INN")
@@ -97,11 +98,15 @@ object LiveSignals {
         for (s in all) {
             for (m in teamInnings.findAll(s)) {
                 val abbr = m.groupValues[1]
-                if (abbr in notTeams || abbr in teams) continue
-                val overs = m.groupValues[3].takeIf { it.isNotEmpty() }
-                val score = m.groupValues[2].replace('-', '/')
+                if (abbr in notTeams) continue
+                val overs = m.groupValues[4].takeIf { it.isNotEmpty() }
+                val score = m.groupValues[3].replace('-', '/')
+                val known = teams[abbr]
+                // Overs in their own box only join the score in the all-lines pass.
+                if (known != null && (known.overs != null || overs == null || known.score != score)) continue
                 if (overs != null || '/' in score) scored = true
-                teams[abbr] = Scoreboard.Team(abbr, score, overs?.let { "$it ov" }, batting = overs != null)
+                teams[abbr] = Scoreboard.Team(abbr, score, overs?.let { "$it ov" }, batting = overs != null,
+                    previous = m.groupValues[2].takeIf { it.isNotEmpty() }?.replace('-', '/'))
             }
             for (m in yetToBat.findAll(s)) {
                 val abbr = m.groupValues[1].uppercase()
@@ -110,18 +115,21 @@ object LiveSignals {
         }
         if (!scored || teams.size < 2) return null
         val (home, away) = teams.values.take(2)
-        // Without overs, the side whose score shows wickets is the one still batting.
-        val fixed = if (home.batting || away.batting) listOf(home, away) else listOf(home, away).let { (h, a) ->
-            when {
-                '/' in h.score && '/' !in a.score -> listOf(h.copy(batting = true), a)
-                '/' in a.score && '/' !in h.score -> listOf(h, a.copy(batting = true))
-                else -> listOf(h, a)
-            }
-        }
-        val summary = lines.firstOrNull { chase.containsMatchIn(it) || it.contains(" won ", true) || it.contains("yet to bat", true) }
+        val summary = lines.firstOrNull { chase.containsMatchIn(it) || resultText.containsMatchIn(it) || it.contains("yet to bat", true) }
             ?.trim().orEmpty()
-        return Scoreboard(fixed[0], fixed[1], "", summary.take(80), league)
+        if (resultText.containsMatchIn(summary))
+            return Scoreboard(home.copy(batting = false), away.copy(batting = false), "Result", summary.take(80), league, live = false)
+        // Who bats: the side the chase line names, else the one mid-over, else the one whose score shows wickets.
+        val chaser = summary.substringBefore(' ').uppercase().takeIf { chase.containsMatchIn(summary) }
+        fun pick(test: (Scoreboard.Team) -> Boolean): Scoreboard.Team? = listOf(home, away).filter(test).singleOrNull()
+        val bat = listOf(home, away).firstOrNull { it.abbr == chaser }
+            ?: pick { it.batting }
+            ?: pick { it.batting && it.overs.orEmpty().contains('.') }
+            ?: pick { '/' in it.score }.takeIf { !home.batting && !away.batting }
+        return Scoreboard(home.copy(batting = home === bat), away.copy(batting = away === bat), "", summary.take(80), league)
     }
+
+    private val resultText = Regex("\\b(won by|won the match|match (?:drawn|tied)|no result|abandoned)\\b", RegexOption.IGNORE_CASE)
 
     /** Text that reads as a live cricket score (or a chase: "need 30 runs in 18 balls"). */
     fun looksLikeScore(lines: List<String>, scoreApp: Boolean = true): Boolean =
