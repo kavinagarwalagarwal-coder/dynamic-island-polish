@@ -57,5 +57,11 @@ class NavigationStepTest {
     @Test fun ignoresNumbersThatAreNotDistances() {
         assertNull(NavigationStep.parse("Take exit 12", "A4 motorway").distance)
         assertNull(NavigationStep.parse("12 min", "Arrive 11:04").distance)
+        val road = NavigationStep.parse("Turn right onto 8 Mile Road", "")
+        assertNull(road.distance)
+        assertEquals("Turn right onto 8 Mile Road", road.instruction)
+        assertEquals("0.5 mi", NavigationStep.parse("Turn right onto 8 Mile Road", "0.5 mi").distance)
+        assertEquals("200 m", NavigationStep.parse("Then in 200 m turn left", "").distance)
+        assertEquals("300 ft", NavigationStep.parse("Keep left · 300 ft", "").distance)
     }
 }

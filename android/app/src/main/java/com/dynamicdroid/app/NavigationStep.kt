@@ -13,7 +13,7 @@ data class NavigationStep(val distance: String?, val instruction: String, val tu
 
         fun parse(title: String, subtitle: String): NavigationStep {
             val t = title.trim(); val s = subtitle.trim()
-            val inTitle = DISTANCE.find(t); val inSub = DISTANCE.find(s)
+            val inTitle = distanceIn(t); val inSub = distanceIn(s)
             val (distance, rest) = when {
                 inTitle != null && inTitle.value.length >= t.length - 1 -> inTitle.value to s
                 inSub != null && inSub.value.length >= s.length - 1 -> inSub.value to t
@@ -23,6 +23,18 @@ data class NavigationStep(val distance: String?, val instruction: String, val tu
             }
             return NavigationStep(distance, rest.ifBlank { t }.replaceFirstChar { it.uppercaseChar() }, turnOf(t, s))
         }
+
+        // A number with a unit inside a street name ("onto 8 Mile Road") is not a distance: accept only
+        // a whole line, "in 200 m", or a distance set off at either end by punctuation.
+        private fun distanceIn(line: String) = DISTANCE.findAll(line).firstOrNull { m ->
+            val before = line.substring(0, m.range.first).trimEnd()
+            val after = line.substring(m.range.last + 1).trimStart()
+            (before.isEmpty() && (after.isEmpty() || after[0] in SEPARATORS)) ||
+                (after.isEmpty() && before.lastOrNull() in SEPARATORS) ||
+                before.endsWith(" in", ignoreCase = true) || before.equals("in", ignoreCase = true)
+        }
+
+        private val SEPARATORS = setOf(',', '·', '-', '–', '—', ':', ';', '•')
 
         private fun strip(text: String, m: MatchResult) =
             text.removeRange(m.range).trim().removePrefix("in ").removePrefix("In ").trim(' ', ',', '·', '-')
