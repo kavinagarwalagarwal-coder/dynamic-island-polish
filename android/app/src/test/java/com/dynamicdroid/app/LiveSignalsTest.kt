@@ -60,4 +60,18 @@ class LiveSignalsTest {
         assertTrue(LiveSignals.isLiveScore(LiveSignals.GOOGLE_APP, true, false, google))
         assertTrue(LiveSignals.isLiveScore("com.cricbuzz.android", true, false, listOf("Live", "198-7")))
     }
+
+    @Test fun cricketNotificationsBecomeATwoTeamScoreboard() {
+        val b = LiveSignals.cricketBoard(listOf("IND 245/3 (42.1 ov) vs AUS 274/8", "IND need 30 runs from 47 balls"))!!
+        assertEquals("IND", b.home.abbr); assertEquals("245/3", b.home.score); assertEquals("42.1 ov", b.home.overs)
+        assertTrue(b.home.batting)
+        assertEquals("AUS", b.away.abbr); assertEquals("274/8", b.away.score); assertFalse(b.away.batting)
+        assertEquals("IND need 30 runs from 47 balls", b.summary)
+        // Google's pinned score in separate boxes, with the other side yet to bat.
+        val g = LiveSignals.cricketBoard(listOf("Australia", "AUS", "245/3", "(42.1 ov)", "England", "ENG", "Yet to bat"))!!
+        assertEquals("AUS", g.home.abbr); assertEquals("ENG", g.away.abbr); assertEquals("", g.away.score)
+        // One team alone, or numbers without a cricket score, are not a scoreboard.
+        assertNull(LiveSignals.cricketBoard(listOf("IND 245/3 (42.1 ov)")))
+        assertNull(LiveSignals.cricketBoard(listOf("ETA 5 min", "PNR 1234")))
+    }
 }

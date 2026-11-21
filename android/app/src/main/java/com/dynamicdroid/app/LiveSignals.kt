@@ -79,6 +79,50 @@ object LiveSignals {
         return null
     }
 
+    // "IND 245/3 (42.1 ov)", "AUS: 274/8", "NZ 368": a team code, its runs, and overs when batting.
+    private val teamInnings = Regex("\\b([A-Z]{2,5}(?:-[AW])?)\\s*:?\\s+(\\d{1,3}(?:[/-]\\d{1,2})?d?)(?![\\d.:])" +
+        "(?:\\s*\\(\\s*(\\d{1,3}(?:\\.[0-5])?)\\s*(?:/\\s*\\d{1,3}\\s*)?(?:ov|ovs|overs?)?\\s*\\))?")
+    private val yetToBat = Regex("\\b([A-Z]{2,5}(?:-[AW])?)\\s*:?\\s+(?i:yet to bat)\\b")
+    private val notTeams = setOf("LIVE", "ODI", "TEST", "OVER", "OVERS", "RUNS", "NEED", "NEEDS", "ETA", "AM", "PM", "WON", "INN")
+
+    /**
+     * Both teams of a cricket notification, for the two-sided scoreboard: "IND 245/3 (42.1 ov)" and
+     * "AUS 274/8" (or "AUS yet to bat"). Null unless two different teams are found and at least
+     * one has a cricket score (wickets or overs), so a lone number never becomes a scoreboard.
+     */
+    fun cricketBoard(lines: List<String>, league: String = ""): Scoreboard? {
+        val all = (lines + listOf(lines.joinToString(" "))).filter { it.isNotBlank() }
+        val teams = LinkedHashMap<String, Scoreboard.Team>()
+        var scored = false
+        for (s in all) {
+            for (m in teamInnings.findAll(s)) {
+                val abbr = m.groupValues[1]
+                if (abbr in notTeams || abbr in teams) continue
+                val overs = m.groupValues[3].takeIf { it.isNotEmpty() }
+                val score = m.groupValues[2].replace('-', '/')
+                if (overs != null || '/' in score) scored = true
+                teams[abbr] = Scoreboard.Team(abbr, score, overs?.let { "$it ov" }, batting = overs != null)
+            }
+            for (m in yetToBat.findAll(s)) {
+                val abbr = m.groupValues[1].uppercase()
+                if (abbr !in notTeams && abbr !in teams) teams[abbr] = Scoreboard.Team(abbr, "")
+            }
+        }
+        if (!scored || teams.size < 2) return null
+        val (home, away) = teams.values.take(2)
+        // Without overs, the side whose score shows wickets is the one still batting.
+        val fixed = if (home.batting || away.batting) listOf(home, away) else listOf(home, away).let { (h, a) ->
+            when {
+                '/' in h.score && '/' !in a.score -> listOf(h.copy(batting = true), a)
+                '/' in a.score && '/' !in h.score -> listOf(h, a.copy(batting = true))
+                else -> listOf(h, a)
+            }
+        }
+        val summary = lines.firstOrNull { chase.containsMatchIn(it) || it.contains(" won ", true) || it.contains("yet to bat", true) }
+            ?.trim().orEmpty()
+        return Scoreboard(fixed[0], fixed[1], "", summary.take(80), league)
+    }
+
     /** Text that reads as a live cricket score (or a chase: "need 30 runs in 18 balls"). */
     fun looksLikeScore(lines: List<String>, scoreApp: Boolean = true): Boolean =
         cricketScore(lines) != null || scoreApp && (lines.any { chase.containsMatchIn(it) || namedTeam.containsMatchIn(it) } ||

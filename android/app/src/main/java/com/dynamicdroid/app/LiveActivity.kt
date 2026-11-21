@@ -87,6 +87,8 @@ data class LiveActivity(
     val detail: String = "",
     /** The few characters the small island shows for a live update ("5 min", "2–1"). */
     val shortText: String? = null,
+    /** A two-team match: drawn as a sports scoreboard, one team each side of the camera. */
+    val scoreboard: Scoreboard? = null,
 ) {
     val isTransient: Boolean get() = mode == IslandMode.MESSAGE || mode == IslandMode.CHARGING ||
         mode == IslandMode.VOLUME || mode == IslandMode.DEVICE || mode == IslandMode.RINGER ||

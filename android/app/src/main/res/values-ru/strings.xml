@@ -531,4 +531,8 @@
     <string name="more_touch">Касания и вибрация</string>
     <string name="more_permissions">Разрешения</string>
     <string name="more_help">Справка и обновления</string>
+    <string name="score_live">LIVE</string>
+    <string name="score_yet_to_bat">Ещё не отбивали</string>
+    <string name="score_target">Цель</string>
+    <string name="score_vs">—</string>
 </resources>
