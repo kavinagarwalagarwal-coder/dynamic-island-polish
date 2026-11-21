@@ -32,40 +32,46 @@ export const Route = createFileRoute("/api/cricket/current")({
         }
 
         try {
-          const url = new URL("https://api.cricapi.com/v1/currentMatches");
-          url.searchParams.set("apikey", apiKey);
-          url.searchParams.set("offset", "0");
+          const currentMatches: UpstreamMatch[] = [];
+          for (let offset = 0; offset < 100; offset += 25) {
+            const url = new URL("https://api.cricapi.com/v1/currentMatches");
+            url.searchParams.set("apikey", apiKey);
+            url.searchParams.set("offset", String(offset));
 
-          const upstream = await fetch(url, {
-            signal: AbortSignal.timeout(8_000),
-            cache: "no-store",
-          });
-          if (!upstream.ok) {
-            return Response.json(
-              { error: "Cricket score provider is unavailable" },
-              { status: 502, headers: { "Cache-Control": "no-store" } },
-            );
+            const upstream = await fetch(url, {
+              signal: AbortSignal.timeout(8_000),
+              cache: "no-store",
+            });
+            if (!upstream.ok) {
+              return Response.json(
+                { error: "Cricket score provider is unavailable" },
+                { status: 502, headers: { "Cache-Control": "no-store" } },
+              );
+            }
+
+            const payload = (await upstream.json()) as {
+              status?: string;
+              reason?: string;
+              data?: UpstreamMatch[];
+            };
+            if (payload.status === "failure" && payload.reason === "Invalid API Key") {
+              return Response.json(
+                { error: "CricAPI rejected the configured server key" },
+                { status: 502, headers: { "Cache-Control": "no-store" } },
+              );
+            }
+            if (payload.status !== "success" || !Array.isArray(payload.data)) {
+              return Response.json(
+                { error: "Cricket score provider returned an invalid response" },
+                { status: 502, headers: { "Cache-Control": "no-store" } },
+              );
+            }
+
+            currentMatches.push(...payload.data);
+            if (payload.data.length < 25) break;
           }
 
-          const payload = (await upstream.json()) as {
-            status?: string;
-            reason?: string;
-            data?: UpstreamMatch[];
-          };
-          if (payload.status === "failure" && payload.reason === "Invalid API Key") {
-            return Response.json(
-              { error: "CricAPI rejected the configured server key" },
-              { status: 502, headers: { "Cache-Control": "no-store" } },
-            );
-          }
-          if (payload.status !== "success" || !Array.isArray(payload.data)) {
-            return Response.json(
-              { error: "Cricket score provider returned an invalid response" },
-              { status: 502, headers: { "Cache-Control": "no-store" } },
-            );
-          }
-
-          const matches = payload.data.map((match) => ({
+          const matches = currentMatches.map((match) => ({
             id: match.id ?? match.name ?? "",
             name: match.name ?? "Cricket match",
             matchType: match.matchType ?? "",
