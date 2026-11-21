@@ -120,6 +120,13 @@ object IslandGlyphs {
                 canvas.drawLine(cx - u * 0.18f, cy - u * 0.75f, cx + u * 0.18f, cy - u * 0.75f, stroke)
                 canvas.drawLine(cx + u * 0.18f, cy - u * 0.75f, cx + u * 0.3f, cy - u * 0.5f, stroke)
             }
+            Glyph.CRICKET -> {
+                canvas.drawCircle(cx, cy, u * 0.62f, stroke)
+                path.reset()
+                path.moveTo(cx - u * 0.22f, cy - u * 0.58f)
+                path.cubicTo(cx + u * 0.42f, cy - u * 0.24f, cx - u * 0.42f, cy + u * 0.24f, cx + u * 0.22f, cy + u * 0.58f)
+                canvas.drawPath(path, stroke)
+            }
             Glyph.HOTSPOT -> {
                 // A dot sending out two arcs on each side.
                 canvas.drawCircle(cx, cy, u * 0.16f, fill)

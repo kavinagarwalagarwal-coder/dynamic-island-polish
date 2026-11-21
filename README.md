@@ -8,7 +8,7 @@
 
 A Dynamic Island for Android that grows out of your punch-hole camera: music, calls, messages, timers, volume and more, with smooth spring animations.
 
-[**⬇ Download the latest APK**](https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases/latest/download/DynamicDroid.apk) · Android 8.0+ · No internet permission · 13 languages · [Scanned on VirusTotal](https://www.virustotal.com/gui/file/c50be41732d9fc2e0f18ace848ac84a409a7076c78df656a861284666c909476)
+[**⬇ Download the latest APK**](https://github.com/kavinagarwalagarwal-coder/dynamic-island-polish/releases/latest/download/DynamicDroid.apk) · Android 8.0+ · Optional network access for live cricket scores · 13 languages · [Scanned on VirusTotal](https://www.virustotal.com/gui/file/c50be41732d9fc2e0f18ace848ac84a409a7076c78df656a861284666c909476)
 
 </div>
 
@@ -21,7 +21,7 @@ A Dynamic Island for Android that grows out of your punch-hole camera: music, ca
 - **It lives in the camera.** When nothing is happening, the island hides inside the punch-hole. When something happens, it springs out of it, then tucks back in.
 - **It moves like the real thing.** Width, height, corners and position all run on springs you can interrupt mid-motion. Numbers roll, bars glide, and a second activity drips off as its own little bubble.
 - **It replaces clutter.** The volume slider, the phone's notification pop-ups and the ring/silent toast all move into the island, so you only look in one place.
-- **It's private.** The app has no internet permission. It reads notification details to build the island and nothing leaves your phone.
+- **It's private.** Live cricket scores are the only feature that uses the network. Notification details stay on your phone and are never sent to the score service.
 
 ## What it shows
 

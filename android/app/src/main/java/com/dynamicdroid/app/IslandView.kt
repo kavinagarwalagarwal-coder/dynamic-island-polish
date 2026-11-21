@@ -438,6 +438,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val waveS = Spring(0f, 160f, 1f, 0.003f)
     private val burnInTick = Runnable { invalidate() }
     private val outlineTick = Runnable { invalidate() }
+    private var cameraScanStartedAt = 0L
+    private val cameraScanPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
 
     fun applyFeatures(next: IslandFeatureSet) {
         features = next.safe()
@@ -791,6 +793,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         // Nothing showing: the next scene appears fresh rather than fading from an old one.
         if (next == null) { sceneKindNow = null; sceneNow = null; scenePrev = null }
         val old = activity
+        if (next?.glyph == Glyph.CAMERA && next.key != old?.key) cameraScanStartedAt = SystemClock.uptimeMillis()
         if (old != null && next != null && old.key == next.key && next.mode == IslandMode.TIMER &&
             ((old.pausedTimerMs == null) != (next.pausedTimerMs == null) ||
                 (old.clockMs() ?: 0L) > 0L && next.clockMs() == 0L)) {
@@ -1668,6 +1671,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         } finally {
             canvas.restoreToCount(saves)
             callbacks?.onGlassFrame()
+            if (activity?.glyph == Glyph.CAMERA && SystemClock.uptimeMillis() - cameraScanStartedAt < 1_600L) {
+                postInvalidateOnAnimation()
+            }
         }
     }
 
@@ -2824,9 +2830,21 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val cy = rect.centerY()
         val icon = min(rect.height(), dp(MEDIUM_HEIGHT_DP)) - dp(20f)
         val l = rect.left + dp(10f)
+        val cx = l + icon / 2
         fillPaint.color = withAlpha(a.accent, alpha * 45 / 255)
-        canvas.drawCircle(l + icon / 2, cy, icon / 2, fillPaint)
-        IslandGlyphs.draw(canvas, a.glyph ?: Glyph.ALARM, l + icon / 2, cy, icon * 0.56f, withAlpha(a.accent, alpha))
+        canvas.drawCircle(cx, cy, icon / 2, fillPaint)
+        if (a.glyph == Glyph.CAMERA) {
+            val progress = ((SystemClock.uptimeMillis() - cameraScanStartedAt) / 1_600f).coerceIn(0f, 1f)
+            cameraScanPaint.color = withAlpha(a.accent, (alpha * (1f - progress) * 0.8f).toInt())
+            cameraScanPaint.strokeWidth = dp(1.5f)
+            for (ring in 0..1) {
+                val phase = (progress + ring * 0.5f) % 1f
+                canvas.drawCircle(cx, cy, dp(8f) + dp(19f) * phase, cameraScanPaint)
+            }
+            val scanY = cy - icon * 0.38f + icon * 0.76f * progress
+            canvas.drawLine(cx - icon * 0.27f, scanY, cx + icon * 0.27f, scanY, cameraScanPaint)
+        }
+        IslandGlyphs.draw(canvas, a.glyph ?: Glyph.ALARM, cx, cy, icon * 0.56f, withAlpha(a.accent, alpha))
         val tx = l + icon + dp(10f)
         var right = rect.right - dp(18f)
         a.progress?.let { level ->

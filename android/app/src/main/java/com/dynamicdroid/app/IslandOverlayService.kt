@@ -34,6 +34,7 @@ import android.view.WindowManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import kotlin.math.max
+import java.util.concurrent.Executors
 import java.util.function.Consumer
 
 /**
@@ -115,6 +116,62 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     /** Foreground app hid the status bar (video, photos, games): tuck the island away. */
     private var fullscreen = false
     private var status: StatusMonitor? = null
+    private var cameraUsageObserver: CameraUsageObserver? = null
+    private var frontCameraBusy = false
+    private val cricketExecutor = Executors.newSingleThreadExecutor()
+    private val refreshCricket = object : Runnable {
+        override fun run() {
+            if (IslandFeatures.read(this@IslandOverlayService).cricketScores) {
+                cricketExecutor.execute {
+                    val result = runCatching { CricketScoreClient.fetch() }
+                    handler.post {
+                        if (!IslandFeatures.read(this@IslandOverlayService).cricketScores) {
+                            onRemoved(CRICKET_FEATURED_KEY)
+                            return@post
+                        }
+                        result.onSuccess { matches ->
+                            val preferred = CricketTeamPreferences.prioritized(
+                                matches,
+                                CricketTeamPreferences.favorites(this@IslandOverlayService),
+                            ).firstOrNull()
+                            if (preferred == null) onRemoved(CRICKET_FEATURED_KEY)
+                            else onActivity(preferred.toActivity(this@IslandOverlayService).copy(key = CRICKET_FEATURED_KEY))
+                        }
+                    }
+                }
+            } else {
+                onRemoved(CRICKET_FEATURED_KEY)
+            }
+            handler.postDelayed(this, CRICKET_REFRESH_MS)
+        }
+    }
+    private val refreshCameraActivity = object : Runnable {
+        override fun run() {
+            if (!frontCameraBusy || !IslandFeatures.read(this@IslandOverlayService).cameraActivity) return
+            onActivity(LiveActivity(
+                key = CAMERA_ACTIVITY_KEY,
+                packageName = packageName,
+                mode = IslandMode.EVENT,
+                title = getString(R.string.camera_in_use),
+                subtitle = getString(R.string.camera_front_active),
+                appLabel = getString(R.string.app_name),
+                appIcon = null,
+                artwork = null,
+                accent = 0xFF63DCF4.toInt(),
+                glyph = Glyph.CAMERA,
+            ))
+        }
+    }
+
+    private fun onFrontCameraBusyChanged(busy: Boolean) {
+        frontCameraBusy = busy
+        handler.removeCallbacks(refreshCameraActivity)
+        if (busy && IslandFeatures.read(this).cameraActivity) {
+            refreshCameraActivity.run()
+        } else if (!busy || !IslandFeatures.read(this).cameraActivity) {
+            onRemoved(CAMERA_ACTIVITY_KEY)
+        }
+    }
 
     private val completions = TimerCompletion()
     private val checkCompletion = Runnable { render() }
@@ -361,6 +418,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         IslandBus.listenerChanged = { HeadsUpControl.sync(this, island != null) }
         IslandAccessibilityService.beforePopupSwipe = { passTouchesFor(it) }
         HeadsUpControl.sync(this, island != null)
+        cameraUsageObserver = CameraUsageObserver(this, ::onFrontCameraBusyChanged).also { it.start() }
+        handler.postDelayed(refreshCricket, 1_000L)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -390,6 +449,14 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             HeadsUpControl.sync(this, island != null)
             devices?.stop(); devices?.start()
             events?.refresh()
+            val features = IslandFeatures.read(this)
+            if (features.cameraActivity && frontCameraBusy) handler.post(refreshCameraActivity)
+            else if (!features.cameraActivity) {
+                handler.removeCallbacks(refreshCameraActivity)
+                onRemoved(CAMERA_ACTIVITY_KEY)
+            }
+            handler.removeCallbacks(refreshCricket)
+            handler.post(refreshCricket)
             handler.removeCallbacks(refreshQuietRules)
             if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)
             IslandNotificationListener.instance?.refreshAllowedApps()
@@ -1414,6 +1481,8 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         HeadsUpControl.restore(this)
         devices?.stop()
         events?.stop()
+        cameraUsageObserver?.stop()
+        cricketExecutor.shutdownNow()
         watcher?.stop()
         status?.stop()
         handler.removeCallbacksAndMessages(null)
@@ -1493,6 +1562,9 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         private const val DEVICE_TIMEOUT_MS = 3_600L
         private const val RINGER_TIMEOUT_MS = 2_000L
         private const val SILENT_KEY = "silent-pill"
+        private const val CRICKET_FEATURED_KEY = "cricket:featured"
+        private const val CAMERA_ACTIVITY_KEY = "camera:front-active"
+        private const val CRICKET_REFRESH_MS = 60_000L
         private const val SENT_TIMEOUT_MS = 1_400L
         /** Lets the system's unlock animation finish so the intro is actually visible. */
         private const val UNLOCK_SETTLE_MS = 320L
