@@ -55,16 +55,18 @@ internal object CricketTeamPreferences {
         return updated
     }
 
-    fun prioritized(matches: List<CricketScore>, favorites: Set<String>): List<CricketScore> {
-        if (favorites.isEmpty()) return matches
-        return matches.withIndex()
+    private val completedStatus = Regex("\\b(won|drawn|abandoned|cancelled|canceled|no result|completed)\\b", RegexOption.IGNORE_CASE)
+
+    fun prioritized(matches: List<CricketScore>, favorites: Set<String>): List<CricketScore> =
+        matches.withIndex()
             .sortedWith(
                 compareBy<IndexedValue<CricketScore>> { (_, match) ->
+                    if (completedStatus.containsMatchIn(match.status)) 1 else 0
+                }.thenBy { (_, match) ->
                     if (match.preferredNames.any(favorites::contains)) 0 else 1
                 }.thenBy { it.index },
             )
             .map { it.value }
-    }
 }
 
 internal object CricketScoreClient {

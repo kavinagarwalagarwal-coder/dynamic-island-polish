@@ -516,7 +516,9 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
             ActionButton(stringResource(R.string.cricket_refresh), enabled = !cricketLoading) { cricketRefresh++ }
             if (cricketLoading) Note(stringResource(R.string.cricket_loading), size = 13)
             if (cricketFailed) Note(cricketError.ifBlank { stringResource(R.string.cricket_load_failed) }, size = 13)
-            cricketMatches.take(4).forEach { match -> Note("${match.title}\n${match.scoreLine}", size = 13) }
+            CricketTeamPreferences.prioritized(cricketMatches, preferredTeams).take(4).forEach { match ->
+                Note("${match.title}\n${match.scoreLine}", size = 13)
+            }
             val teams = cricketMatches.flatMap { it.teams }.distinct().sorted()
             if (teams.isEmpty() && !cricketLoading && !cricketFailed) Note(stringResource(R.string.cricket_no_matches), size = 13)
             teams.forEach { team ->

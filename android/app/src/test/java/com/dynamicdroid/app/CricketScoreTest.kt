@@ -25,6 +25,17 @@ class CricketScoreTest {
     }
 
     @Test
+    fun inProgressMatchesAreSortedAheadOfCompletedMatches() {
+        val completed = match("completed", "Australia", "England").copy(status = "Australia won by 5 wkts")
+        val inProgress = match("in-progress", "India", "New Zealand").copy(status = "Day 3: India lead by 46 runs")
+
+        assertEquals(
+            listOf("in-progress", "completed"),
+            CricketTeamPreferences.prioritized(listOf(completed, inProgress), emptySet()).map { it.id },
+        )
+    }
+
+    @Test
     fun allMatchesRemainAvailableWhenNoTeamsArePreferred() {
         val matches = listOf(match("first", "England", "South Africa"), match("second", "Sri Lanka", "Bangladesh"))
 
