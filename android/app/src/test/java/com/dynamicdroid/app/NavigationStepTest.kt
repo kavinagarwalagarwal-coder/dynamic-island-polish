@@ -51,6 +51,7 @@ class NavigationStepTest {
         assertEquals(Turn.LEFT, NavigationStep.turnOf("Turn left to stay on Right St"))
         assertEquals(Turn.STRAIGHT, NavigationStep.turnOf("Continue on Leftwich Ave"))
         assertEquals(Turn.RIGHT, NavigationStep.turnOf("Use any lane to turn right"))
+        assertNull(NavigationStep.turnOf("Take exit 12 toward Left Bank Road"))
         assertEquals(Turn.SLIGHT_LEFT, NavigationStep.turnOf("Use the left 2 lanes to keep left onto Right Bank Rd"))
         assertEquals(Turn.RIGHT, NavigationStep.parse("Left Bank Road", "Turn right").turn)
         assertEquals(Turn.ARRIVE, NavigationStep.turnOf("Destination will be on the left"))

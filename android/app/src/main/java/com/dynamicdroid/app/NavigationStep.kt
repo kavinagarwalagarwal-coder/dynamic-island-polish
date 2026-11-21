@@ -44,9 +44,11 @@ data class NavigationStep(val distance: String?, val instruction: String, val tu
         private val MANOEUVRE = Regex("""(?i)\b(?:turn|keep|bear|exit|merge|continue|head|make|take|slight|sharp|arriv|u-turn|roundabout|fork|stay|destination)""")
 
         /** The turn named in the phrase that holds the manoeuvre ("use any lane to turn right"), not in a street name. */
-        fun turnOf(vararg lines: String): Turn? =
-            lines.flatMap { ROAD.split(it) }.sortedByDescending { MANOEUVRE.containsMatchIn(it) }
-                .firstNotNullOfOrNull { classify(it) }
+        fun turnOf(vararg lines: String): Turn? {
+            val phrases = lines.flatMap { ROAD.split(it) }
+            val manoeuvres = phrases.filter { MANOEUVRE.containsMatchIn(it) }
+            return manoeuvres.ifEmpty { phrases }.firstNotNullOfOrNull { classify(it) }
+        }
 
         private fun classify(text: String): Turn? {
             val x = text.lowercase()
