@@ -192,6 +192,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val dimPaint = Paint().apply { colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) }) }
     // Levels glide to new values: critically damped, so they settle without wobbling.
     private val levelS = Spring(0f, 340f, 1f, 0.0015f)
+    // The flashlight level follows the finger a touch behind; sliders stretch past either end, as on iOS.
+    private val torchS = Spring.apple(1f, 0.3f, 0.1f, 0.002f)
+    private val sliderStretchS = Spring.apple(0f, 0.38f, 0.32f, 0.3f)
     /** Where the ringer highlight sits: 0 ring, 1 vibrate, 2 silent. It slides between buttons. */
     private val modeS = Spring(0f, 420f, 0.86f, 0.002f)
     /** Album-art backdrop: how much shows (fades with play/pause) and the crossfade between covers. */
@@ -688,7 +691,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var introHoldUntil = 0L
     private val introWiden = Runnable { widenIntro() }
     private val shapeSprings = listOf(widthS, heightS, radiusS, topS, centerS)
-    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, dropImpact, levelS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA, wobbleS, rippleS, tiltS)
+    private val springs = listOf(widthS, heightS, radiusS, topS, centerS, expandedA, compactA, pressS, stretchS, absorbS, introS, idleA, concealS, secondaryA, timerFeedback, bubblePress, presenceS, bubbleCenterS, dropS, dropImpact, levelS, torchS, sliderStretchS, bubbleLevelS, musicBarS, barPulse, waveS, modeS, artA, artMix, fieldA, wobbleS, rippleS, tiltS)
 
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.BLACK }
     private fun blend(a: Int, b: Int, t: Float): Int {
@@ -812,6 +815,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             eventOutlineUntil = SystemClock.uptimeMillis() + OUTLINE_EVENT_MS
             removeCallbacks(outlineTick); postDelayed(outlineTick, OUTLINE_EVENT_MS + 32L)
             next.progress?.let { levelS.snap(it) }
+            if (next.mode == IslandMode.TORCH) torchS.snap(next.progress ?: 1f)
             ringerIndex(next.ringer)?.let { modeS.snap(it) }
         }
         next?.progress?.let { level ->
@@ -2248,7 +2252,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             }
             IslandMode.TORCH -> {
                 val level = a.progress
-                text(canvas, if (level != null) "${IslandSignals.percent(level)}%" else context.getString(R.string.torch_on),
+                if (level != null && smallPaint.measureText("100%") <= roomRight)
+                    rolling(canvas, "torch-c", "${IslandSignals.percent(level)}%", right, cy + dp(4.5f), smallPaint, a.accent, alpha, alignRight = true)
+                else text(canvas, if (level != null) "${IslandSignals.percent(level)}%" else context.getString(R.string.torch_on),
                     right, cy + dp(4.5f), roomRight, smallPaint, a.accent, alpha, alignRight = true)
             }
             IslandMode.DOWNLOAD -> {
@@ -2867,7 +2873,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 pixels.endSign(canvas, sceneRect.right - cell * 12f, signY, cell, true, alpha)
                 canvas.restore()
             }
-        } else drawBar(canvas, volumeLeft, volumeRight, rect.top + volumeHeight() - dp(14f), level, userAccent ?: waveColor, alpha, thick)
+        } else {
+            val stretch = sliderStretchS.value
+            drawBar(canvas, volumeLeft - max(0f, -stretch), volumeRight + max(0f, stretch), rect.top + volumeHeight() - dp(14f),
+                level, userAccent ?: waveColor, alpha, thick - abs(stretch) * 0.08f)
+        }
         if (a.ringer != null) drawRingerControls(canvas, a, alpha)
     }
 
@@ -3010,55 +3020,118 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val torchBeam = Path()
     private var torchDragging = false
     private var torchLive: Float? = null
+    private var torchStart = 1f
+    private var torchStep = -1
+    private var torchSentAt = 0L
+    private val torchClip = Path()
+    private val beamPaint = Paint(Paint.ANTI_ALIAS_FLAG)
 
     /** iOS-inspired flashlight intensity card: a live beam and a vertical, touch-friendly slider. */
+    /**
+     * The flashlight, after iOS: the light's own beam fans out of the button and grows longer and
+     * brighter with the level; a Control Center slider on the right follows a drag anywhere on the card.
+     */
     private fun drawTorchExpanded(canvas: Canvas, a: LiveActivity, alpha: Int) {
         val hasLevels = a.progress != null
-        val level = (torchLive ?: a.progress ?: 1f).coerceIn(0f, 1f)
+        val want = (torchLive ?: a.progress ?: 1f).coerceIn(0f, 1f)
+        if (!torchDragging) torchS.target = want
+        val level = if (reduceMotion) want else torchS.value.coerceIn(0f, 1f)
         val cy = rect.centerY()
-        val icon = dp(38f)
+        val icon = dp(44f)
         val l = rect.left + dp(18f)
         val cx = l + icon / 2f
+        val sliderX = rect.right - dp(36f)
+        val beamEnd = if (hasLevels) sliderX - dp(30f) else rect.right - dp(14f)
 
-        // The beam grows brighter as the slider rises, so the light itself reflects its intensity.
+        // The beam: a soft cone out of the lamp, fading with distance.
+        val apex = cx + icon * 0.28f
+        val len = max(0f, (beamEnd - apex) * (0.45f + 0.55f * level))
+        val spread = rect.height() * (0.2f + 0.16f * level)
         torchBeam.reset()
-        torchBeam.moveTo(cx - icon * 0.34f, cy - icon * 0.34f)
-        torchBeam.lineTo(cx, cy - icon * (0.7f + 0.9f * level))
-        torchBeam.lineTo(cx + icon * 0.34f, cy - icon * 0.34f)
+        torchBeam.moveTo(apex, cy - icon * 0.18f)
+        torchBeam.lineTo(apex + len, cy - spread)
+        torchBeam.quadTo(apex + len + spread * 0.4f, cy, apex + len, cy + spread)
+        torchBeam.lineTo(apex, cy + icon * 0.18f)
         torchBeam.close()
-        fillPaint.color = withAlpha(a.accent, (alpha * (0.04f + 0.16f * level)).toInt())
-        canvas.drawPath(torchBeam, fillPaint)
-        fillPaint.color = withAlpha(a.accent, (alpha * (0.18f + 0.34f * level)).toInt())
-        canvas.drawCircle(cx, cy, icon * 0.56f, fillPaint)
-        IslandGlyphs.draw(canvas, Glyph.TORCH, cx, cy, icon * 0.56f, withAlpha(Color.BLACK, alpha))
+        if (len > 1f) {
+            beamPaint.shader = LinearGradient(apex, cy, apex + len, cy,
+                withAlpha(a.accent, (alpha * (0.14f + 0.42f * level) * (if (hasLevels) 1f else 0.45f)).toInt()), withAlpha(a.accent, 0), Shader.TileMode.CLAMP)
+            canvas.drawPath(torchBeam, beamPaint)
+            // Wavefronts across the beam, fainter further out.
+            ringPaint.strokeWidth = dp(1.5f)
+            for (i in 1..3) {
+                val f = i / 4f
+                val x = apex + len * f
+                val h = icon * 0.18f + (spread - icon * 0.18f) * f
+                ringPaint.color = withAlpha(a.accent, (alpha * level * (0.36f - 0.09f * i)).toInt())
+                arcRect.set(x - h * 0.5f, cy - h, x + h * 0.5f, cy + h)
+                canvas.drawArc(arcRect, -60f, 120f, false, ringPaint)
+            }
+        }
+        // The lamp: a lit button with a halo that grows with the level; tapping it turns the light off.
+        fillPaint.color = withAlpha(a.accent, (alpha * 0.22f * level).toInt())
+        canvas.drawCircle(cx, cy, icon / 2f + dp(7f) * level, fillPaint)
+        fillPaint.color = withAlpha(a.accent, alpha)
+        canvas.drawCircle(cx, cy, icon / 2f, fillPaint)
+        IslandGlyphs.draw(canvas, Glyph.TORCH, cx, cy, icon * 0.52f, withAlpha(Color.BLACK, alpha))
         torchOffHit.set(l - dp(6f), cy - icon / 2 - dp(6f), l + icon + dp(6f), cy + icon / 2 + dp(6f))
 
-        val tx = l + icon + dp(12f)
-        val sliderX = rect.right - dp(38f)
-        val textRight = if (hasLevels) sliderX - dp(18f) else rect.right - dp(18f)
-        val titleY = cy - dp(3f)
-        val detailY = cy + dp(19f)
-        fadeText(canvas, a, 0, a.title, tx, titleY, textRight - tx, titlePaint, Color.WHITE, alpha)
-        fadeText(canvas, a, 1, a.subtitle, tx, detailY, textRight - tx, smallPaint, GREY, alpha)
+        if (!hasLevels) {
+            val tx = l + icon + dp(12f)
+            val textRight = rect.right - dp(18f)
+            fadeText(canvas, a, 0, a.title, tx, cy - dp(3f), textRight - tx, titlePaint, Color.WHITE, alpha)
+            fadeText(canvas, a, 1, a.subtitle, tx, cy + dp(19f), textRight - tx, smallPaint, GREY, alpha)
+            torchBar.setEmpty(); torchTouch.setEmpty(); return
+        }
+        // Above the beam: the name, and the level as a rolling number.
+        val headY = rect.top + dp(26f)
+        text(canvas, a.title, l, headY, beamEnd - l - dp(52f), smallPaint, GREY, alpha)
+        rolling(canvas, "torch", "${IslandSignals.percent(want)}%", beamEnd, headY, smallPaint, a.accent, alpha, alignRight = true)
 
-        if (!hasLevels) { torchBar.setEmpty(); torchTouch.setEmpty(); return }
-
-        val trackWidth = dp(28f)
-        torchBar.set(sliderX - trackWidth / 2f, rect.top + dp(18f), sliderX + trackWidth / 2f, rect.bottom - dp(18f))
+        // The slider stretches past its ends like iOS's, thinning a little as it does.
+        val stretch = sliderStretchS.value
+        val half = dp(17f) - abs(stretch) * 0.18f
+        torchBar.set(sliderX - half, rect.top + dp(16f) - max(0f, stretch), sliderX + half, rect.bottom - dp(16f) + max(0f, -stretch))
         torchTouch.set(torchBar.left - dp(12f), torchBar.top - dp(10f), torchBar.right + dp(12f), torchBar.bottom + dp(10f))
-        val radius = trackWidth / 2f
-        fillPaint.color = withAlpha(Color.WHITE, alpha * 34 / 255)
+        val radius = half * 0.62f
+        fillPaint.color = withAlpha(Color.WHITE, alpha * 40 / 255)
         canvas.drawRoundRect(torchBar, radius, radius, fillPaint)
-
         val fillTop = torchBar.bottom - torchBar.height() * level
-        fillPaint.color = withAlpha(a.accent, (alpha * (0.68f + 0.32f * level)).toInt())
-        canvas.drawRoundRect(torchBar.left, fillTop, torchBar.right, torchBar.bottom, radius, radius, fillPaint)
+        torchClip.reset()
+        torchClip.addRoundRect(torchBar, radius, radius, Path.Direction.CW)
+        canvas.save()
+        canvas.clipPath(torchClip)
+        fillPaint.color = withAlpha(if (apple) Color.WHITE else a.accent, alpha)
+        canvas.drawRect(torchBar.left, fillTop, torchBar.right, torchBar.bottom, fillPaint)
+        canvas.restore()
+        val gy = torchBar.bottom - dp(15f)
+        val covered = torchBar.bottom - fillTop > dp(24f)
+        IslandGlyphs.draw(canvas, Glyph.TORCH, sliderX, gy, dp(15f),
+            withAlpha(if (covered) Color.BLACK else Color.WHITE, if (covered) alpha else alpha * 160 / 255))
+    }
 
-        val thumbY = fillTop
-        fillPaint.color = withAlpha(Color.WHITE, alpha)
-        canvas.drawCircle(sliderX, thumbY, dp(11f), fillPaint)
-        fillPaint.color = withAlpha(a.accent, alpha)
-        canvas.drawCircle(sliderX, thumbY, dp(5f), fillPaint)
+    /** How far a slider stretches when dragged past its end: quick at first, then resisting. */
+    private fun rubberBand(over: Float) =
+        if (reduceMotion || over == 0f) 0f else Math.signum(over) * dp(12f) * (1f - 1f / (1f + abs(over) / dp(48f)))
+
+    /** A drag anywhere on the card moves the level from where it was, as iOS's flashlight does. */
+    private fun dragTorch(y: Float) {
+        val h = max(1f, torchBar.height())
+        val raw = torchStart + (downY - y) / h
+        val level = raw.coerceIn(0.05f, 1f)
+        val over = (raw - level) * h
+        sliderStretchS.snap(rubberBand(over))
+        torchLive = level
+        torchS.target = level
+        val step = (level * 10f).roundToInt()
+        if (step != torchStep) {
+            if (torchStep >= 0) haptic(HapticGesture.SWIPE, HapticFeedbackConstants.CLOCK_TICK)
+            torchStep = step
+        }
+        val now = SystemClock.uptimeMillis()
+        if (now - torchSentAt > TORCH_SEND_MS) { torchSentAt = now; callbacks?.onTorchLevel(level) }
+        settled = false
+        kick()
     }
 
     private fun torchFraction(y: Float) = ((torchBar.bottom - y) / max(1f, torchBar.height())).coerceIn(0.05f, 1f)
@@ -4137,8 +4210,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                     e.y < (if (showsWizard(a)) volumeDragBottom else rect.top + volumeHeight() + dp(2f))
                 if (volumeDragging) setVolumeFromTouch(e.x)
                 torchDragging = presentation == Presentation.EXPANDED && a?.mode == IslandMode.TORCH && !torchTouch.isEmpty &&
-                    torchTouch.contains(e.x, e.y)
-                if (torchDragging) { torchLive = torchFraction(e.y); invalidate() }
+                    !torchOffHit.contains(e.x, e.y)
+                if (torchDragging) { torchStart = torchLive ?: a?.progress ?: 1f; torchStep = -1 }
                 if (touchingSecondary) bubblePress.target = if (reduceMotion) 1f else 0.94f
                 else pressS.target = if (reduceMotion) 1f else if (presentation == Presentation.EXPANDED) 0.985f else 0.96f
                 if (presentation == Presentation.COMPACT) postDelayed(longPress, LONG_PRESS_MS)
@@ -4158,8 +4231,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 if (volumeDragging) {
                     setVolumeFromTouch(e.x)
                 } else if (torchDragging) {
-                    torchLive = torchFraction(e.y)
-                    invalidate()
+                    if (dragging) dragTorch(e.y)
                 } else if (seeking) {
                     seekFraction = fractionAt(e.x)
                     invalidate()
@@ -4177,12 +4249,16 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 val velocityY = dy * 1000f / max(1L, e.eventTime - downAt)
                 val swipe = abs(dy) > abs(dx) && (abs(dy) > dp(26f) || abs(dy) > slop && abs(velocityY) > dp(500f))
                 val a = activity
+                // A tap on the slider jumps there; a tap anywhere else on the card turns the light off.
+                val torchSet = torchDragging && (dragging || torchTouch.contains(e.x, e.y))
+                torchDragging = false
                 when {
                     longFired -> Unit
-                    volumeDragging -> { volumeDragging = false; haptic(HapticGesture.SWIPE, HapticFeedbackConstants.CLOCK_TICK) }
-                    torchDragging -> {
-                        torchDragging = false
+                    volumeDragging -> { volumeDragging = false; sliderStretchS.target = 0f; haptic(HapticGesture.SWIPE, HapticFeedbackConstants.CLOCK_TICK) }
+                    torchSet -> {
+                        if (!dragging) { torchLive = torchFraction(e.y); torchS.target = torchLive!! }
                         torchLive?.let { callbacks?.onTorchLevel(it) }
+                        sliderStretchS.target = 0f
                         haptic(HapticGesture.SWIPE, HapticFeedbackConstants.CLOCK_TICK)
                     }
                     seeking && a != null -> {
@@ -4228,6 +4304,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 seeking = false
                 volumeDragging = false
                 torchDragging = false
+                sliderStretchS.target = 0f
                 return true
             }
         }
@@ -4352,7 +4429,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     private fun setVolumeFromTouch(x: Float) {
-        val fraction = ((x - volumeLeft) / max(1f, volumeRight - volumeLeft)).coerceIn(0f, 1f)
+        val w = max(1f, volumeRight - volumeLeft)
+        val raw = (x - volumeLeft) / w
+        val fraction = raw.coerceIn(0f, 1f)
+        sliderStretchS.snap(rubberBand((raw - fraction) * w))
         levelS.target = fraction
         callbacks?.onVolumeChange(fraction)
         settled = false
@@ -4457,6 +4537,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val MEDIUM_HEIGHT_DP = 60f
         /** A live update card without progress, buttons or a detail line. */
         private const val LIVE_BASE_DP = 104f
+        private const val TORCH_SEND_MS = 70L
         private const val SCORE_BASE_DP = 118f
         private const val SCORE_CHASE_DP = 14f
         private const val SCORE_SUMMARY_DP = 24f
