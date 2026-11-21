@@ -57,8 +57,13 @@ internal object CricketTeamPreferences {
 
     fun prioritized(matches: List<CricketScore>, favorites: Set<String>): List<CricketScore> {
         if (favorites.isEmpty()) return matches
-        val followed = matches.filter { match -> match.preferredNames.any(favorites::contains) }
-        return followed.ifEmpty { matches }
+        return matches.withIndex()
+            .sortedWith(
+                compareBy<IndexedValue<CricketScore>> { (_, match) ->
+                    if (match.preferredNames.any(favorites::contains)) 0 else 1
+                }.thenBy { it.index },
+            )
+            .map { it.value }
     }
 }
 
