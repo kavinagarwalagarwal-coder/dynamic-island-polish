@@ -17,9 +17,11 @@ object CricketScores {
     const val FEED = "https://site.web.api.espn.com/apis/site/v2/sports/cricket/scorepanel"
     const val KEY = "cricket-auto"
 
-    data class Side(val abbr: String, val score: String, val batting: Boolean)
-    data class Match(val id: String, val state: String, val league: String, val home: Side, val away: Side, val summary: String) {
+    data class Side(val abbr: String, val score: String, val batting: Boolean, val color: Int? = null)
+    data class Match(val id: String, val state: String, val league: String, val home: Side, val away: Side, val summary: String,
+                     val status: String = "") {
         val live get() = state == "in"
+        val finished get() = state == "post"
         val sides get() = listOf(home, away)
         fun has(team: String) = sides.any { it.abbr.equals(team, true) }
     }
@@ -37,7 +39,8 @@ object CricketScores {
             val league = g["leagues"].arr.firstOrNull()?.obj?.str("name").orEmpty()
             for (e in g["events"].arr) {
                 val ev = e.obj ?: continue
-                val state = ev["status"]?.obj?.get("type")?.obj?.str("state") ?: continue
+                val type = ev["status"]?.obj?.get("type")?.obj
+                val state = type?.str("state") ?: continue
                 val comp = ev["competitions"].arr.firstOrNull()?.obj ?: continue
                 val sides = comp["competitors"].arr.mapNotNull { c ->
                     val o = c.obj ?: return@mapNotNull null
@@ -46,13 +49,14 @@ object CricketScores {
                         val l = it.obj
                         l?.get("isBatting")?.jsonPrimitive?.booleanOrNull == true && l["isCurrent"]?.jsonPrimitive?.intOrNull == 1
                     }
-                    (o.str("homeAway") ?: "") to Side(abbr, o.str("score").orEmpty(), batting)
+                    val color = Scoreboard.parseColor(o["team"]?.obj?.str("color"))
+                    (o.str("homeAway") ?: "") to Side(abbr, o.str("score").orEmpty(), batting, color)
                 }
                 if (sides.size < 2) continue
                 val home = sides.firstOrNull { it.first == "home" }?.second ?: sides[0].second
                 val away = sides.firstOrNull { it.first == "away" }?.second ?: sides[1].second
-                val summary = comp["status"]?.obj?.str("summary").orEmpty()
-                out += Match(ev.str("id").orEmpty(), state, league, home, away, summary)
+                val summary = unescape(comp["status"]?.obj?.str("summary").orEmpty())
+                out += Match(ev.str("id").orEmpty(), state, league, home, away, summary, type?.str("shortDetail").orEmpty())
             }
         }
         out
@@ -75,6 +79,24 @@ object CricketScores {
         return ov.takeIf { it.isNotEmpty() }?.let { "$it ov" }
     }
 
+    /** "33/1 (3.4/20 ov, target 188)" → 188. */
+    fun target(score: String): Int? =
+        Regex("target\\s+(\\d+)").find(score.substringAfterLast('&'))?.groupValues?.get(1)?.toIntOrNull()
+
+    /** "292 & 138/3 (21.2 ov)" → "292": the innings already over in a multi-day match. */
+    fun previous(score: String): String? =
+        score.takeIf { '&' in it }?.substringBeforeLast('&')?.substringBefore('(')?.trim()?.takeIf { it.isNotEmpty() }
+
+    /** Both teams, side by side, for the island's scoreboard. */
+    fun board(m: Match): Scoreboard {
+        val bat = batting(m).takeIf { m.sides.any(Side::batting) || '(' in it.score }
+        fun team(s: Side) = Scoreboard.Team(
+            abbr = s.abbr, score = current(s.score), overs = overs(s.score), batting = s === bat,
+            color = s.color, target = target(s.score), previous = previous(s.score),
+        )
+        return Scoreboard(team(m.home), team(m.away), if (m.finished) "Result" else m.status, m.summary, m.league, live = m.live)
+    }
+
     private fun batting(m: Match) = m.sides.firstOrNull { it.batting } ?: m.sides.firstOrNull { '(' in it.score } ?: m.away
 
     /** The small island's chip: the batting side and its score, "IND 486/4". */
@@ -88,6 +110,9 @@ object CricketScores {
         val o = if (other.score.isBlank()) other.abbr else "${other.abbr} ${current(other.score)}"
         return "$b  ·  $o"
     }
+
+    private fun unescape(s: String) =
+        s.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'")
 
     private val JsonElement.obj get() = this as? JsonObject
     private val JsonElement?.arr get() = (this as? JsonArray) ?: JsonArray(emptyList())

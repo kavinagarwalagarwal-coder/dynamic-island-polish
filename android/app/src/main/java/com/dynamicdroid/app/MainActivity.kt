@@ -462,6 +462,11 @@ class MainActivity : AppCompatActivity() {
         title = "IND 245/3 (42.1 ov)  ·  AUS 274/8", subtitle = getString(R.string.demo_score_text),
         appLabel = "Cricbuzz", appIcon = null, artwork = null, accent = AppStyle.GREEN,
         shortText = LiveSignals.cricketScore(listOf("IND 245/3 (42.1 ov)")),
+        scoreboard = Scoreboard(
+            home = Scoreboard.Team("IND", "245/3", "42.1 ov", batting = true, target = 275),
+            away = Scoreboard.Team("AUS", "274/8", "50 ov"),
+            status = "Live", summary = getString(R.string.demo_score_text), league = "Australia tour of India",
+        ),
     )
 
     internal fun demoNavigation() = LiveActivity(

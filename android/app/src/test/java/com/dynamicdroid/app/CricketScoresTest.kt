@@ -32,4 +32,37 @@ class CricketScoresTest {
         assertEquals("138/3", CricketScores.current("292 & 138/3 (21.2 ov, target 138)"))
         assertTrue(CricketScores.parse("<html>Access Denied</html>").isEmpty())
     }
+
+    @Test fun bothTeamsBecomeAScoreboard() {
+        val chase = CricketScores.board(CricketScores.parse(feed).first { it.id == "2" })
+        assertEquals("AUS", chase.home.abbr); assertEquals("ENG", chase.away.abbr)
+        assertEquals("33/1", chase.home.score); assertEquals("3.4 ov", chase.home.overs)
+        assertTrue(chase.home.batting); assertFalse(chase.away.batting)
+        assertEquals(188, chase.home.target)
+        assertEquals(33f / 188f, chase.chase!!, 0.001f)
+        assertEquals("Australia require 155 runs", chase.summary)
+        val test = CricketScores.board(CricketScores.parse(feed).first { it.id == "3" })
+        assertNull(test.chase)
+        assertTrue(test.away.batting)
+        assertEquals("486/4", test.away.score)
+    }
+
+    @Test fun multiDayInningsColoursAndResults() {
+        assertEquals("292", CricketScores.previous("292 & 138/3 (21.2 ov, target 138)"))
+        assertNull(CricketScores.previous("138/3 (21.2 ov)"))
+        assertEquals(138, CricketScores.target("292 & 138/3 (21.2 ov, target 138)"))
+        val body = """{"scores":[{"leagues":[{"name":"T20"}],"events":[{"id":"9","status":{"type":{"state":"post","shortDetail":"Final Result"}},
+            "competitions":[{"status":{"summary":"Colombo won by an inns &amp; 117 runs"},"competitors":[
+            {"homeAway":"home","score":"427","team":{"abbreviation":"CCC","color":"#050ceb"}},
+            {"homeAway":"away","score":"179 & 131 (43.1 ov)","team":{"abbreviation":"TAM","color":""}}]}]}]}]}"""
+        val m = CricketScores.parse(body).single()
+        assertTrue(m.finished)
+        val b = CricketScores.board(m)
+        assertFalse(b.live); assertFalse(b.inPlay)
+        assertEquals("Result", b.status)
+        assertEquals("Colombo won by an inns & 117 runs", b.summary)
+        assertEquals(0xFF050CEB.toInt(), b.home.color)
+        assertNull(b.away.color)
+        assertEquals("179", b.away.previous)
+    }
 }

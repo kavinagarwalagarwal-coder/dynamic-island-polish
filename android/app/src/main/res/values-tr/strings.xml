@@ -531,4 +531,8 @@
     <string name="more_touch">Dokunma ve titreşim</string>
     <string name="more_permissions">İzinler</string>
     <string name="more_help">Yardım ve güncellemeler</string>
+    <string name="score_live">CANLI</string>
+    <string name="score_yet_to_bat">Henüz vuruşta değil</string>
+    <string name="score_target">Hedef</string>
+    <string name="score_vs">-</string>
 </resources>

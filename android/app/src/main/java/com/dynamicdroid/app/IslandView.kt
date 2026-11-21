@@ -159,7 +159,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun applyLook() {
         val face = if (apple) appleSemibold else NothingStyle.mono
-        listOf(titlePaint, smallPaint, bigPaint, secondaryTimerPaint, digitPaint, statusPaint).forEach { it.typeface = face }
+        listOf(titlePaint, smallPaint, bigPaint, secondaryTimerPaint, digitPaint, statusPaint, scorePaint).forEach { it.typeface = face }
+        scorePaint.textSize = dp(if (apple) 26f else 22f)
         bodyPaint.typeface = if (apple) Typeface.DEFAULT else null
         // Apple's compact labels are 15pt; the monospace face was set smaller because it runs wide.
         smallPaint.textSize = dp(if (apple) 13f else 11.5f)
@@ -702,6 +703,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val bodyPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { textSize = dp(14f) }
     private val smallPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = medium; textSize = dp(11.5f) }
     private val bigPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = medium; textSize = dp(26f) }
+    // Scoreboard runs: tabular figures, so a ticking score never shifts its neighbours.
+    private val scorePaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply { typeface = medium; textSize = dp(24f); fontFeatureSettings = "tnum" }
     private val letterPaint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
         typeface = Typeface.DEFAULT_BOLD; textAlign = Paint.Align.CENTER
     }
@@ -1418,7 +1421,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 else Spec(want.coerceIn(dp(136f), w), h, h / 2f, cameraCenter())
             }
             IslandMode.NAVIGATION -> Spec(w, dp(128f), cardRadius(dp(44f)), screenCenter())
-            IslandMode.LIVE -> {
+            IslandMode.LIVE -> if (a.scoreboard != null) Spec(w, scoreHeight(a, a.scoreboard), cardRadius(dp(44f)), screenCenter()) else {
                 val h = dp(LIVE_BASE_DP) + (if (a.progress != null) dp(26f) else 0f) +
                     (if (visibleActions(a).isNotEmpty()) dp(52f) else 0f) + (if (a.detail.isNotBlank()) dp(18f) else 0f)
                 Spec(w, h, cardRadius(dp(44f)), screenCenter())
@@ -2173,6 +2176,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     }
 
     private fun drawCompact(canvas: Canvas, a: LiveActivity, alpha: Int) {
+        if (a.mode == IslandMode.LIVE && a.scoreboard != null) { drawScoreCompact(canvas, a.scoreboard, alpha); return }
         val cy = rect.centerY()
         val s = dp(22f)
         val l = rect.left + dp(7f)
@@ -2440,6 +2444,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
      * a marker riding along it, and the app's own buttons.
      */
     private fun drawLiveExpanded(canvas: Canvas, a: LiveActivity, alpha: Int, late: Int) {
+        a.scoreboard?.let { drawScoreExpanded(canvas, a, it, alpha, late); return }
         val pad = dp(20f)
         val l = rect.left + pad
         val rr = rect.right - pad
@@ -2474,6 +2479,165 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             y += dp(26f)
         }
         if (visibleActions(a).isNotEmpty()) drawActions(canvas, a, l, y + dp(4f), rr, late)
+    }
+
+    // ---------------------------------------------------------------- scoreboard (two teams)
+
+    private fun scoreHeight(a: LiveActivity, b: Scoreboard): Float =
+        dp(SCORE_BASE_DP) + (if (b.chase != null) dp(SCORE_CHASE_DP) else 0f) +
+            (if (b.summary.isNotBlank()) dp(SCORE_SUMMARY_DP) else 0f) + (if (visibleActions(a).isNotEmpty()) dp(52f) else 0f)
+
+    /** A team's colour on the black island: Apple keeps team colours (lifted if too dark); Nothing stays monochrome. */
+    private fun teamColor(t: Scoreboard.Team): Int {
+        if (!apple) return NOTHING_BADGE
+        val c = t.tint
+        return if (Scoreboard.brightness(c) < 0.22f) ColorUtils.blendARGB(c, Color.WHITE, 0.28f) else c
+    }
+
+    /** The round team badge (Apple's sports Live Activities show team logos here): colour and code. */
+    private fun drawTeamBadge(canvas: Canvas, t: Scoreboard.Team, cx: Float, cy: Float, d: Float, alpha: Int) {
+        val c = teamColor(t)
+        fillPaint.color = withAlpha(c, alpha)
+        canvas.drawCircle(cx, cy, d / 2f, fillPaint)
+        val code = t.code
+        letterPaint.textSize = d * when (code.length) { 1, 2 -> .4f; 3 -> .32f; else -> .26f }
+        letterPaint.color = withAlpha(if (!apple) cFg else if (Scoreboard.brightness(c) > .62f) Color.BLACK else Color.WHITE, alpha)
+        canvas.drawText(code, cx, cy - (letterPaint.ascent() + letterPaint.descent()) / 2f, letterPaint)
+    }
+
+    /** The side that is not batting reads a step quieter, so who is batting shows at a glance. */
+    private fun scoreAlpha(b: Scoreboard, t: Scoreboard.Team, alpha: Int) =
+        if (b.batting != null && !t.batting && b.live) (alpha * .62f).toInt() else alpha
+
+    /**
+     * The small island for a match, like an iPhone sports Live Activity: one team's badge and runs
+     * left of the camera, the other's runs and badge right of it.
+     */
+    private fun drawScoreCompact(canvas: Canvas, b: Scoreboard, alpha: Int) {
+        val cy = rect.centerY()
+        val d = min(dp(22f), rect.height() - dp(12f))
+        val inset = (rect.height() - d) / 2f
+        val l = rect.left + inset
+        val r = rect.right - inset
+        val keep = cameraKeepOut()
+        val midL = keep?.first ?: (rect.centerX() - dp(10f))
+        val midR = keep?.second ?: (rect.centerX() + dp(10f))
+        val gap = dp(6f)
+        drawTeamBadge(canvas, b.home, l + d / 2f, cy, d, alpha)
+        drawTeamBadge(canvas, b.away, r - d / 2f, cy, d, alpha)
+        compactScore(canvas, "cric-h", b, b.home, l + d + gap, midL - (l + d + gap), cy, alpha, alignRight = false)
+        compactScore(canvas, "cric-a", b, b.away, r - d - gap, (r - d - gap) - midR, cy, alpha, alignRight = true)
+    }
+
+    private fun compactScore(canvas: Canvas, slot: String, b: Scoreboard, t: Scoreboard.Team, x: Float, room: Float, cy: Float,
+                             alpha: Int, alignRight: Boolean) {
+        if (room <= dp(8f)) return
+        val baseline = cy + dp(4.5f)
+        if (t.score.isBlank()) {
+            val yet = context.getString(R.string.score_yet_to_bat)
+            text(canvas, if (smallPaint.measureText(yet) <= room) yet else "–", x, baseline, room, smallPaint, GREY, alpha, alignRight)
+            return
+        }
+        val a = scoreAlpha(b, t, alpha)
+        if (smallPaint.measureText(t.score) <= room) rolling(canvas, slot, t.score, x, baseline, smallPaint, cFg, a, alignRight)
+        else text(canvas, t.score, x, baseline, room, smallPaint, cFg, a, alignRight)
+    }
+
+    /**
+     * The open island for a match: the league and a LIVE badge on top, then both teams facing each
+     * other (badge, code, runs, overs) with the target between them, the chase bar and one line
+     * about the match.
+     */
+    private fun drawScoreExpanded(canvas: Canvas, a: LiveActivity, b: Scoreboard, alpha: Int, late: Int) {
+        val pad = dp(if (apple) 20f else 18f)
+        val l = rect.left + pad
+        val rr = rect.right - pad
+        val top = rect.top + dp(18f)
+        val headY = top + dp(12f)
+        // Status first, right-aligned, so the league takes whatever room is left.
+        val statusW = if (b.inPlay) {
+            val word = context.getString(R.string.score_live)
+            val red = if (apple) APPLE_RED else cRed
+            val ww = smallPaint.measureText(word)
+            text(canvas, word, rr, headY, ww + dp(2f), smallPaint, red, alpha, alignRight = true)
+            fillPaint.color = withAlpha(red, alpha)
+            canvas.drawCircle(rr - ww - dp(7f), headY - dp(4f), dp(3.5f), fillPaint)
+            ww + dp(16f)
+        } else {
+            val word = b.status.ifBlank { a.appLabel }
+            text(canvas, word, rr, headY, (rr - l) * .4f, smallPaint, GREY, alpha, alignRight = true)
+            min(smallPaint.measureText(word), (rr - l) * .4f) + dp(10f)
+        }
+        text(canvas, b.league.ifBlank { a.appLabel }, l, headY, rr - l - statusW - dp(8f), smallPaint, GREY, alpha)
+
+        val badge = dp(40f)
+        val rowCy = top + dp(56f)
+        drawTeamBadge(canvas, b.home, l + badge / 2f, rowCy, badge, alpha)
+        drawTeamBadge(canvas, b.away, rr - badge / 2f, rowCy, badge, alpha)
+        val centreW = dp(64f)
+        val colW = (rr - l - centreW) / 2f - badge - dp(10f)
+        scoreColumn(canvas, a, "cric-xh", b, b.home, l + badge + dp(10f), rowCy, colW, alpha, alignRight = false)
+        scoreColumn(canvas, a, "cric-xa", b, b.away, rr - badge - dp(10f), rowCy, colW, alpha, alignRight = true)
+
+        // Between the teams: the target being chased, else a quiet "vs".
+        val cx = rect.centerX()
+        val target = b.teams.firstNotNullOfOrNull { it.target }
+        if (target != null) {
+            val label = context.getString(R.string.score_target)
+            val lw = smallPaint.measureText(label)
+            text(canvas, label, cx - lw / 2f, rowCy - dp(6f), lw + dp(2f), smallPaint, GREY, alpha, center = true)
+            val tv = target.toString()
+            val tw = titlePaint.measureText(tv)
+            text(canvas, tv, cx - tw / 2f, rowCy + dp(14f), tw + dp(2f), titlePaint, cFg, alpha, center = true)
+        } else {
+            val vs = context.getString(R.string.score_vs)
+            val vw = bodyPaint.measureText(vs)
+            text(canvas, vs, cx - vw / 2f, rowCy + dp(5f), vw + dp(2f), bodyPaint, GREY, alpha, center = true)
+        }
+
+        var y = top + dp(SCORE_BASE_DP - 30f)
+        b.chase?.let { fraction ->
+            val bat = b.teams.first { it.target != null }
+            drawBar(canvas, l, rr, y + dp(6f), fraction, if (apple) teamColor(bat) else accentSoft, late, dp(4f))
+            y += dp(SCORE_CHASE_DP)
+        }
+        if (b.summary.isNotBlank()) {
+            fadeText(canvas, a, 1, b.summary, l, y + dp(16f), rr - l, bodyPaint, cFg, late)
+            y += dp(SCORE_SUMMARY_DP)
+        }
+        if (visibleActions(a).isNotEmpty()) drawActions(canvas, a, l, y + dp(6f), rr, late)
+    }
+
+    /** One team's column: code (with a dot while batting), runs, then overs and any earlier innings. */
+    private fun scoreColumn(canvas: Canvas, a: LiveActivity, slot: String, b: Scoreboard, t: Scoreboard.Team, x: Float, cy: Float,
+                            room: Float, alpha: Int, alignRight: Boolean) {
+        if (room <= dp(12f)) return
+        val codeY = cy - dp(12f)
+        val cw = min(smallPaint.measureText(t.abbr), room)
+        text(canvas, t.abbr, x, codeY, room, smallPaint, GREY, alpha, alignRight)
+        if (t.batting && b.live) {
+            // The ball: a small red dot beside whoever is batting.
+            val dx = if (alignRight) x - cw - dp(7f) else x + cw + dp(7f)
+            fillPaint.color = withAlpha(if (apple) BALL_RED else cFg, alpha)
+            canvas.drawCircle(dx, codeY - dp(4f), dp(3f), fillPaint)
+        }
+        val scoreY = cy + dp(13f)
+        if (t.score.isBlank()) {
+            text(canvas, context.getString(R.string.score_yet_to_bat), x, cy + dp(9f), room, bodyPaint, GREY, alpha, alignRight)
+            return
+        }
+        val sa = scoreAlpha(b, t, alpha)
+        // Scores shrink to fit their half rather than lose digits, as iOS scoreboards do.
+        val size = scorePaint.textSize
+        val w = scorePaint.measureText(t.score)
+        if (w > room) scorePaint.textSize = max(size * room / w, size * .6f)
+        if (scorePaint.measureText(t.score) <= room) rolling(canvas, slot, t.score, x, scoreY, scorePaint, cFg, sa, alignRight)
+        else text(canvas, t.score, x, scoreY, room, scorePaint, cFg, sa, alignRight)
+        scorePaint.textSize = size
+        val prev = t.previous?.let { "& $it" }
+        val sub = listOfNotNull(listOfNotNull(t.overs, prev).joinToString(" · "), prev, t.overs)
+            .firstOrNull { it.isNotEmpty() && smallPaint.measureText(it) <= room }
+        if (sub != null) text(canvas, sub, x, cy + dp(30f), room, smallPaint, GREY, alpha, alignRight)
     }
 
     /** Recording the screen or a voice memo: a breathing red dot, the time so far, and Stop. */
@@ -4293,6 +4457,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         private const val MEDIUM_HEIGHT_DP = 60f
         /** A live update card without progress, buttons or a detail line. */
         private const val LIVE_BASE_DP = 104f
+        private const val SCORE_BASE_DP = 118f
+        private const val SCORE_CHASE_DP = 14f
+        private const val SCORE_SUMMARY_DP = 24f
+        private val BALL_RED = Color.rgb(255, 69, 58)
+        private val NOTHING_BADGE = Color.rgb(44, 44, 46)
         private val REC_RED = Color.rgb(255, 59, 48)
         /** A medium pill's two text lines, measured from the bottom of the camera hole. */
         private const val MEDIUM_TEXT_BLOCK_DP = 44f

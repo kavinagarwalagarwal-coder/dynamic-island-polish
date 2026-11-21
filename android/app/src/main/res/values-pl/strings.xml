@@ -531,4 +531,8 @@
     <string name="more_touch">Dotyk i wibracje</string>
     <string name="more_permissions">Uprawnienia</string>
     <string name="more_help">Pomoc i aktualizacje</string>
+    <string name="score_live">NA ŻYWO</string>
+    <string name="score_yet_to_bat">Jeszcze nie odbija</string>
+    <string name="score_target">Cel</string>
+    <string name="score_vs">vs</string>
 </resources>

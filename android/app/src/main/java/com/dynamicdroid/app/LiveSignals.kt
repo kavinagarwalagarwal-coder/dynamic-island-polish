@@ -79,6 +79,60 @@ object LiveSignals {
         return null
     }
 
+    // "IND 245/3 (42.1 ov)", "AUS: 274/8", "NZ 368": a team code, its runs, and overs when batting.
+    // "NZ 368 & 75/1 (22 ov)": an earlier innings may come before the current one.
+    private val teamInnings = Regex("\\b([A-Z]{2,5}(?:-[AW])?)\\s*:?\\s+(?:(\\d{1,3}(?:[/-]\\d{1,2})?d?)\\s*&\\s*)?(\\d{1,3}(?:[/-]\\d{1,2})?d?)(?![\\d.:])" +
+        "(?:\\s*\\(\\s*(\\d{1,3}(?:\\.[0-5])?)\\s*(?:/\\s*\\d{1,3}\\s*)?(?:ov|ovs|overs?)?\\s*\\))?")
+    private val yetToBat = Regex("\\b([A-Z]{2,5}(?:-[AW])?)\\s*:?\\s+(?i:yet to bat)\\b")
+    private val notTeams = setOf("LIVE", "ODI", "TEST", "OVER", "OVERS", "RUNS", "NEED", "NEEDS", "ETA", "AM", "PM", "WON", "INN")
+
+    /**
+     * Both teams of a cricket notification, for the two-sided scoreboard: "IND 245/3 (42.1 ov)" and
+     * "AUS 274/8" (or "AUS yet to bat"). Null unless two different teams are found and at least
+     * one has a cricket score (wickets or overs), so a lone number never becomes a scoreboard.
+     */
+    fun cricketBoard(lines: List<String>, league: String = ""): Scoreboard? {
+        val all = (lines + listOf(lines.joinToString(" "))).filter { it.isNotBlank() }
+        val teams = LinkedHashMap<String, Scoreboard.Team>()
+        var scored = false
+        for (s in all) {
+            for (m in teamInnings.findAll(s)) {
+                val abbr = m.groupValues[1]
+                if (abbr in notTeams) continue
+                val overs = m.groupValues[4].takeIf { it.isNotEmpty() }
+                val score = m.groupValues[3].replace('-', '/')
+                val known = teams[abbr]
+                // Overs in their own box only join the score in the all-lines pass.
+                if (known != null && (known.overs != null || overs == null || known.score != score)) continue
+                if (overs != null || '/' in score) scored = true
+                teams[abbr] = Scoreboard.Team(abbr, score, overs?.let { "$it ov" }, batting = overs != null,
+                    previous = m.groupValues[2].takeIf { it.isNotEmpty() }?.replace('-', '/'))
+            }
+            for (m in yetToBat.findAll(s)) {
+                val abbr = m.groupValues[1].uppercase()
+                if (abbr !in notTeams && abbr !in teams) teams[abbr] = Scoreboard.Team(abbr, "")
+            }
+        }
+        if (!scored || teams.size < 2) return null
+        val (home, away) = teams.values.take(2)
+        val summary = lines.firstOrNull { chase.containsMatchIn(it) || resultText.containsMatchIn(it) || it.contains("yet to bat", true) }
+            ?.trim().orEmpty()
+        if (resultText.containsMatchIn(summary))
+            return Scoreboard(home.copy(batting = false), away.copy(batting = false), "Result", summary.take(80), league, live = false)
+        // Who bats: the side the chase line names, else the one mid-over, else the one whose score shows wickets.
+        val chaser = chaserLine.find(summary)?.groupValues?.get(1)?.uppercase()
+        fun pick(test: (Scoreboard.Team) -> Boolean): Scoreboard.Team? = listOf(home, away).filter(test).singleOrNull()
+        val bat = listOf(home, away).firstOrNull { it.abbr == chaser }
+            ?: pick { it.batting }
+            ?: pick { it.batting && it.overs.orEmpty().contains('.') }
+            ?: pick { '/' in it.score }.takeIf { !home.batting && !away.batting }
+        return Scoreboard(home.copy(batting = home === bat), away.copy(batting = away === bat), "", summary.take(80), league)
+    }
+
+    // "IND need 30 runs": only a team that needs runs is batting; "AUS lead by 241" says nothing.
+    private val chaserLine = Regex("^(\\S+)\\s+(?:needs?|requires?)\\b", RegexOption.IGNORE_CASE)
+    private val resultText = Regex("\\b(won by|won the match|match (?:drawn|tied)|no result|abandoned)\\b", RegexOption.IGNORE_CASE)
+
     /** Text that reads as a live cricket score (or a chase: "need 30 runs in 18 balls"). */
     fun looksLikeScore(lines: List<String>, scoreApp: Boolean = true): Boolean =
         cricketScore(lines) != null || scoreApp && (lines.any { chase.containsMatchIn(it) || namedTeam.containsMatchIn(it) } ||
