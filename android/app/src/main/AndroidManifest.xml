@@ -4,8 +4,8 @@
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- The app processes activity and wallpaper data locally; Skip libraries must not add network access. -->
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
+    <!-- Only for downloading public live cricket scores; notifications, wallpaper and screen data stay on the phone. -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />

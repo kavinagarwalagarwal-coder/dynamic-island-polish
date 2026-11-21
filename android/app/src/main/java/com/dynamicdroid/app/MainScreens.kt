@@ -487,6 +487,7 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         checked = f.liveUpdates, onChecked = { setFeature("show_live", it) }) {
         toggle(R.string.feature_show_navigation, "show_navigation", f.navigation)
         toggle(R.string.feature_recording, "show_recording", f.recording, R.string.feature_recording_note)
+        toggle(R.string.feature_auto_cricket, "auto_cricket", f.autoCricket, R.string.feature_auto_cricket_note)
         Note(stringResource(R.string.live_last_seen) + " " + remember { LiveDiagnostics.read(this@FeaturesPage) }, size = 13)
     }
     SettingsCard(stringResource(R.string.group_sound), count(f.volume, f.ringer, f.ringerControls), flow.next(),

@@ -67,6 +67,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private var transientExpanded = false
     private var devices: DeviceMonitor? = null
     private var events: SystemEvents? = null
+    private var cricket: CricketScoreFeed? = null
     /** The island's own stopwatch: when it started (elapsed) and, while paused, how far it got. */
     private var stopwatchStart = 0L
     private var stopwatchPausedAt: Long? = null
@@ -352,6 +353,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)
         devices = DeviceMonitor(this) { onActivity(it) }.also { it.start() }
         events = SystemEvents(this, ::onActivity, ::onRemoved).also { it.start() }
+        cricket = CricketScoreFeed(this, ::onActivity, ::onRemoved).also { it.start() }
         reply = ReplyPanel(this, ::onReplySent) { armTransientTimeout(transient) }
         IslandAccessibilityService.onVolumeKey = ::handleVolumeKey
         StatusBarCleanup.undo(this)
@@ -1372,6 +1374,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     override fun onDestroy() {
         if (instance === this) instance = null
+        cricket?.stop(); cricket = null
         if (IslandBus.listener === this) IslandBus.listener = null
         IslandAccessibilityService.onChanged = null
         IslandAccessibilityService.onForegroundPackage = null

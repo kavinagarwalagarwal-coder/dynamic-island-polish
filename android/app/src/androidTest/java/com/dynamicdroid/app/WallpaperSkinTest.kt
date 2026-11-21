@@ -54,8 +54,6 @@ class WallpaperSkinTest {
     }
     @Test fun importedImageIsSampledAndKeptOutsideAndroidBackup() {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
-        assertEquals(android.content.pm.PackageManager.PERMISSION_DENIED,
-            context.packageManager.checkPermission("android.permission.INTERNET", context.packageName))
         val input = File(context.cacheDir, "test-wallpaper.png")
         val image = Bitmap.createBitmap(2048, 1024, Bitmap.Config.ARGB_8888)
         input.outputStream().use { image.compress(Bitmap.CompressFormat.PNG, 100, it) }

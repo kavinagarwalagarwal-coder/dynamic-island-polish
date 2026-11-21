@@ -553,4 +553,7 @@
     <string name="more_touch">Touch &amp; haptics</string>
     <string name="more_permissions">Permissions</string>
     <string name="more_help">Help &amp; updates</string>
+    <string name="feature_auto_cricket">Live cricket scores automatically</string>
+    <string name="feature_auto_cricket_note">Shows India\'s live matches (and other international games) without any cricket app. Downloads only the public score list every 30 seconds during a match; nothing about you is sent.</string>
+    <string name="cricket_live_label">Live cricket</string>
 </resources>
