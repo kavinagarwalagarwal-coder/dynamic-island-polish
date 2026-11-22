@@ -257,6 +257,70 @@ class PixelScenes(private val density: Float) {
         }
     }
 
+    
+    // ----------------------------------------------------------------------------- cricket
+    /**
+     * A short cricket celebration drawn on the same hard-edged pixel grid as the road trip.
+     * The scene is deliberately compact so the live score remains the star of the card.
+     */
+    fun cricket(canvas: Canvas, scene: android.graphics.RectF, event: String, elapsed: Float, now: Long, alpha: Int) {
+        val cell = max(dp(1.5f), scene.height() / 12f)
+        val groundY = scene.bottom - cell * 2f
+        // A few strips of pixel turf and a simple pitch.
+        for (x in 0 until (scene.width() / cell).toInt() + 1) {
+            cellRect(canvas, scene.left + x * cell, groundY, cell, 0xFF397D42.toInt(), alpha)
+            if (x % 4 == 0) cellRect(canvas, scene.left + x * cell, groundY + cell, cell, 0xFF285B35.toInt(), alpha)
+        }
+        val t = elapsed.coerceIn(0f, 1f)
+        val ballX: Float
+        val ballY: Float
+        when (event) {
+            "WICKET" -> {
+                val sx = scene.centerX()
+                val base = groundY - cell
+                val stumps = arrayOf("W.W.W", "W.W.W", "W.W.W", "W.W.W", "W.W.W")
+                sprite(canvas, stumps, sx - cell * 2.5f, base - cell * 5f, cell, alpha, false) { 0xFFFFE7B0.toInt() }
+                // Bails pop into the air after the wicket.
+                val pop = (1f - t) * cell * 5f
+                cellRect(canvas, sx - cell * 3.5f - pop, base - cell * 6f - pop, cell * 1.5f, 0xFFFFE7B0.toInt(), alpha)
+                cellRect(canvas, sx + cell * 2f + pop, base - cell * 6f - pop * .7f, cell * 1.5f, 0xFFFFE7B0.toInt(), alpha)
+                ballX = scene.left + cell * 3f + (scene.width() * .28f * t)
+                ballY = groundY - cell * (3f + 2f * (1f - t))
+            }
+            "FOUR" -> {
+                ballX = scene.left + cell * 3f + (scene.width() - cell * 6f) * t
+                ballY = groundY - cell * (2.5f + sin(t * Math.PI.toFloat()) * 2f)
+                // Boundary rope.
+                for (x in 0 until (scene.width() / cell).toInt() step 3)
+                    cellRect(canvas, scene.left + x * cell, scene.top + cell, cell * 2f, 0xFFB7E4FF.toInt(), alpha)
+            }
+            else -> {
+                ballX = scene.left + cell * 3f + (scene.width() - cell * 6f) * t
+                ballY = groundY - cell * (2f + sin(t * Math.PI.toFloat()) * 7f)
+                // Tiny starburst at the top of the six.
+                if (t > .35f && t < .8f) {
+                    val sx = ballX; val sy = ballY - cell * 2f
+                    for (k in -2..2) {
+                        cellRect(canvas, sx + k * cell, sy, cell, 0xFFFFD76A.toInt(), alpha)
+                        cellRect(canvas, sx, sy + k * cell, cell, 0xFFFFD76A.toInt(), alpha)
+                    }
+                }
+            }
+        }
+        // Square ball and a short pixel trail make the movement legible at pill size.
+        for (k in 1..3) {
+            val trailAlpha = (alpha * (4 - k) / 5)
+            cellRect(canvas, ballX - cell * k * 1.5f, ballY + cell * k * .45f, cell * .75f,
+                ColorUtils.setAlphaComponent(0xFFFF654F.toInt(), trailAlpha), 255)
+        }
+        cellRect(canvas, ballX, ballY, cell * 1.25f, 0xFFFF654F.toInt(), alpha)
+        if (event == "WICKET") {
+            // A few falling pixel fragments.
+            for (k in 0..3) cellRect(canvas, scene.centerX() + (k - 2) * cell * 2f,
+                groundY - cell * (2f + ((now / 110L + k) % 3)), cell * .7f, 0xFFFFD76A.toInt(), alpha)
+        }
+    }
+
     // ----------------------------------------------------------------------------- charging
 
     /** A pixel battery whose columns fill to the level, with a spark running through the charge. */
