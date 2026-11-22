@@ -1587,6 +1587,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             // Pixel scenes tick at a retro 15 fps while their card is open.
             features.pixelScenes && !reduceMotion && presentation == Presentation.EXPANDED &&
                 a.mode == IslandMode.LIVE && a.scoreboard != null && cricketEventActive() -> 66L
+            // Live cricket: the batting glow, LIVE dot and ball pulse breathe smoothly.
+            !reduceMotion && a.mode == IslandMode.LIVE && a.scoreboard != null && a.scoreboard.live -> 50L
             features.pixelScenes && !reduceMotion && presentation == Presentation.EXPANDED &&
                 (a.mode == IslandMode.VOLUME || a.mode == IslandMode.DOWNLOAD || a.mode == IslandMode.CHARGING) -> 66L
             a.mode == IslandMode.ALARM -> 33L
@@ -2670,15 +2672,72 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         return if (Scoreboard.brightness(c) < 0.22f) ColorUtils.blendARGB(c, Color.WHITE, 0.28f) else c
     }
 
-    /** The round team badge (Apple's sports Live Activities show team logos here): colour and code. */
+    /** Flag colours for known teams, drawn as simple horizontal bands inside the badge. */
+    private fun flagBands(abbr: String): List<Int>? = when (abbr.substringBefore('-').uppercase()) {
+        "IND" -> listOf(0xFF138808.toInt(), 0xFFFFFFFF.toInt(), 0xFF000080.toInt())
+        "AUS" -> listOf(0xFF00247D.toInt(), 0xFFFFFFFF.toInt())
+        "ENG" -> listOf(0xFFCF142B.toInt(), 0xFFFFFFFF.toInt())
+        "PAK" -> listOf(0xFF01411C.toInt(), 0xFFFFFFFF.toInt())
+        "SA"  -> listOf(0xFF007A4D.toInt(), 0xFF001489.toInt(), 0xFFDE3831.toInt())
+        "NZ"  -> listOf(0xFF00247D.toInt(), 0xFFFFFFFF.toInt(), 0xFFC8102E.toInt())
+        "SL"  -> listOf(0xFFFFB81C.toInt(), 0xFF8D153A.toInt(), 0xFF00534E.toInt())
+        "BAN" -> listOf(0xFF006A4E.toInt(), 0xFFF42A41.toInt())
+        "WI"  -> listOf(0xFF7B3F00.toInt(), 0xFFFFD100.toInt())
+        "AFG" -> listOf(0xFF000000.toInt(), 0xFFD32011.toInt(), 0xFF00A651.toInt())
+        "ZIM" -> listOf(0xFF004200.toInt(), 0xFFFFFF00.toInt(), 0xFFC8102E.toInt())
+        "IRE" -> listOf(0xFF169B62.toInt(), 0xFFFFFFFF.toInt(), 0xFFFF883E.toInt())
+        else -> null
+    }
+
+    /** The round team badge with flag-inspired bands and a subtle inner ring for depth. */
     private fun drawTeamBadge(canvas: Canvas, t: Scoreboard.Team, cx: Float, cy: Float, d: Float, alpha: Int) {
         val c = teamColor(t)
-        fillPaint.color = withAlpha(c, alpha)
-        canvas.drawCircle(cx, cy, d / 2f, fillPaint)
+        val r = d / 2f
+        val bands = if (apple) flagBands(t.code) else null
+        if (bands != null && bands.size >= 2) {
+            val bandH = d / bands.size
+            val saveCount = canvas.save()
+            val clipPath = flagClipPath
+            clipPath.reset()
+            clipPath.addCircle(cx, cy, r, Path.Direction.CW)
+            canvas.clipPath(clipPath)
+            for (i in bands.indices) {
+                fillPaint.color = withAlpha(bands[i], alpha)
+                canvas.drawRect(cx - r, cy - r + i * bandH, cx + r, cy - r + (i + 1) * bandH, fillPaint)
+            }
+            canvas.restoreToCount(saveCount)
+        } else {
+            fillPaint.color = withAlpha(c, alpha)
+            canvas.drawCircle(cx, cy, r, fillPaint)
+        }
+        ringPaint.strokeWidth = max(dp(0.8f), d * 0.04f)
+        ringPaint.color = withAlpha(if (apple) Color.argb(50, 255, 255, 255) else c, alpha)
+        canvas.drawCircle(cx, cy, r - ringPaint.strokeWidth / 2f, ringPaint)
         val code = t.code
         letterPaint.textSize = d * when (code.length) { 1, 2 -> .4f; 3 -> .32f; else -> .26f }
-        letterPaint.color = withAlpha(if (!apple) cFg else if (Scoreboard.brightness(c) > .62f) Color.BLACK else Color.WHITE, alpha)
-        canvas.drawText(code, cx, cy - (letterPaint.ascent() + letterPaint.descent()) / 2f, letterPaint)
+        val light = apple && (bands != null || Scoreboard.brightness(c) > .62f)
+        letterPaint.color = withAlpha(if (!apple) cFg else if (light) Color.BLACK else Color.WHITE, alpha)
+        val textY = cy - (letterPaint.ascent() + letterPaint.descent()) / 2f
+        if (bands != null) {
+            fillPaint.color = withAlpha(Color.argb(160, 0, 0, 0), alpha)
+            canvas.drawRect(cx - r, textY + letterPaint.ascent() - dp(1f), cx + r, textY + letterPaint.descent() + dp(1f), fillPaint)
+        }
+        canvas.drawText(code, cx, textY, letterPaint)
+    }
+
+    private val flagClipPath = Path()
+
+    /** Pulsing glow ring around the batting team's badge, like an iOS sports Live Activity. */
+    private fun drawBattingGlow(canvas: Canvas, t: Scoreboard.Team, cx: Float, cy: Float, d: Float, alpha: Int) {
+        if (!apple) return
+        val now = SystemClock.uptimeMillis()
+        val phase = (now % 1800L) / 1800f
+        val breathe = 0.5f + 0.5f * sin(phase * 2f * PI.toFloat())
+        val glowR = d / 2f + dp(3f) + dp(2.5f) * breathe
+        val glowA = (alpha * (0.18f + 0.16f * breathe)).toInt().coerceIn(0, 255)
+        ringPaint.strokeWidth = dp(2f)
+        ringPaint.color = withAlpha(teamColor(t), glowA)
+        canvas.drawCircle(cx, cy, glowR, ringPaint)
     }
 
     /** The side that is not batting reads a step quieter, so who is batting shows at a glance. */
@@ -2699,6 +2758,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val midL = keep?.first ?: (rect.centerX() - dp(10f))
         val midR = keep?.second ?: (rect.centerX() + dp(10f))
         val gap = dp(6f)
+        if (b.home.batting && b.live) drawBattingGlow(canvas, b.home, l + d / 2f, cy, d, alpha)
+        if (b.away.batting && b.live) drawBattingGlow(canvas, b.away, r - d / 2f, cy, d, alpha)
         drawTeamBadge(canvas, b.home, l + d / 2f, cy, d, alpha)
         drawTeamBadge(canvas, b.away, r - d / 2f, cy, d, alpha)
         compactScore(canvas, "cric-h", b, b.home, l + d + gap, midL - (l + d + gap), cy, alpha, alignRight = false)
@@ -2736,8 +2797,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             val red = if (apple) APPLE_RED else cRed
             val ww = smallPaint.measureText(word)
             text(canvas, word, rr, headY, ww + dp(2f), smallPaint, red, alpha, alignRight = true)
-            fillPaint.color = withAlpha(red, alpha)
-            canvas.drawCircle(rr - ww - dp(7f), headY - dp(4f), dp(3.5f), fillPaint)
+            fillPaint.color = withAlpha(red, pulse(alpha))
+            val dotPulse = dp(3.5f) + dp(1.2f) * (0.5f + 0.5f * sin((SystemClock.uptimeMillis() % 1400L) / 1400f * 2f * PI.toFloat()))
+            canvas.drawCircle(rr - ww - dp(7f), headY - dp(4f), dotPulse, fillPaint)
             ww + dp(16f)
         } else {
             val word = b.status.ifBlank { a.appLabel }
@@ -2748,6 +2810,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
         val badge = dp(40f)
         val rowCy = top + dp(56f)
+        if (b.home.batting && b.live) drawBattingGlow(canvas, b.home, l + badge / 2f, rowCy, badge, alpha)
+        if (b.away.batting && b.live) drawBattingGlow(canvas, b.away, rr - badge / 2f, rowCy, badge, alpha)
         drawTeamBadge(canvas, b.home, l + badge / 2f, rowCy, badge, alpha)
         drawTeamBadge(canvas, b.away, rr - badge / 2f, rowCy, badge, alpha)
         val centreW = dp(64f)
@@ -2800,10 +2864,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val cw = min(smallPaint.measureText(t.abbr), room)
         text(canvas, t.abbr, x, codeY, room, smallPaint, GREY, alpha, alignRight)
         if (t.batting && b.live) {
-            // The ball: a small red dot beside whoever is batting.
+            // The ball: a small pulsing red dot beside whoever is batting.
             val dx = if (alignRight) x - cw - dp(7f) else x + cw + dp(7f)
+            val ballPulse = dp(3f) + dp(0.8f) * (0.5f + 0.5f * sin((SystemClock.uptimeMillis() % 1200L) / 1200f * 2f * PI.toFloat()))
             fillPaint.color = withAlpha(if (apple) BALL_RED else cFg, alpha)
-            canvas.drawCircle(dx, codeY - dp(4f), dp(3f), fillPaint)
+            canvas.drawCircle(dx, codeY - dp(4f), ballPulse, fillPaint)
         }
         val scoreY = cy + dp(13f)
         if (t.score.isBlank()) {
