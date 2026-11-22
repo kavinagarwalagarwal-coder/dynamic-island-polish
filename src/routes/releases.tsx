@@ -114,7 +114,7 @@ function ReleasesPage() {
                 volume, two live, and app handoff
               </p>
               <p>
-                <Check aria-hidden="true" /> Dedicated Android 17 build; no internet permission
+                <Check aria-hidden="true" /> Dedicated Android 17 build; no tracking
               </p>
             </div>
           </div>

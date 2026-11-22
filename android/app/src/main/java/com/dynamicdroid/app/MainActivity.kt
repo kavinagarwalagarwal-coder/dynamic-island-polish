@@ -558,6 +558,8 @@ class MainActivity : AppCompatActivity() {
 
     internal fun placementExplanation(): String = when {
         fit.placement == IslandPlacement.BELOW_STATUS_BAR -> getString(R.string.placement_below)
+        fit.placement == IslandPlacement.CAMERA && IslandAccessibilityService.instance == null ->
+            getString(R.string.placement_camera_needs_accessibility)
         IslandAccessibilityService.instance != null -> getString(R.string.placement_camera)
         else -> getString(R.string.placement_standard)
     }

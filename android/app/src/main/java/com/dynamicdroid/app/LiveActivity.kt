@@ -28,7 +28,7 @@ enum class IslandMode {
 
 /** The little picture an event island shows. */
 enum class Glyph { WIFI, WIFI_OFF, BATTERY_LOW, UNPLUGGED, PLANE, USB, UNLOCK, BRIGHTNESS, ALARM, PAY, TORCH, MOON, STOPWATCH, CAMERA,
-    HOTSPOT, SCREEN, MIC }
+    HOTSPOT, SCREEN, MIC, CRICKET }
 
 /** What the ringer switch or Do Not Disturb just changed to. */
 enum class RingerState { RING, VIBRATE, SILENT, DND_ON, DND_OFF }

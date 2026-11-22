@@ -114,7 +114,7 @@ function Index() {
               <Check aria-hidden="true" /> Android 8.0+
             </span>
             <span>
-              <Fingerprint aria-hidden="true" /> No internet permission
+              <Fingerprint aria-hidden="true" /> No tracking
             </span>
           </div>
         </div>
@@ -299,8 +299,8 @@ function Index() {
             <em>Private underneath.</em>
           </h2>
           <p>
-            No account. No tracking. No internet permission. Notifications stay on your phone, right
-            where they belong.
+            No account and no tracking. Notifications stay on your phone; network access is used
+            only for the optional live cricket score feed.
           </p>
           <Link to="/releases" className="text-link">
             Meet the latest release <ArrowUpRight aria-hidden="true" />

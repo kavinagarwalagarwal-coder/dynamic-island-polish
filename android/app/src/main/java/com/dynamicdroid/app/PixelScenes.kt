@@ -258,7 +258,6 @@ class PixelScenes(private val density: Float) {
         }
     }
 
-    
     // ----------------------------------------------------------------------------- cricket
     /**
      * A short cricket celebration drawn on the same hard-edged pixel grid as the road trip.

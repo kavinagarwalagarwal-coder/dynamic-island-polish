@@ -4,7 +4,7 @@
 
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- Only for downloading public live cricket scores; notifications, wallpaper and screen data stay on the phone. -->
+    <!-- Internet is used only for optional public cricket scores; API credentials remain server-side. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />

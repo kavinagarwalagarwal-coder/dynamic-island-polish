@@ -74,6 +74,10 @@ data class IslandFeatureSet(
     val autoCricket: Boolean = true,
     /** Screen and voice recording in progress. */
     val recording: Boolean = true,
+    /** Live cricket scores fetched through Dynamic Droid's secure score proxy. */
+    val cricketScores: Boolean = true,
+    /** Brief front-camera activity cue; Android does not identify biometric unlock specifically. */
+    val cameraActivity: Boolean = true,
     val charging: Boolean = true,
     /** The edge glow only while the island is open, not around the small pill. */
     val glowOpenOnly: Boolean = false,
@@ -189,6 +193,8 @@ object IslandFeatures {
             liveUpdates = p.getBoolean("show_live", d.liveUpdates),
             autoCricket = p.getBoolean("auto_cricket", d.autoCricket),
             recording = p.getBoolean("show_recording", d.recording),
+            cricketScores = p.getBoolean("cricket_scores", d.cricketScores),
+            cameraActivity = p.getBoolean("camera_activity", d.cameraActivity),
             charging = p.getBoolean("show_charging", d.charging),
             glowOpenOnly = p.getBoolean("glow_open_only", d.glowOpenOnly),
             callsOverFullscreen = p.getBoolean("calls_over_fullscreen", d.callsOverFullscreen),
