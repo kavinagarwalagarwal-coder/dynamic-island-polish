@@ -623,10 +623,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     fun setConcealed(hidden: Boolean) {
         if (hidden == isConcealed) return
         isConcealed = hidden
-        if (hidden) {
-            tracking = false; seeking = false
-            removeCallbacks(longPress)
-        }
+        if (hidden) abortTouch()
         concealS.target = if (hidden) 0f else 1f
         settled = false
         kick()
@@ -667,21 +664,21 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private val absorbS = Spring(0f, 78f, 0.94f, 0.003f)
     // Water-drop extras: a lightly damped jiggle once the shape lands, a tap ripple, and a
     // tilt-following glint. All are springs so any gesture can interrupt them.
-    private val wobbleS = Spring(0f, 240f, 0.16f, 0.0006f)
+    private val wobbleS = Spring(0f, IslandMotion.WATER_WOBBLE_K, IslandMotion.WATER_WOBBLE_DAMPING, 0.0006f)
     private val rippleS = Spring(1f, 70f, 1f, 0.003f)
     private val tiltS = Spring(0f, 60f, 0.9f, 0.004f)
     private var rippleX = 0f
     private var rippleY = 0f
-    private var shapePeak = 0f
     private val ripplePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; color = Color.WHITE }
     private val glintMatrix = Matrix()
     private val glintShader = RadialGradient(0f, 0f, 1f, intArrayOf(0x55FFFFFF, 0x14FFFFFF, 0x00FFFFFF),
         floatArrayOf(0f, .45f, 1f), Shader.TileMode.CLAMP)
     private val glintPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { shader = glintShader }
     private val sensors = context.getSystemService(Context.SENSOR_SERVICE) as? android.hardware.SensorManager
+    private var tiltRegistered = false
     private val tiltListener = object : android.hardware.SensorEventListener {
         override fun onSensorChanged(e: android.hardware.SensorEvent) {
-            if (activity == null || reduceMotion) return
+            if (activity == null || reduceMotion || !isShown || isConcealed) return
             val t = (-e.values[0] / 9.81f).coerceIn(-1f, 1f)
             if (abs(t - tiltS.target) > 0.08f) { tiltS.target = t; settled = false; kick() }
         }
@@ -786,6 +783,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             bubblePress.target = 1f
             if (touchingSecondary) secondary?.let { callbacks?.onSecondaryExpand(it) }
             else callbacks?.onExpandRequest()
+            kick()
         }
     }
 
@@ -884,7 +882,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
 
         if (isAbsorbing && (next?.key != old?.key || p != Presentation.COMPACT)) {
-            absorbS.snap(0f); morphCard = null; softMorphCard = null; morphStart = 0L
+            clearAppMorph()
         }
         if (absorb && next != null && !reduceMotion && features.appMorph) {
             // Back from the app it belongs to: the app flies up into the island.
@@ -948,8 +946,21 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     fun cancelAppMorph() {
         if (!isAbsorbing) return
-        absorbS.snap(0f); morphCard = null; softMorphCard = null; morphStart = 0L; morphOrigin = null
+        clearAppMorph()
+        restoreFlightBubble()
         settled = false; kick(); invalidate()
+    }
+
+    private fun clearAppMorph() {
+        absorbS.snap(0f)
+        morphCard = null; softMorphCard = null; morphStart = 0L; morphQueuedAt = 0L
+        morphSpec = null; morphOrigin = null
+    }
+
+    private fun restoreFlightBubble() {
+        secondaryA.target = if (secondary != null && presentation == Presentation.COMPACT) 1f else 0f
+        setDropTarget(secondaryA.target)
+        if (secondaryA.target > 0f) bubbleCenterS.target = compactCluster().bubbleCenter
     }
 
     /** Content fades in slowly once the shape has room, and fades out fast so it never squashes. */
@@ -968,10 +979,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         liquidGlass.invalidateContent()
         Choreographer.getInstance().removeFrameCallback(this)
         running = false; delayedFrame = false; lastFrame = 0L
-        tracking = false; seeking = false
-        removeCallbacks(longPress)
+        abortTouch()
         pressS.snap(1f); stretchS.snap(0f); absorbS.snap(0f)
-        morphCard = null; softMorphCard = null
+        bubblePress.snap(1f); sliderStretchS.snap(0f); wobbleS.snap(0f); rippleS.snap(1f)
+        clearAppMorph()
         removeCallbacks(introWiden)
         introHoldUntil = 0L
         introS.snap(0f)
@@ -1201,16 +1212,18 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
         val t = (now - morphStart) / APP_MORPH_MS.toFloat()
         if (t < 1f) { absorbS.snap(1f - t.coerceAtLeast(0f)); return true }
-        // Landed: hand over to the island's springs with a small widening overshoot, like iOS.
+        // Land at the exact flight endpoint; momentum supplies the soft overshoot without
+        // snapping the body six percent wider in a single frame.
         morphStart = 0L
         absorbS.snap(0f)
         morphCard = null
         morphOrigin = null
         morphSpec?.let { spec ->
-            widthS.snap(spec.w * 1.06f); widthS.target = spec.w
-            heightS.snap(spec.h * 0.94f); heightS.target = spec.h
+            widthS.snap(spec.w); widthS.fling(spec.w * 0.8f)
+            heightS.snap(spec.h); heightS.fling(-spec.h * 0.6f)
         }
-        morphSpec = null
+        morphSpec = null; morphQueuedAt = 0L
+        restoreFlightBubble()
         settled = false
         return true
     }
@@ -1495,8 +1508,11 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         val dt = if (lastFrame == 0L) 1f / 60f else (frameTimeNanos - lastFrame) / 1_000_000_000f
         lastFrame = frameTimeNanos
         var rest = true
-        // Remember how hard the shape was moving; when it lands, the drop jiggles in proportion.
-        for (s in shapeSprings) if (!s.isAtRest) { shapePeak = max(shapePeak, abs(s.speed)) }
+        syncTiltSensor()
+        // Let the surface follow the morph's momentum and relax with it. A delayed kick at
+        // rest made a finished transition jump back into motion and delayed touch restoration.
+        wobbleS.target = if (reduceMotion || tracking || isAbsorbing) 0f else
+            IslandMotion.waterWobble(widthS.speed, heightS.speed, widthS.value, heightS.value, squash())
         for (s in springs) {
             if (reduceMotion) s.snap(s.target) else s.step(dt)
             if (!s.isAtRest) rest = false
@@ -1506,11 +1522,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             dropImpact.snap(0f)
             dropImpact.target = 1f
             rest = false
-        }
-        if (!reduceMotion && shapePeak > 0f && shapeSprings.all { it.isAtRest }) {
-            val kickV = (shapePeak / dp(900f)).coerceIn(0f, 1f) * 0.9f
-            if (kickV > 0.05f && !tracking) { wobbleS.fling(kickV); rest = false }
-            shapePeak = 0f
         }
         if (stepAppMorph()) rest = false
         invalidate()
@@ -1523,7 +1534,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
         val continuous = continuousDelay()
         when {
-            !rest || tracking || sheenActive() -> Choreographer.getInstance().postFrameCallback(this)
+            !rest || sheenActive() -> Choreographer.getInstance().postFrameCallback(this)
             continuous != null -> {
                 lastFrame = 0L; delayedFrame = true
                 Choreographer.getInstance().postFrameCallbackDelayed(this, continuous)
@@ -1592,30 +1603,49 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
     }
 
+    /** No sensor work for an empty, concealed or reduced-motion island. */
+    private fun syncTiltSensor() {
+        val manager = sensors ?: return
+        val wanted = isAttachedToWindow && isShown && activity != null && !isConcealed && !reduceMotion
+        if (wanted == tiltRegistered) return
+        if (wanted) {
+            val sensor = manager.getDefaultSensor(android.hardware.Sensor.TYPE_GRAVITY)
+                ?: manager.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER)
+                ?: return
+            tiltRegistered = manager.registerListener(tiltListener, sensor, android.hardware.SensorManager.SENSOR_DELAY_UI)
+        } else {
+            manager.unregisterListener(tiltListener)
+            tiltRegistered = false
+        }
+    }
+
     override fun onAttachedToWindow() {
         super.onAttachedToWindow()
         liquidGlass.invalidateContent()
         dropLiquidGlass.invalidateContent()
-        sensors?.let { m ->
-            (m.getDefaultSensor(android.hardware.Sensor.TYPE_GRAVITY) ?: m.getDefaultSensor(android.hardware.Sensor.TYPE_ACCELEROMETER))
-                ?.let { m.registerListener(tiltListener, it, android.hardware.SensorManager.SENSOR_DELAY_UI) }
-        }
+        syncTiltSensor()
         kick()
     }
 
     override fun onVisibilityChanged(changedView: View, visibility: Int) {
         super.onVisibilityChanged(changedView, visibility)
+        // View can invoke this callback from its constructor, before fields are initialized.
+        if (visibility != VISIBLE) { sensors?.unregisterListener(tiltListener); tiltRegistered = false }
         if (visibility == VISIBLE) { liquidGlass.invalidateContent(); dropLiquidGlass.invalidateContent(); kick() }
     }
 
     override fun onWindowVisibilityChanged(visibility: Int) {
         super.onWindowVisibilityChanged(visibility)
+        syncTiltSensor()
         // Screen-off and lock hide the overlay window; HWUI may free its display lists meanwhile.
         if (visibility == VISIBLE) { liquidGlass.invalidateContent(); dropLiquidGlass.invalidateContent(); invalidate() }
     }
 
     override fun onDetachedFromWindow() {
         sensors?.unregisterListener(tiltListener)
+        tiltRegistered = false
+        abortTouch()
+        lastFrame = 0L; delayedFrame = false
         removeCallbacks(introWiden); introHoldUntil = 0L
         Choreographer.getInstance().removeFrameCallback(this)
         running = false
@@ -1752,10 +1782,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         w *= 1f - 0.05f * flowY + 0.015f * flowX
         // Pulling the drop down pinches its waist so its volume stays constant.
         val base = max(dp(1f), heightS.value)
-        w *= (1f - 0.4f * (stretchS.value / base)).coerceIn(0.7f, 1.15f)
+        w *= (1f - 0.4f * (stretchS.value / base) * squash()).coerceIn(0.7f, 1.15f)
         // Settle jiggle: the drop wobbles wide/flat then tall/narrow, keeping its volume.
-        val wob = wobbleS.value.coerceIn(-0.12f, 0.12f)
-        w *= 1f + wob * 0.6f
+        val wob = if (reduceMotion || squash() == 0f) 0f else wobbleS.value.coerceIn(-0.08f, 0.08f)
+        w /= 1f - wob
         h = max(dp(1f), h * (1f - wob))
         val top = topS.value
         rect.set(cx - w / 2f, top, cx + w / 2f, top + h)
@@ -4333,7 +4363,13 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 touchingSecondary = secondary != null && presentation == Presentation.COMPACT && secondaryA.value > 0.5f && dropS.value > .92f && secondaryHit.contains(e.x, e.y)
                 if (isConcealed || (!touchingSecondary && !hit.contains(e.x, e.y))) return false
                 tracking = true
-                if (!reduceMotion) { rippleX = e.x; rippleY = e.y; rippleS.snap(0f); rippleS.target = 1f; wobbleS.fling(-0.35f) }
+                if (!reduceMotion) {
+                    rippleX = e.x; rippleY = e.y; rippleS.snap(0f); rippleS.target = 1f
+                    if (!touchingSecondary && squash() > 0f) {
+                        wobbleS.target = 0f
+                        wobbleS.fling(-0.18f * squash())
+                    }
+                }
                 dragging = false
                 longFired = false
                 downX = e.x
@@ -4442,11 +4478,9 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
                 return true
             }
             MotionEvent.ACTION_CANCEL -> {
-                finishTouch()
-                seeking = false
-                volumeDragging = false
-                torchDragging = false
-                sliderStretchS.target = 0f
+                abortTouch()
+                settled = false
+                kick()
                 return true
             }
         }
@@ -4461,6 +4495,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         stretchS.target = 0f
         settled = false
         kick()
+    }
+
+    /** Lifecycle cancellation restores all feedback without scheduling a hidden/detached view. */
+    private fun abortTouch() {
+        tracking = false; dragging = false; seeking = false
+        volumeDragging = false; torchDragging = false
+        removeCallbacks(longPress)
+        pressS.target = 1f; bubblePress.target = 1f
+        stretchS.target = 0f; sliderStretchS.target = 0f
     }
 
     private fun rubber(dy: Float): Float {

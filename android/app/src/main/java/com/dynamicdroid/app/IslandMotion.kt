@@ -35,6 +35,14 @@ object IslandMotion {
     const val COMPACT_HEIGHT_DP = 36f
     const val COMPACT_WIDTH_DP = 232f
 
+    const val WATER_WOBBLE_K = 220f
+    const val WATER_WOBBLE_DAMPING = 0.38f
+
+    /** Speed-driven surface tension, not a second animation kicked after the island lands. */
+    fun waterWobble(widthSpeed: Float, heightSpeed: Float, width: Float, height: Float, strength: Float): Float =
+        ((heightSpeed / height.coerceAtLeast(1f) - widthSpeed / width.coerceAtLeast(1f)) * 0.008f * strength)
+            .coerceIn(-0.045f, 0.045f)
+
     fun dampingRatio(stiffness: Float, damping: Float): Float =
         damping / (2f * sqrt(stiffness))
 

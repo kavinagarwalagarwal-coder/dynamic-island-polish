@@ -1,7 +1,9 @@
 package com.dynamicdroid.app
 
 import kotlin.math.abs
-import kotlin.math.min
+import kotlin.math.cos
+import kotlin.math.exp
+import kotlin.math.sin
 import kotlin.math.sqrt
 
 /** Small critically-tunable spring, stepped by IslandView every frame (iOS-style motion). */
@@ -53,14 +55,40 @@ class Spring(
             velocity = 0f
             return
         }
-        var remaining = dtSeconds.coerceIn(0f, 0.064f)
-        val damping = 2f * dampingRatio * sqrt(stiffness)
-        while (remaining > 0f) {
-            val h = min(remaining, 1f / 240f)
-            val accel = -stiffness * (value - target) - damping * velocity
-            velocity += accel * h
-            value += velocity * h
-            remaining -= h
+        if (!dtSeconds.isFinite() || dtSeconds <= 0f) return
+        // Solve the spring exactly: the same elapsed time produces the same trajectory at
+        // 30, 60, 90 and 120 Hz, without Euler's refresh-dependent damping or substep churn.
+        // Bound a stalled frame so resuming the app cannot teleport the island to its target.
+        val dt = dtSeconds.coerceAtMost(0.064f).toDouble()
+        val omega = sqrt(stiffness.coerceAtLeast(0f).toDouble())
+        val zeta = dampingRatio.coerceAtLeast(0f).toDouble()
+        val x = (value - target).toDouble()
+        val v = velocity.toDouble()
+        if (omega == 0.0) {
+            value += (v * dt).toFloat()
+        } else if (abs(zeta - 1.0) < 0.0001) {
+            val b = v + omega * x
+            val decay = exp(-omega * dt)
+            value = target + ((x + b * dt) * decay).toFloat()
+            velocity = ((v - omega * b * dt) * decay).toFloat()
+        } else if (zeta < 1.0) {
+            val decayRate = zeta * omega
+            val frequency = omega * sqrt(1.0 - zeta * zeta)
+            val c = cos(frequency * dt)
+            val s = sin(frequency * dt)
+            val decay = exp(-decayRate * dt)
+            value = target + (decay * (x * c + (v + decayRate * x) / frequency * s)).toFloat()
+            velocity = (decay * (v * c - (decayRate * v + omega * omega * x) / frequency * s)).toFloat()
+        } else {
+            val root = sqrt(zeta * zeta - 1.0)
+            val r1 = -omega / (zeta + root)
+            val r2 = -omega * (zeta + root)
+            val a = (v - r2 * x) / (r1 - r2)
+            val b = x - a
+            val e1 = exp(r1 * dt)
+            val e2 = exp(r2 * dt)
+            value = target + (a * e1 + b * e2).toFloat()
+            velocity = (a * r1 * e1 + b * r2 * e2).toFloat()
         }
         if (isAtRest) {
             value = target

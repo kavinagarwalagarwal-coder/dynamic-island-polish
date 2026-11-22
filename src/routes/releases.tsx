@@ -27,6 +27,8 @@ export const Route = createFileRoute("/releases")({
       },
       { property: "og:title", content: "Latest releases — Dynamic Droid" },
       { property: "og:description", content: "Get the latest Dynamic Droid Android release." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: ReleasesPage,
