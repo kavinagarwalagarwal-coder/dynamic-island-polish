@@ -56,6 +56,14 @@ class ActivityShelfTest {
         assertFalse(TimerRecognition.matches(false, false, false, false, true, false, false, false))
         assertFalse(TimerRecognition.matches(false, false, false, false, false, false, true, true))
     }
+    @Test fun dualActivityClusterCentersAsAWhole() {
+        val camera = 200f
+        val cluster = IslandCluster.layout(400f, 200f, camera, true, 36f, 8f, 4f)
+        val combinedCenter = (cluster.center - cluster.width / 2f + cluster.bubbleCenter + 18f) / 2f
+
+        assertEquals(camera, combinedCenter, 0.01f)
+    }
+
     @Test fun compactAndBubbleFitAtBothEdgesAndAllPhoneScales() {
         for (scale in listOf(0.7f, 1f, 1.3f)) for (physicalWidth in listOf(240f, 320f, 360f, 480f)) {
             val screen = physicalWidth / scale

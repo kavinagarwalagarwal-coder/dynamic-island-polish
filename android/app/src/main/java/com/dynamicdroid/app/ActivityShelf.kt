@@ -41,7 +41,8 @@ object IslandCluster {
         val width = requestedWidth.coerceIn(0f, (screen - margin * 2 - reserved).coerceAtLeast(0f))
         val low = margin + width / 2
         val high = (screen - margin - reserved - width / 2).coerceAtLeast(low)
-        val center = camera.coerceIn(low, high)
+        val desiredCenter = camera - reserved / 2f
+        val center = desiredCenter.coerceIn(low, high)
         return Layout(width, center, center + width / 2 + gap + diameter / 2)
     }
 }
