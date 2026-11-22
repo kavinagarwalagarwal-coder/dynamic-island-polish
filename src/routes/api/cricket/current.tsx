@@ -71,24 +71,30 @@ export const Route = createFileRoute("/api/cricket/current")({
             if (payload.data.length < 25) break;
           }
 
-          const matches = currentMatches.map((match) => ({
-            id: match.id ?? match.name ?? "",
-            name: match.name ?? "Cricket match",
-            matchType: match.matchType ?? "",
-            status: match.status ?? "Live",
-            venue: match.venue ?? "",
-            date: match.date ?? "",
-            teams: Array.isArray(match.teams) ? match.teams.slice(0, 2) : [],
-            score: Array.isArray(match.score)
-              ? match.score.slice(0, 4).map((score) => ({
-                  team: score.team ?? "",
-                  inning: score.inning ?? "",
-                  runs: Number.isFinite(score.r) ? score.r : null,
-                  wickets: Number.isFinite(score.w) ? score.w : null,
-                  overs: Number.isFinite(score.o) ? score.o : null,
-                }))
-              : [],
-          }));
+          const matches = currentMatches
+            .filter((match) => {
+              const teams = Array.isArray(match.teams) ? match.teams : [];
+              const teamNames = [...teams, match.name ?? ""].map((s) => s.toLowerCase());
+              return teamNames.some((s) => /\bindia\b/.test(s));
+            })
+            .map((match) => ({
+              id: match.id ?? match.name ?? "",
+              name: match.name ?? "Cricket match",
+              matchType: match.matchType ?? "",
+              status: match.status ?? "Live",
+              venue: match.venue ?? "",
+              date: match.date ?? "",
+              teams: Array.isArray(match.teams) ? match.teams.slice(0, 2) : [],
+              score: Array.isArray(match.score)
+                ? match.score.slice(0, 4).map((score) => ({
+                    team: score.team ?? "",
+                    inning: score.inning ?? "",
+                    runs: Number.isFinite(score.r) ? score.r : null,
+                    wickets: Number.isFinite(score.w) ? score.w : null,
+                    overs: Number.isFinite(score.o) ? score.o : null,
+                  }))
+                : [],
+            }));
 
           return Response.json(
             { matches, updatedAt: new Date().toISOString() },
