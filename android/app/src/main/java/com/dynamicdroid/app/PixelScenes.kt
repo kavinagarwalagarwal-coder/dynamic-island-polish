@@ -8,6 +8,7 @@ import kotlin.math.abs
 import kotlin.math.floor
 import kotlin.math.max
 import kotlin.math.min
+import kotlin.math.sin
 
 /**
  * Little dot-matrix scenes that stand in for plain level bars, in the island's pixel style:
