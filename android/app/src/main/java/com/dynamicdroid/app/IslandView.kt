@@ -2627,7 +2627,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun scoreHeight(a: LiveActivity, b: Scoreboard): Float =
         dp(SCORE_BASE_DP) + (if (b.chase != null) dp(SCORE_CHASE_DP) else 0f) +
-            (if (b.summary.isNotBlank()) dp(SCORE_SUMMARY_DP) else 0f) + (if (cricketEventActive() && features.pixelScenes) dp(34f) else 0f) + (if (visibleActions(a).isNotEmpty()) dp(52f) else 0f)
+            (if (b.summary.isNotBlank()) dp(SCORE_SUMMARY_DP) else 0f) + (if (features.pixelScenes) dp(34f) else 0f) + (if (visibleActions(a).isNotEmpty()) dp(52f) else 0f)
 
     /** A team's colour on the black island: Apple keeps team colours (lifted if too dark); Nothing stays monochrome. */
     private fun teamColor(t: Scoreboard.Team): Int {
@@ -2749,7 +2749,6 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         }
         if (features.pixelScenes && cricketEventActive()) {
             val elapsed = ((SystemClock.uptimeMillis() - cricketEventAt).toFloat() / CRICKET_EVENT_MS).coerceIn(0f, 1f)
-            val eventH = dp(26f)
             val eventRect = RectF(l, rect.bottom - dp(31f), rr, rect.bottom - dp(5f))
             pixels.cricket(canvas, eventRect, cricketEvent ?: "FOUR", elapsed, SystemClock.uptimeMillis(), late)
             val label = when (cricketEvent) { "WICKET" -> "WICKET!"; "SIX" -> "SIX!"; else -> "FOUR!" }
