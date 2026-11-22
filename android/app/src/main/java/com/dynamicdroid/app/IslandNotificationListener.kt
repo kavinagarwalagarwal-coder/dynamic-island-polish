@@ -276,6 +276,7 @@ class IslandNotificationListener : NotificationListenerService() {
             detail = extras.getCharSequence(Notification.EXTRA_SUB_TEXT)?.toString().orEmpty(),
             shortText = if (mode == IslandMode.LIVE && !hotspot) (if (liveScore) LiveSignals.cricketScore(scoreLines) else null)
                 ?: LiveSignals.shortText(shortCritical, title, text) else null,
+            scoreboard = if (liveScore && mode == IslandMode.LIVE) LiveSignals.cricketBoard(scoreLines) else null,
         )
         if (mode == IslandMode.TIMER) timers[sbn.key] = activity
         if (mode == IslandMode.RECORDING) recordings += sbn.key

@@ -419,6 +419,9 @@ private fun MainActivity.FitPage(flow: Flow) {
             fit = fit.copy(placement = it); updateFit()
         }
     }
+    if (fit.placement == IslandPlacement.CAMERA && IslandAccessibilityService.instance == null) {
+        ActionButton(stringResource(R.string.setup_a11y_allow), flow.next()) { openAccessibility() }
+    }
     ActionButton(stringResource(R.string.fit_test), flow.next()) { testFit() }
     ActionButton(stringResource(R.string.fit_save_profile), flow.next()) { saveProfile() }
     ActionButton(stringResource(R.string.fit_load_profile), flow.next()) { loadProfile() }
@@ -491,6 +494,7 @@ private fun MainActivity.FeaturesPage(flow: Flow) {
         toggle(R.string.feature_show_navigation, "show_navigation", f.navigation)
         toggle(R.string.feature_recording, "show_recording", f.recording, R.string.feature_recording_note)
         toggle(R.string.camera_activity, "camera_activity", f.cameraActivity, R.string.camera_activity_note)
+        toggle(R.string.feature_auto_cricket, "auto_cricket", f.autoCricket, R.string.feature_auto_cricket_note)
         Note(stringResource(R.string.live_last_seen) + " " + remember { LiveDiagnostics.read(this@FeaturesPage) }, size = 13)
     }
     val cricketContext = LocalContext.current
@@ -623,6 +627,9 @@ private fun MainActivity.LookPage(flow: Flow) {
             IslandPlacement.CAMERA to stringResource(R.string.fit_camera),
             IslandPlacement.BELOW_STATUS_BAR to stringResource(R.string.fit_below)), fit.placement) {
             fit = fit.copy(placement = it); updateFit()
+        }
+        if (fit.placement == IslandPlacement.CAMERA && IslandAccessibilityService.instance == null) {
+            ActionButton(stringResource(R.string.setup_a11y_allow)) { openAccessibility() }
         }
         val percent = stringResource(R.string.unit_percent)
         val dpUnit = stringResource(R.string.unit_dp)

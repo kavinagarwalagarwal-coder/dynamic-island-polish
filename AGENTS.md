@@ -10,6 +10,7 @@
 <!-- LOVABLE:END -->
 
 - The real product is the native Android app in `android/`; island motion is spring-driven in IslandView.kt (no Animator APIs) so every gesture can interrupt any animation.
+- Solve Spring's damped motion analytically and derive liquid deformation from normalized axis velocity in IslandMotion; this keeps refresh rates consistent and avoids a second settle-triggered animation.
 - The island window is hosted by IslandAccessibilityService (TYPE_ACCESSIBILITY_OVERLAY) when enabled, falling back to TYPE_APPLICATION_OVERLAY; app overlays sit below the status bar, so top-edge taps would otherwise open the notification shade.
 - The wake intro is armed on SCREEN_OFF and played only after the keyguard is gone (polled), because overlays animating behind the lock screen are never seen.
 - Keep the overlay window full-width with state-sized height so its horizontal drawing origin never jumps during WindowManager relayout.
@@ -24,3 +25,4 @@
 - The settled idle overlay window must be FLAG_NOT_TOUCHABLE with minimal height so it never deadens the screen strip it covers, except when the resting pill opens the home card; render() and onSettled both decide through IslandTouchPolicy.takesTouches so they never disagree.
 - Native settings use wrap-content text controls with minimum touch sizes and labelled platform widgets so system font scaling and accessibility services remain usable.
 - Idle without the resting pill (the Nothing look's default) is invisible and contracts to the physical camera cutout; the Apple look keeps a black resting pill at the camera instead; it never renders an extra status bar. Keep its overlay touch-through. Expand out of the cutout only for active content. Fullscreen concealment remains spring-driven. Timers detach beside normal activities by default; a hold can explicitly focus one.
+- Network access exists only for CricketScoreFeed's public score download (CricketScores parses it, pure and unit-tested); never send user, notification, wallpaper or screen data over the network.

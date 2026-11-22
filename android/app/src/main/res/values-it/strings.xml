@@ -531,4 +531,8 @@
     <string name="more_touch">Tocco e vibrazione</string>
     <string name="more_permissions">Autorizzazioni</string>
     <string name="more_help">Aiuto e aggiornamenti</string>
+    <string name="score_live">LIVE</string>
+    <string name="score_yet_to_bat">Deve ancora battere</string>
+    <string name="score_target">Obiettivo</string>
+    <string name="score_vs">vs</string>
 </resources>

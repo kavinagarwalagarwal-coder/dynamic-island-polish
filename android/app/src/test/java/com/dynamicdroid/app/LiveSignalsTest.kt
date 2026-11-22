@@ -60,4 +60,35 @@ class LiveSignalsTest {
         assertTrue(LiveSignals.isLiveScore(LiveSignals.GOOGLE_APP, true, false, google))
         assertTrue(LiveSignals.isLiveScore("com.cricbuzz.android", true, false, listOf("Live", "198-7")))
     }
+
+    @Test fun cricketNotificationsBecomeATwoTeamScoreboard() {
+        val b = LiveSignals.cricketBoard(listOf("IND 245/3 (42.1 ov) vs AUS 274/8", "IND need 30 runs from 47 balls"))!!
+        assertEquals("IND", b.home.abbr); assertEquals("245/3", b.home.score); assertEquals("42.1 ov", b.home.overs)
+        assertTrue(b.home.batting)
+        assertEquals("AUS", b.away.abbr); assertEquals("274/8", b.away.score); assertFalse(b.away.batting)
+        assertEquals("IND need 30 runs from 47 balls", b.summary)
+        // Google's pinned score in separate boxes, with the other side yet to bat.
+        val g = LiveSignals.cricketBoard(listOf("Australia", "AUS", "245/3", "(42.1 ov)", "England", "ENG", "Yet to bat"))!!
+        assertEquals("AUS", g.home.abbr); assertEquals("ENG", g.away.abbr); assertEquals("", g.away.score)
+        // One team alone, or numbers without a cricket score, are not a scoreboard.
+        assertNull(LiveSignals.cricketBoard(listOf("IND 245/3 (42.1 ov)")))
+        assertNull(LiveSignals.cricketBoard(listOf("ETA 5 min", "PNR 1234")))
+    }
+
+    @Test fun scoreboardNotificationsKeepTheCurrentInningsAndOneBatter() {
+        val multi = LiveSignals.cricketBoard(listOf("NZ 368 & 75/1 (22 ov) vs IND 486/4"))!!
+        assertEquals("75/1", multi.home.score); assertEquals("368", multi.home.previous); assertTrue(multi.home.batting)
+        assertFalse(multi.away.batting)
+        val both = LiveSignals.cricketBoard(listOf("IND 245/3 (42.1 ov) vs AUS 274/8 (50 ov)"))!!
+        assertTrue(both.home.batting); assertFalse(both.away.batting)
+        val named = LiveSignals.cricketBoard(listOf("AUS 274/8 (50 ov) vs IND 245/3 (42 ov)", "IND need 30 runs from 48 balls"))!!
+        assertFalse(named.home.batting); assertTrue(named.away.batting)
+        val lead = LiveSignals.cricketBoard(listOf("AUS 486 vs IND 245/3 (62.1 ov)", "AUS lead by 241 runs"))!!
+        assertFalse(lead.home.batting); assertTrue(lead.away.batting)
+        val done = LiveSignals.cricketBoard(listOf("IND 275/4 (48.2 ov) vs AUS 274/8 (50 ov)", "IND won by 6 wickets"))!!
+        assertFalse(done.live); assertFalse(done.inPlay); assertEquals("Result", done.status)
+        assertFalse(done.home.batting || done.away.batting)
+        val split = LiveSignals.cricketBoard(listOf("AUS 245/3", "(42.1 ov)", "ENG", "Yet to bat"))!!
+        assertEquals("42.1 ov", split.home.overs); assertTrue(split.home.batting)
+    }
 }

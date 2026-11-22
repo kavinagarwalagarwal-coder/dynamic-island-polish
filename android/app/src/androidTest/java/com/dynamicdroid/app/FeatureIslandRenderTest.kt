@@ -70,6 +70,14 @@ class FeatureIslandRenderTest {
             chronometerCountDown = true, clockBaseElapsed = SystemClock.elapsedRealtime() + 240_000)
         val music = LiveActivity("music", "test.music", IslandMode.MUSIC, "Midnight City", "M83", "Music", null, null,
             Color.WHITE, isPlaying = false)
+        val cricket = activity("cricket", IslandMode.LIVE, "IND 245/3 (42.1 ov)  ·  AUS 274/8", "IND need 30 runs from 47 balls", "Live cricket")
+            .copy(scoreboard = Scoreboard(
+                Scoreboard.Team("IND", "245/3", "42.1 ov", batting = true, target = 275), Scoreboard.Team("AUS", "274/8", "50 ov"),
+                "Live", "IND need 30 runs from 47 balls", "Australia tour of India"))
+        val testMatch = activity("cricket-test", IslandMode.LIVE, "NZ 368  ·  IND 486/4", "India lead by 118 runs", "Live cricket")
+            .copy(scoreboard = Scoreboard(
+                Scoreboard.Team("NZ", "368"), Scoreboard.Team("IND", "75/1", "22 ov", batting = true, previous = "411"),
+                "Stumps", "India lead by 118 runs", "India tour of New Zealand"))
         val scenes = listOf(
             Triple("feature-volume", activity("volume", IslandMode.VOLUME, "Media", "", progress = .6f), Presentation.EXPANDED),
             Triple("feature-headphones", activity("ear", IslandMode.DEVICE, "Nothing Ear (a)", "Connected", progress = .73f), Presentation.EXPANDED),
@@ -86,6 +94,9 @@ class FeatureIslandRenderTest {
             Triple("feature-ringer-vibrate", activity("ringer2", IslandMode.RINGER, "Vibrate", "").copy(ringer = RingerState.VIBRATE), Presentation.EXPANDED),
             Triple("feature-ringer-ring", activity("ringer3", IslandMode.RINGER, "Ring", "").copy(ringer = RingerState.RING), Presentation.EXPANDED),
             Triple("feature-ringer-dnd", activity("ringer4", IslandMode.RINGER, "Do Not Disturb", "").copy(ringer = RingerState.DND_ON), Presentation.EXPANDED),
+            Triple("feature-cricket-compact", cricket, Presentation.COMPACT),
+            Triple("feature-cricket-expanded", cricket, Presentation.EXPANDED),
+            Triple("feature-cricket-test-match", testMatch, Presentation.EXPANDED),
         )
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { activity ->

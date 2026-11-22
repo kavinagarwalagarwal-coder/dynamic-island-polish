@@ -12,7 +12,6 @@ import android.graphics.Color
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.RectF
-import android.graphics.drawable.GradientDrawable
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -52,7 +51,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private var params: WindowManager.LayoutParams? = null
     private var glassWindow: LiveGlassWindow? = null
     private var glassDialog: Dialog? = null
-    private var glassBackground: GradientDrawable? = null
     private var glassBlurManager: WindowManager? = null
     private var glassBlurListener: Consumer<Boolean>? = null
     private var crossWindowBlurAvailable = false
@@ -71,6 +69,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
     private var transientExpanded = false
     private var devices: DeviceMonitor? = null
     private var events: SystemEvents? = null
+    private var cricket: CricketScoreFeed? = null
     /** The island's own stopwatch: when it started (elapsed) and, while paused, how far it got. */
     private var stopwatchStart = 0L
     private var stopwatchPausedAt: Long? = null
@@ -412,6 +411,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         if (IslandCustomization.quietEnabled(this)) handler.postDelayed(refreshQuietRules, 60_000L)
         devices = DeviceMonitor(this) { onActivity(it) }.also { it.start() }
         events = SystemEvents(this, ::onActivity, ::onRemoved).also { it.start() }
+        cricket = CricketScoreFeed(this, ::onActivity, ::onRemoved).also { it.start() }
         reply = ReplyPanel(this, ::onReplySent) { armTransientTimeout(transient) }
         IslandAccessibilityService.onVolumeKey = ::handleVolumeKey
         StatusBarCleanup.undo(this)
@@ -1296,10 +1296,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             setContentView(view)
         }
         val window = dialog.window ?: return
-        val background = GradientDrawable().apply {
-            setColor(Color.argb(18, 255, 255, 255))
-            cornerRadius = 26f * resources.displayMetrics.density
-        }
         val lp = window.attributes.apply {
             this.type = type
             width = 1
@@ -1319,12 +1315,11 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
                 layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             }
         }
-        window.setBackgroundDrawable(background)
+        window.setBackgroundDrawableResource(android.R.color.transparent)
         window.attributes = lp
         if (runCatching { dialog.show() }.isFailure) return
         glassWindow = view
         glassDialog = dialog
-        glassBackground = background
         glassBlurManager = wm
         val listener = Consumer<Boolean> { enabled -> handler.post { updateLiveGlassAvailability(enabled) } }
         glassBlurListener = listener
@@ -1358,7 +1353,6 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
         runCatching { glassDialog?.dismiss() }
         glassWindow = null
         glassDialog = null
-        glassBackground = null
         glassBlurManager = null
         glassBlurListener = null
         glassAppliedBounds.setEmpty()
@@ -1392,16 +1386,17 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
             return
         }
         if (next != glassAppliedBounds || blur.visibility != View.VISIBLE) {
+            blur.visibility = View.INVISIBLE
+            window.setBackgroundBlurRadius(0)
             val lp = window.attributes
             lp.x = next.left
             lp.y = next.top
             lp.width = next.width().coerceAtLeast(1)
             lp.height = next.height().coerceAtLeast(1)
             lp.gravity = Gravity.TOP or Gravity.LEFT
-            glassBackground?.cornerRadius = minOf(lp.height / 2f, 26f * resources.displayMetrics.density)
             window.attributes = lp
-            window.setBackgroundBlurRadius((24f * resources.displayMetrics.density).toInt())
             glassAppliedBounds.set(next)
+            window.setBackgroundBlurRadius((24f * resources.displayMetrics.density).toInt())
             blur.visibility = View.VISIBLE
         }
     }
@@ -1468,6 +1463,7 @@ class IslandOverlayService : Service(), IslandBus.Listener, IslandView.Callbacks
 
     override fun onDestroy() {
         if (instance === this) instance = null
+        cricket?.stop(); cricket = null
         if (IslandBus.listener === this) IslandBus.listener = null
         IslandAccessibilityService.onChanged = null
         IslandAccessibilityService.onForegroundPackage = null

@@ -531,4 +531,8 @@
     <string name="more_touch">टच और हैप्टिक्स</string>
     <string name="more_permissions">अनुमतियाँ</string>
     <string name="more_help">मदद और अपडेट</string>
+    <string name="score_live">लाइव</string>
+    <string name="score_yet_to_bat">बल्लेबाज़ी बाकी</string>
+    <string name="score_target">लक्ष्य</string>
+    <string name="score_vs">बनाम</string>
 </resources>

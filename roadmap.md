@@ -1,4 +1,6 @@
 # Current work
+- [ ] Refine native animation timing, liquid settling and gesture feedback; run focused regression tests.
+- [ ] Improve the root and Android READMEs with accurate setup, privacy, build and troubleshooting notes.
 - [x] Fix dead touch strip at the top: idle window is now touch-through with minimal height, touches restore instantly when an activity shows.
 - [x] Add wallpaper theming: read current wallpaper or pick an image, extract main colours, tint island accents, persist and live-update the overlay.
 - [x] Polish animation details: staggered content fade on expand, softer compact press, themed waves/progress.

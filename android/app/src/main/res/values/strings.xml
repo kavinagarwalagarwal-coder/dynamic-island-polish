@@ -189,6 +189,7 @@
     <string name="placement_below">Below status bar • avoids system clock and icon overlap</string>
     <string name="placement_camera">Camera-area overlay connected • Automatic follows the camera in portrait</string>
     <string name="placement_standard">Standard overlay • Automatic keeps the island below the status bar</string>
+    <string name="placement_camera_needs_accessibility">To place the island over the camera cutout, enable its Accessibility overlay. Android keeps standard overlays below the status bar.</string>
     <string name="glass_heading">WALLPAPER GLASS</string>
     <string name="glass_hint">Choose your wallpaper image. It stays still beneath the refracted glass.</string>
     <string name="glass_choose">Choose wallpaper image</string>
@@ -564,4 +565,11 @@
     <string name="more_touch">Touch &amp; haptics</string>
     <string name="more_permissions">Permissions</string>
     <string name="more_help">Help &amp; updates</string>
+    <string name="feature_auto_cricket">Live cricket scores automatically</string>
+    <string name="feature_auto_cricket_note">Shows India\'s live matches (and other international games) without any cricket app. Downloads only the public score list every 30 seconds during a match; nothing about you is sent.</string>
+    <string name="cricket_live_label">Live cricket</string>
+    <string name="score_live">LIVE</string>
+    <string name="score_yet_to_bat">Yet to bat</string>
+    <string name="score_target">Target</string>
+    <string name="score_vs">vs</string>
 </resources>

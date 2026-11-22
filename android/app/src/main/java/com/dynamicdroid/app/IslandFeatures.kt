@@ -70,6 +70,8 @@ data class IslandFeatureSet(
     val navigation: Boolean = true,
     /** Live trips, orders, scores and flights from apps, and the hotspot (Android 16 Live Updates and more). */
     val liveUpdates: Boolean = true,
+    /** Live cricket scores fetched from the internet, shown without any cricket app. */
+    val autoCricket: Boolean = true,
     /** Screen and voice recording in progress. */
     val recording: Boolean = true,
     /** Live cricket scores fetched through Dynamic Droid's secure score proxy. */
@@ -189,6 +191,7 @@ object IslandFeatures {
             timers = p.getBoolean("show_timers", d.timers),
             navigation = p.getBoolean("show_navigation", d.navigation),
             liveUpdates = p.getBoolean("show_live", d.liveUpdates),
+            autoCricket = p.getBoolean("auto_cricket", d.autoCricket),
             recording = p.getBoolean("show_recording", d.recording),
             cricketScores = p.getBoolean("cricket_scores", d.cricketScores),
             cameraActivity = p.getBoolean("camera_activity", d.cameraActivity),
@@ -216,6 +219,10 @@ object IslandFeatures {
             appMorph = p.getBoolean("app_morph", d.appMorph),
         ).safe()
     }
+
+    /** Teams whose live matches show first, as score-feed codes ("IND"). */
+    fun cricketTeams(context: Context): List<String> =
+        p(context).getString("cricket_teams", "IND").orEmpty().split(',').map { it.trim().uppercase() }.filter { it.isNotEmpty() }
 
     fun setBoolean(context: Context, key: String, value: Boolean) = p(context).edit().putBoolean(key, value).apply()
     fun setCompactHeight(context: Context, dp: Float) = p(context).edit()

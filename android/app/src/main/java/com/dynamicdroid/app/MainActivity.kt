@@ -462,6 +462,11 @@ class MainActivity : AppCompatActivity() {
         title = "IND 245/3 (42.1 ov)  ·  AUS 274/8", subtitle = getString(R.string.demo_score_text),
         appLabel = "Cricbuzz", appIcon = null, artwork = null, accent = AppStyle.GREEN,
         shortText = LiveSignals.cricketScore(listOf("IND 245/3 (42.1 ov)")),
+        scoreboard = Scoreboard(
+            home = Scoreboard.Team("IND", "245/3", "42.1 ov", batting = true, target = 275),
+            away = Scoreboard.Team("AUS", "274/8", "50 ov"),
+            status = "Live", summary = getString(R.string.demo_score_text), league = "Australia tour of India",
+        ),
     )
 
     internal fun demoNavigation() = LiveActivity(
@@ -553,6 +558,8 @@ class MainActivity : AppCompatActivity() {
 
     internal fun placementExplanation(): String = when {
         fit.placement == IslandPlacement.BELOW_STATUS_BAR -> getString(R.string.placement_below)
+        fit.placement == IslandPlacement.CAMERA && IslandAccessibilityService.instance == null ->
+            getString(R.string.placement_camera_needs_accessibility)
         IslandAccessibilityService.instance != null -> getString(R.string.placement_camera)
         else -> getString(R.string.placement_standard)
     }
