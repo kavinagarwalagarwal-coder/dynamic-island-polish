@@ -186,6 +186,30 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
     private var eventOutlineUntil = 0L
     /** When the current ringer state first showed; drives its one-shot glyph animation. */
     private var ringerAnimAt = 0L
+    /** One-shot cricket highlight inferred from a real scoreboard change, never from redraws. */
+    private var cricketEvent: String? = null
+    private var cricketEventAt = 0L
+    private val CRICKET_EVENT_MS = 2_100L
+
+    private fun detectCricketEvent(old: LiveActivity?, next: LiveActivity?): String? {
+        if (old == null || next == null || old.key != next.key ||
+            old.mode != IslandMode.LIVE || next.mode != IslandMode.LIVE) return null
+        val before = old.scoreboard ?: return null
+        val after = next.scoreboard ?: return null
+        val oldBat = before.batting ?: return null
+        val newBat = after.batting ?: return null
+        if (!oldBat.abbr.equals(newBat.abbr, true)) return null
+        val oldRuns = oldBat.runs ?: return null
+        val newRuns = newBat.runs ?: return null
+        val oldWickets = oldBat.score.substringAfter('/', "").takeWhile { it.isDigit() }.toIntOrNull()
+        val newWickets = newBat.score.substringAfter('/', "").takeWhile { it.isDigit() }.toIntOrNull()
+        if (oldWickets != null && newWickets != null && newWickets > oldWickets) return "WICKET"
+        return when (newRuns - oldRuns) { 4 -> "FOUR"; 6 -> "SIX"; else -> null }
+    }
+
+    private fun cricketEventActive(now: Long = SystemClock.uptimeMillis()) =
+        cricketEvent != null && now - cricketEventAt < CRICKET_EVENT_MS
+
     private val moonCut = Path()
     private val haloPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
     private val outlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE }
@@ -798,6 +822,10 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         // Nothing showing: the next scene appears fresh rather than fading from an old one.
         if (next == null) { sceneKindNow = null; sceneNow = null; scenePrev = null }
         val old = activity
+        detectCricketEvent(old, next)?.let { event ->
+            cricketEvent = event
+            cricketEventAt = SystemClock.uptimeMillis()
+        }
         if (old != null && next != null && old.key == next.key && next.mode == IslandMode.TIMER &&
             ((old.pausedTimerMs == null) != (next.pausedTimerMs == null) ||
                 (old.clockMs() ?: 0L) > 0L && next.clockMs() == 0L)) {
@@ -826,6 +854,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             }
         }
         activity = next
+        if (cricketEventActive() && next?.mode == IslandMode.LIVE && next.scoreboard != null) kick()
         userAccent = next?.let { IslandCustomization.customAccent(context, it.packageName) }
         mediaActions = next?.let { activity -> IslandCustomization.mediaSelection(context, activity.packageName)
             ?: setOf(IslandBus.MEDIA_PREVIOUS, IslandBus.MEDIA_TOGGLE, IslandBus.MEDIA_NEXT, IslandBus.MEDIA_SEEK) }
@@ -1542,6 +1571,8 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
             usesDots(a) && (cardDots.beatGlow > 0.01f || cardDots.rippling || fieldFading) -> 16L
             a.mode == IslandMode.CALL -> 50L
             // Pixel scenes tick at a retro 15 fps while their card is open.
+            features.pixelScenes && !reduceMotion && presentation == Presentation.EXPANDED &&
+                a.mode == IslandMode.LIVE && a.scoreboard != null && cricketEventActive() -> 66L
             features.pixelScenes && !reduceMotion && presentation == Presentation.EXPANDED &&
                 (a.mode == IslandMode.VOLUME || a.mode == IslandMode.DOWNLOAD || a.mode == IslandMode.CHARGING) -> 66L
             a.mode == IslandMode.ALARM -> 33L
@@ -2596,7 +2627,7 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
 
     private fun scoreHeight(a: LiveActivity, b: Scoreboard): Float =
         dp(SCORE_BASE_DP) + (if (b.chase != null) dp(SCORE_CHASE_DP) else 0f) +
-            (if (b.summary.isNotBlank()) dp(SCORE_SUMMARY_DP) else 0f) + (if (visibleActions(a).isNotEmpty()) dp(52f) else 0f)
+            (if (b.summary.isNotBlank()) dp(SCORE_SUMMARY_DP) else 0f) + (if (cricketEventActive() && features.pixelScenes) dp(34f) else 0f) + (if (visibleActions(a).isNotEmpty()) dp(52f) else 0f)
 
     /** A team's colour on the black island: Apple keeps team colours (lifted if too dark); Nothing stays monochrome. */
     private fun teamColor(t: Scoreboard.Team): Int {
@@ -2715,6 +2746,15 @@ class IslandView(context: Context) : View(context), Choreographer.FrameCallback 
         if (b.summary.isNotBlank()) {
             fadeText(canvas, a, 1, b.summary, l, y + dp(16f), rr - l, bodyPaint, cFg, late)
             y += dp(SCORE_SUMMARY_DP)
+        }
+        if (features.pixelScenes && cricketEventActive()) {
+            val elapsed = ((SystemClock.uptimeMillis() - cricketEventAt).toFloat() / CRICKET_EVENT_MS).coerceIn(0f, 1f)
+            val eventH = dp(26f)
+            val eventRect = RectF(l, rect.bottom - dp(31f), rr, rect.bottom - dp(5f))
+            pixels.cricket(canvas, eventRect, cricketEvent ?: "FOUR", elapsed, SystemClock.uptimeMillis(), late)
+            val label = when (cricketEvent) { "WICKET" -> "WICKET!"; "SIX" -> "SIX!"; else -> "FOUR!" }
+            val labelColor = when (cricketEvent) { "WICKET" -> 0xFFFF7468.toInt(); "SIX" -> 0xFFFFD76A.toInt(); else -> 0xFF8FE3A0.toInt() }
+            text(canvas, label, rr, eventRect.top - dp(2f), dp(68f), smallPaint, labelColor, late, alignRight = true)
         }
         if (visibleActions(a).isNotEmpty()) drawActions(canvas, a, l, y + dp(6f), rr, late)
     }
