@@ -11,6 +11,8 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -289,16 +291,25 @@ fun SettingsCard(
     summary: String? = null,
     modifier: Modifier = Modifier,
     startOpen: Boolean = false,
+    openRequest: Int? = null,
     checked: Boolean? = null,
     onChecked: (Boolean) -> Unit = {},
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     var open by androidx.compose.runtime.saveable.rememberSaveable(title) { mutableStateOf(startOpen) }
+    val bringIntoView = remember { BringIntoViewRequester() }
+    LaunchedEffect(openRequest) {
+        if (openRequest != null) {
+            open = true
+            kotlinx.coroutines.delay(120L)
+            bringIntoView.bringIntoView()
+        }
+    }
     val source = remember { MutableInteractionSource() }
     val turn by animateFloatAsState(if (open) 90f else 0f, Fluid.snappy(), label = "chevron")
     val edge by animateColorAsState(if (open) Fluid.muted.copy(alpha = 0.55f) else Fluid.line, Fluid.liquid(), label = "cardEdge")
     Column(
-        modifier.fillMaxWidth().padding(top = 12.dp)
+        modifier.fillMaxWidth().padding(top = 12.dp).bringIntoViewRequester(bringIntoView)
             .background(Fluid.surface, Fluid.card).border(1.dp, edge, Fluid.card)
             .clip(Fluid.card),
     ) {

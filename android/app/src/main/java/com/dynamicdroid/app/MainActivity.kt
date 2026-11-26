@@ -71,6 +71,8 @@ class MainActivity : AppCompatActivity() {
     internal var hasDotPhoto by mutableStateOf(false)
     /** Counts page visits, so each visit flows its content in afresh. */
     internal var visit by mutableIntStateOf(0)
+    internal var focusSection by mutableStateOf<String?>(null)
+    internal var focusRequest by mutableIntStateOf(0)
 
     internal var headerLogo: LogoMarkView? = null
     private var onboarding: OnboardingOverlay? = null
@@ -256,6 +258,7 @@ class MainActivity : AppCompatActivity() {
 
     /** Switches page; the logo rebuilds and the new page's parts flow in. */
     internal fun selectPage(requested: String) {
+        focusSection = null
         // Older page names (from before the four-page layout) still land somewhere sensible.
         val name = when (requested) {
             "Playground" -> "Home"
@@ -269,6 +272,12 @@ class MainActivity : AppCompatActivity() {
         page = name
         visit++
         headerLogo?.takeIf { !Motion.reduced(this) }?.play(0L, 750L)
+    }
+
+    internal fun selectDestination(targetPage: String, section: String?) {
+        if (targetPage == page) visit++ else selectPage(targetPage)
+        focusSection = section
+        focusRequest++
     }
 
     @VisibleForTesting fun openPage(name: String) = selectPage(name)

@@ -83,6 +83,10 @@
     <string name="nav_appearance">Appearance</string>
     <string name="nav_rules">Rules</string>
     <string name="nav_phone_fit">Phone fit</string>
+    <string name="finder_open">Find a setting</string>
+    <string name="finder_hint">Find a setting, action, or setup step</string>
+    <string name="finder_title">Where do you want to go?</string>
+    <string name="finder_empty">No matching sections. Try another word.</string>
     <string name="play_heading">TRY YOUR ISLAND</string>
     <string name="play_hint">Tap a scene. Hold the island to expand it, or swipe up to collapse.</string>
     <string name="demo_music">Music</string>
@@ -535,9 +539,9 @@
     <string name="feature_pixel_scenes">Pixel scenes</string>
     <string name="feature_pixel_scenes_note">Volume is a car driving down a pixel street, a download is a rocket flying to a planet, and charging is a pixel battery with a spark running through it.</string>
     <string name="nav_home">Home</string>
-    <string name="nav_islands">Islands</string>
-    <string name="nav_look">Look</string>
-    <string name="nav_more">More</string>
+    <string name="nav_islands">Setup</string>
+    <string name="nav_look">Style</string>
+    <string name="nav_more">Settings</string>
     <string name="home_ready">Your island is on</string>
     <string name="home_setup">Finish setting up</string>
     <string name="home_try">Try your island</string>
