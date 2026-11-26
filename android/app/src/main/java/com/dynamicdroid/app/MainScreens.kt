@@ -21,6 +21,8 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -42,9 +44,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.platform.LocalContext
@@ -71,16 +77,24 @@ import androidx.compose.ui.viewinterop.AndroidView
 
 internal val PAGE_ORDER = listOf("Home", "Islands", "Look", "More")
 
+private data class FinderDestination(
+    val title: String,
+    val page: String,
+    val section: String?,
+    val keywords: String,
+)
+
 /**
- * The whole app: a slim header, the current page, and a floating bar to move between four pages.
- * Settings live in cards that fold open, so each page starts short and calm.
+ * The whole app: a slim header, quick settings finder, current page, and floating page bar.
  */
 @Composable
 internal fun MainActivity.MainScreen() {
     val reduce = Motion.reduced(this)
+    var finderOpen by remember { mutableStateOf(false) }
     Box(Modifier.fillMaxSize().background(Fluid.backdrop)) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing).padding(horizontal = 20.dp)) {
             Header()
+            FinderLauncher { finderOpen = true }
             AnimatedContent(
                 targetState = page,
                 transitionSpec = {
@@ -112,6 +126,98 @@ internal fun MainActivity.MainScreen() {
             Modifier.align(Alignment.BottomCenter).windowInsetsPadding(WindowInsets.safeDrawing)
                 .padding(start = 20.dp, end = 20.dp, bottom = 12.dp)) { selectPage(it) }
     }
+    if (finderOpen) SettingsFinder(onDismiss = { finderOpen = false }) { destination ->
+        finderOpen = false
+        selectDestination(destination.page, destination.section)
+    }
+}
+
+@Composable
+private fun FinderLauncher(onClick: () -> Unit) {
+    val label = stringResource(R.string.finder_open)
+    Row(
+        Modifier.fillMaxWidth().padding(bottom = 4.dp).defaultMinSize(minHeight = 48.dp)
+            .background(Fluid.surface, Fluid.pill).border(1.dp, Fluid.line, Fluid.pill)
+            .clickable(role = Role.Button, onClick = onClick)
+            .semantics { contentDescription = label },
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        androidx.compose.material3.Icon(
+            Icons.Outlined.Search,
+            contentDescription = null,
+            tint = Fluid.muted,
+            modifier = Modifier.padding(start = 15.dp, end = 10.dp).size(20.dp),
+        )
+        Text(stringResource(R.string.finder_hint), style = TextStyle(fontFamily = Fluid.body, fontSize = 14.sp, color = Fluid.muted))
+    }
+}
+
+@Composable
+private fun MainActivity.SettingsFinder(onDismiss: () -> Unit, onSelect: (FinderDestination) -> Unit) {
+    var query by remember { mutableStateOf("") }
+    val destinations = remember {
+        listOf(
+            FinderDestination(getString(R.string.more_setup), "Islands", null, "setup connect start guide"),
+            FinderDestination(getString(R.string.more_permissions), "More", getString(R.string.more_permissions), "overlay notifications accessibility access"),
+            FinderDestination(getString(R.string.more_behaviour), "More", getString(R.string.more_behaviour), "behavior display lock screen burn-in"),
+            FinderDestination(getString(R.string.more_touch), "More", getString(R.string.more_touch), "touch vibration haptics"),
+            FinderDestination(getString(R.string.more_help), "More", getString(R.string.more_help), "help tour updates errors"),
+            FinderDestination(getString(R.string.look_style), "Look", getString(R.string.look_style), "style motion animation"),
+            FinderDestination(getString(R.string.look_colours), "Look", getString(R.string.look_colours), "color colour theme wallpaper accent"),
+            FinderDestination(getString(R.string.look_size), "Look", getString(R.string.look_size), "size position camera fit phone"),
+            FinderDestination(getString(R.string.look_glass), "Look", getString(R.string.look_glass), "wallpaper glass background"),
+            FinderDestination(getString(R.string.home_real_timer), "Home", "__timer_shortcut__", "timer countdown start clock"),
+        )
+    }
+    val matches = remember(query, destinations) {
+        val needle = query.trim().lowercase()
+        destinations.filter { needle.isBlank() || it.title.lowercase().contains(needle) || it.keywords.contains(needle) }
+    }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = Fluid.surface,
+        titleContentColor = Fluid.foreground,
+        textContentColor = Fluid.foreground,
+        title = { Text(stringResource(R.string.finder_title), style = TextStyle(fontFamily = Fluid.body, fontSize = 19.sp, fontWeight = FontWeight.SemiBold)) },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    singleLine = true,
+                    label = { Text(stringResource(R.string.finder_open)) },
+                    placeholder = { Text(stringResource(R.string.finder_hint), color = Fluid.muted) },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = Fluid.pill,
+                    colors = OutlinedTextFieldDefaults.colors(
+                        focusedTextColor = Fluid.foreground, unfocusedTextColor = Fluid.foreground,
+                        focusedBorderColor = Fluid.aqua, unfocusedBorderColor = Fluid.line,
+                        cursorColor = Fluid.aqua, focusedContainerColor = Fluid.background,
+                        unfocusedContainerColor = Fluid.background,
+                    ),
+                )
+                Column(Modifier.fillMaxWidth().height(300.dp).verticalScroll(rememberScrollState())) {
+                    if (matches.isEmpty()) {
+                        Note(stringResource(R.string.finder_empty), Modifier.padding(top = 16.dp), size = 14)
+                    } else matches.forEach { destination ->
+                        Row(
+                            Modifier.fillMaxWidth().defaultMinSize(minHeight = 54.dp)
+                                .clickable(role = Role.Button) { onSelect(destination) }
+                                .padding(horizontal = 8.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(destination.title, style = TextStyle(fontFamily = Fluid.body, fontSize = 15.sp, color = Fluid.foreground, fontWeight = FontWeight.Medium))
+                                Text(navLabel(destination.page), style = TextStyle(fontFamily = Fluid.body, fontSize = 12.sp, color = Fluid.muted))
+                            }
+                            Text("›", style = TextStyle(fontSize = 22.sp, color = Fluid.muted))
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.common_done), color = Fluid.aqua) } },
+    )
 }
 
 /** Hands out rise-in delays in order, so a page's parts flow in one after another. */
@@ -134,7 +240,7 @@ private fun MainActivity.Header() {
         // A small dot: green when the island is running, red (and tappable) when setup is unfinished.
         val dot by animateColorAsState(if (ready) Fluid.good else Fluid.red, Fluid.liquid(), label = "readyDot")
         val label = stringResource(if (ready) R.string.home_ready else R.string.home_setup)
-        Box(Modifier.size(44.dp).clickable(role = Role.Button) { selectPage(if (ready) "Home" else "More") }
+        Box(Modifier.size(44.dp).clickable(role = Role.Button) { selectPage(if (ready) "Home" else "Islands") }
             .semantics { contentDescription = label }, contentAlignment = Alignment.Center) {
             Box(Modifier.size(10.dp).background(dot, CircleShape))
         }
@@ -222,7 +328,14 @@ private fun MainActivity.HomePage(flow: Flow) {
             PillChip(stringResource(R.string.demo_idle)) { showIdle() }
         }
     }
-    Column(flow.next()) {
+    val timerShortcutRequester = remember { BringIntoViewRequester() }
+    LaunchedEffect(focusRequest) {
+        if (focusSection == "__timer_shortcut__") {
+            kotlinx.coroutines.delay(120L)
+            timerShortcutRequester.bringIntoView()
+        }
+    }
+    Column(flow.next().bringIntoViewRequester(timerShortcutRequester)) {
         OutlinedTextField(
             value = timerLabel, onValueChange = { timerLabel = it },
             placeholder = { Text(stringResource(R.string.timer_name_hint), color = Fluid.muted) },
@@ -594,7 +707,8 @@ private fun MainActivity.LookPage(flow: Flow) {
         SettingSwitch(stringResource(title), checked, note?.let { stringResource(it) }) { setFeature(key, it) }
     fun replay() = showDemo(demoMusic(true), if (preview.presentation == Presentation.EXPANDED) Presentation.COMPACT else Presentation.EXPANDED)
 
-    SettingsCard(stringResource(R.string.look_style), stringResource(R.string.look_note), flow.next(), startOpen = true) {
+    SettingsCard(stringResource(R.string.look_style), stringResource(R.string.look_note), flow.next(), startOpen = true,
+        openRequest = focusRequest.takeIf { focusSection == getString(R.string.look_style) }) {
         Label(stringResource(R.string.look_title))
         Segmented(listOf(IslandLook.APPLE to stringResource(R.string.look_apple), IslandLook.NOTHING to stringResource(R.string.look_nothing)), f.look) {
             IslandFeatures.setLook(this@LookPage, it); applyFeaturesUpdate(); replay()
@@ -607,7 +721,8 @@ private fun MainActivity.LookPage(flow: Flow) {
         Spacer(Modifier.height(10.dp))
         toggle(R.string.feature_pixel_scenes, "pixel_scenes", f.pixelScenes, R.string.feature_pixel_scenes_note)
     }
-    SettingsCard(stringResource(R.string.look_colours), stringResource(R.string.look_hint), flow.next()) {
+    SettingsCard(stringResource(R.string.look_colours), stringResource(R.string.look_hint), flow.next(),
+        openRequest = focusRequest.takeIf { focusSection == getString(R.string.look_colours) }) {
         SettingSwitch(stringResource(R.string.look_match), theme.enabled) { theme = theme.copy(enabled = it); applyThemeUpdate() }
         Row(Modifier.padding(top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
             val a by animateColorAsState(Color(if (theme.enabled) theme.accent else NothingStyle.red), Fluid.liquid(), label = "swatchA")
@@ -621,7 +736,8 @@ private fun MainActivity.LookPage(flow: Flow) {
         ActionButton(stringResource(R.string.look_app_styles)) { chooseAppStyle() }
         toggle(R.string.feature_bubbles, "coloured_bubbles", f.colouredBubbles, R.string.feature_bubbles_note)
     }
-    SettingsCard(stringResource(R.string.look_size), stringResource(R.string.fit_hint), flow.next()) {
+    SettingsCard(stringResource(R.string.look_size), stringResource(R.string.fit_hint), flow.next(),
+        openRequest = focusRequest.takeIf { focusSection == getString(R.string.look_size) }) {
         Note(placementExplanation())
         Segmented(listOf(IslandPlacement.AUTO to stringResource(R.string.fit_auto),
             IslandPlacement.CAMERA to stringResource(R.string.fit_camera),
@@ -670,7 +786,8 @@ private fun MainActivity.LookPage(flow: Flow) {
         toggle(R.string.feature_camera_fade, "camera_fade", f.cameraFade, R.string.feature_camera_fade_note)
         toggle(R.string.feature_idle_pill, "idle_pill", f.idlePill, R.string.feature_idle_pill_note)
     }
-    SettingsCard(stringResource(R.string.look_glass), stringResource(R.string.glass_hint), flow.next()) {
+    SettingsCard(stringResource(R.string.look_glass), stringResource(R.string.glass_hint), flow.next(),
+        openRequest = focusRequest.takeIf { focusSection == getString(R.string.look_glass) }) {
         ActionButton(stringResource(R.string.glass_choose), enabled = !wallpaperBusy) { pickWallpaper.launch("image/*") }
         val hasImage = remember(tick, wallpaperStyle) { WallpaperSkinStore.image(this@LookPage) != null }
         SettingSwitch(stringResource(R.string.glass_inside), wallpaperStyle.enabled && hasImage) { on ->
@@ -715,22 +832,26 @@ private fun MainActivity.MorePage(flow: Flow) {
     val sdk = Build.VERSION.SDK_INT
     SettingsCard(stringResource(R.string.more_setup),
         stringResource(R.string.guide_progress, SetupPlan.doneCount(state, sdk), SetupPlan.steps(sdk).size), flow.next(),
-        startOpen = !SetupPlan.ready(state, sdk)) { SetupGuideCard() }
-    SettingsCard(stringResource(R.string.more_behaviour), stringResource(R.string.feature_hide_media_note), flow.next()) {
+        startOpen = !SetupPlan.ready(state, sdk),
+        openRequest = focusRequest.takeIf { focusSection == getString(R.string.more_setup) }) { SetupGuideCard() }
+    SettingsCard(stringResource(R.string.more_behaviour), stringResource(R.string.feature_hide_media_note), flow.next(),
+        openRequest = focusRequest.takeIf { focusSection == getString(R.string.more_behaviour) }) {
         toggle(R.string.feature_hide_media, "hide_for_media", f.hideForMedia)
         toggle(R.string.feature_landscape, "landscape_see_through", f.landscapeSeeThrough, R.string.feature_landscape_note)
         toggle(R.string.feature_lock, "lock_screen", f.lockScreen, R.string.feature_lock_note)
         toggle(R.string.feature_burn_in, "burn_in", f.burnInCare, R.string.feature_burn_in_note)
         Note(stringResource(R.string.feature_tuck_note), size = 13)
     }
-    SettingsCard(stringResource(R.string.more_touch), null, flow.next()) {
+    SettingsCard(stringResource(R.string.more_touch), null, flow.next(),
+        openRequest = focusRequest.takeIf { focusSection == getString(R.string.more_touch) }) {
         toggle(R.string.haptic_tap, "haptic_tap", f.hapticTap)
         toggle(R.string.haptic_hold, "haptic_hold", f.hapticHold)
         toggle(R.string.haptic_swipe, "haptic_swipe", f.hapticSwipe)
         toggle(R.string.haptic_up, "haptic_up", f.hapticUp)
         toggle(R.string.haptic_dnd, "haptic_dnd_quiet", f.quietHapticsInDnd)
     }
-    SettingsCard(stringResource(R.string.more_permissions), stringResource(R.string.setup_fallback), flow.next()) {
+    SettingsCard(stringResource(R.string.more_permissions), stringResource(R.string.setup_fallback), flow.next(),
+        openRequest = focusRequest.takeIf { focusSection == getString(R.string.more_permissions) }) {
         ActionButton(setupLabel("overlay")) { requestOverlay() }
         ActionButton(setupLabel("notifications")) { startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS")) }
         ActionButton(setupLabel("a11y")) { openAccessibility() }
@@ -748,7 +869,8 @@ private fun MainActivity.MorePage(flow: Flow) {
             toast(getString(R.string.guide_adb_copied))
         }
     }
-    SettingsCard(stringResource(R.string.more_help), null, flow.next()) {
+    SettingsCard(stringResource(R.string.more_help), null, flow.next(),
+        openRequest = focusRequest.takeIf { focusSection == getString(R.string.more_help) }) {
         ActionButton(stringResource(R.string.play_tour)) { showOnboarding() }
         val version = remember { runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: "?" }
         Note(stringResource(R.string.guide_update_note, version), size = 13)
