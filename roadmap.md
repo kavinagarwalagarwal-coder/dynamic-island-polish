@@ -1,5 +1,7 @@
 # Current work
-- [ ] Refine native animation timing, liquid settling and gesture feedback; run focused regression tests.
+- [ ] Diagnose and fix current preview/build errors, then check native app paths for interaction and animation regressions.
+- [ ] Apply the selected cricket priority: India matches and IPL franchise matches first.
+- [ ] Refine native motion and touch feedback, and run focused regression tests.
 - [ ] Improve the root and Android READMEs with accurate setup, privacy, build and troubleshooting notes.
 - [x] Fix dead touch strip at the top: idle window is now touch-through with minimal height, touches restore instantly when an activity shows.
 - [x] Add wallpaper theming: read current wallpaper or pick an image, extract main colours, tint island accents, persist and live-update the overlay.

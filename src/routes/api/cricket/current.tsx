@@ -23,7 +23,7 @@ export const Route = createFileRoute("/api/cricket/current")({
   server: {
     handlers: {
       GET: async () => {
-        const apiKey = process.env.CRICAPI_API_KEY;
+        const apiKey = process.env["CRICAPI_API_KEY"];
         if (!apiKey) {
           return Response.json(
             { error: "Cricket score service is not configured" },
